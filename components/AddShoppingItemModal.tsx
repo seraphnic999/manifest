@@ -82,7 +82,7 @@ export default function AddShoppingItemModal({
             <Text style={styles.sheetTitle}>{editId ? "Edit shopping item" : "Add shopping item"}</Text>
 
             <Text style={styles.label}>Name</Text>
-            <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Olive oil, perfume\u2026" />
+            <TextInput style={styles.input} value={name} onChangeText={setName} placeholder={"Olive oil, perfume\u2026"} />
 
             <Text style={styles.label}>Quantity</Text>
             <TextInput style={styles.input} value={quantity} onChangeText={setQuantity} keyboardType="number-pad" />

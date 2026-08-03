@@ -26,6 +26,7 @@ export default function EditItem() {
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
   const [vendor, setVendor] = useState("");
+  const [flightNumber, setFlightNumber] = useState("");
   const [bookingSource, setBookingSource] = useState("");
   const [confirmationCode, setConfirmationCode] = useState("");
   const [link, setLink] = useState("");
@@ -55,6 +56,7 @@ export default function EditItem() {
       setAddress(item.address ?? "");
       setPhone(item.phone ?? "");
       setVendor(item.vendor ?? "");
+      setFlightNumber((item.custom_fields as any)?.flight_number ?? "");
       setBookingSource(item.booking_source ?? "");
       setConfirmationCode(item.confirmation_code ?? "");
       setLink(item.link ?? "");
@@ -91,6 +93,7 @@ export default function EditItem() {
       confirmation_code: confirmationCode || null,
       link: link || null,
       notes: notes || null,
+      custom_fields: flightNumber ? { flight_number: flightNumber } : {},
     }).eq("id", itemId);
     setSaving(false);
     if (error) { Alert.alert("Couldn't save", error.message); return; }
@@ -187,6 +190,10 @@ export default function EditItem() {
       {has("vendor") && (
         <><Text style={styles.label}>Vendor</Text>
         <TextInput style={styles.input} value={vendor} onChangeText={setVendor} /></>
+      )}
+      {has("flightNumber") && (
+        <><Text style={styles.label}>Flight number</Text>
+        <TextInput style={styles.input} value={flightNumber} onChangeText={setFlightNumber} autoCapitalize="characters" /></>
       )}
       {has("address") && (
         <><Text style={styles.label}>Address</Text>

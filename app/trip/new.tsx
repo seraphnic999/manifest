@@ -140,7 +140,7 @@ export default function NewTrip() {
       <Stack.Screen options={{ title: "New Trip" }} />
 
       <Text style={styles.label}>Trip name</Text>
-      <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Barcelona & Cruise" />
+      <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="e.g. Summer road trip" />
 
       <View style={styles.row}>
         <DateField label="Start date" value={startDate} onChange={setStartDate} />
@@ -185,14 +185,19 @@ export default function NewTrip() {
 
       <Modal visible={tzPickerOpen} transparent animationType="fade">
         <Pressable style={styles.modalBackdrop} onPress={() => setTzPickerOpen(false)}>
-          <View style={styles.modalCard}>
-            {COMMON_TIMEZONES.map((tz) => (
-              <Pressable key={tz} style={styles.modalRow} onPress={() => { setTimezone(tz); setTzPickerOpen(false); }}>
-                <Text style={styles.modalRowText}>{tz}</Text>
-                <Text style={styles.offsetText}>{tzOffsetLabel(tz)}</Text>
-              </Pressable>
-            ))}
-          </View>
+          <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
+            <ScrollView style={{ maxHeight: 420 }}>
+              {COMMON_TIMEZONES.map((tz) => (
+                <Pressable key={tz} style={styles.modalRow} onPress={() => { setTimezone(tz); setTzPickerOpen(false); }}>
+                  <Text style={styles.modalRowText}>{tz}</Text>
+                  <Text style={styles.offsetText}>{tzOffsetLabel(tz)}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+            <Pressable onPress={() => { setTzPickerOpen(false); setCustomTz(true); }}>
+              <Text style={styles.linkText}>Not listed? Type a custom timezone instead</Text>
+            </Pressable>
+          </Pressable>
         </Pressable>
       </Modal>
 
@@ -205,12 +210,13 @@ export default function NewTrip() {
       {currencies.map((c) => (
         <View key={c.code} style={styles.currencyRow}>
           <Text style={styles.currencyCode}>{c.code}</Text>
-          <Text style={styles.currencyRate}>{c.rate} -> NIS</Text>
+          <Text style={styles.currencyRate}>{c.rate} -&gt; NIS</Text>
           <Pressable onPress={() => removeCurrency(c.code)}>
             <Text style={styles.removeText}>Remove</Text>
           </Pressable>
         </View>
       ))}
+      <Text style={styles.hint}>Tap a common one below, or type any currency code directly.</Text>
       <View style={styles.currencyChipRow}>
         {COMMON_CURRENCIES.filter((c) => !currencies.some((r) => r.code === c)).map((c) => (
           <Pressable key={c} style={styles.currencyChip} onPress={() => setNewCode(c)}>
@@ -223,7 +229,7 @@ export default function NewTrip() {
           style={[styles.input, { flex: 1 }]}
           value={newCode}
           onChangeText={setNewCode}
-          placeholder="Code"
+          placeholder="Code (e.g. USD)"
           autoCapitalize="characters"
           maxLength={3}
         />

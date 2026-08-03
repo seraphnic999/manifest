@@ -73,15 +73,15 @@ begin
     (v_trip_id, d16, v_cruise, 'lodging', 'Check out - Legend of the Seas', null, 'booked', 100);
 
   -- ---------- 05/08 Wed - Flight in + Barcelona ----------
-  insert into items (trip_id, day_id, type, title, time_start, time_end, vendor, confirmation_code, address, phone, booking_source, status, notes, sort_order) values
-  (v_trip_id, d05, 'flight',      'TLV to BCN',                     '05:25', '09:25', 'LY393', 'XWKTMD', null, null, null, 'booked', null, 100),
-  (v_trip_id, d05, 'transfer',    'Transfeero to apartment',        null,    null,    'Transfeero', '78580592', null, null, null, 'booked', null, 200),
-  (v_trip_id, d05, 'meal',        'Dunkin Donuts',                  null,    null,    null, null, null, null, null, 'booked', null, 300),
-  (v_trip_id, d05, 'sightseeing', 'Big Fun Museum',                 null,    null,    null, null, null, null, null, 'booked', null, 400),
-  (v_trip_id, d05, 'meal',        'Lunch - Macchina (Italian)',     null,    null,    null, null, null, null, null, 'booked', null, 500),
-  (v_trip_id, d05, 'sightseeing', 'La Boqueria / Rambla',           null,    null,    null, null, null, null, null, 'booked', null, 600),
-  (v_trip_id, d05, 'activity',    'Tuk Tuk Tour',                  '16:00', '18:00', 'Hola TukTuk', null, 'Carrer d''Arago 414, Eixample', null, 'GetYourGuide', 'booked', null, 700),
-  (v_trip_id, d05, 'meal',        'Dinner - Xiringuito Scribe',     '20:00', null,    null, null, null, null, null, 'booked', null, 800);
+  insert into items (trip_id, day_id, type, title, time_start, time_end, vendor, confirmation_code, address, phone, booking_source, status, notes, sort_order, custom_fields) values
+  (v_trip_id, d05, 'flight',      'TLV to BCN',                     '05:25', '09:25', 'El Al', 'XWKTMD', null, null, null, 'booked', null, 100, '{"flight_number": "LY393"}'),
+  (v_trip_id, d05, 'transfer',    'Transfeero to apartment',        null,    null,    'Transfeero', '78580592', null, null, null, 'booked', null, 200, '{}'),
+  (v_trip_id, d05, 'meal',        'Dunkin Donuts',                  null,    null,    null, null, null, null, null, 'booked', null, 300, '{}'),
+  (v_trip_id, d05, 'sightseeing', 'Big Fun Museum',                 null,    null,    null, null, null, null, null, 'booked', null, 400, '{}'),
+  (v_trip_id, d05, 'meal',        'Lunch - Macchina (Italian)',     null,    null,    null, null, null, null, null, 'booked', null, 500, '{}'),
+  (v_trip_id, d05, 'sightseeing', 'La Boqueria / Rambla',           null,    null,    null, null, null, null, null, 'booked', null, 600, '{}'),
+  (v_trip_id, d05, 'activity',    'Tuk Tuk Tour',                  '16:00', '18:00', 'Hola TukTuk', null, 'Carrer d''Arago 414, Eixample', null, 'GetYourGuide', 'booked', null, 700, '{}'),
+  (v_trip_id, d05, 'meal',        'Dinner - Xiringuito Scribe',     '20:00', null,    null, null, null, null, null, 'booked', null, 800, '{}');
 
   -- ---------- 06/08 Thu - Barcelona ----------
   insert into items (trip_id, day_id, type, title, time_start, time_end, vendor, confirmation_code, address, phone, booking_source, status, notes, sort_order) values
@@ -170,9 +170,9 @@ begin
   (v_trip_id, d15, 'activity', 'Charlie and the Chocolate Factory',  '20:30', null, null, null, null, null, null, 'booked', null, 200);
 
   -- ---------- 16/08 Sun - Barcelona + flight home ----------
-  insert into items (trip_id, day_id, type, title, time_start, time_end, vendor, confirmation_code, address, phone, booking_source, status, notes, sort_order) values
-  (v_trip_id, d16, 'other',       'Locker near Placa Catalunya', null,    null, null, null, null, null, null, 'pending', 'Need to book', 200),
-  (v_trip_id, d16, 'sightseeing', 'Bunkers of Carmel or Montjuic', null,  null, null, null, null, null, null, 'idea',    null, 300),
-  (v_trip_id, d16, 'flight',      'BCN to TLV',                  '22:35', '03:40', 'LY392', 'XWKTMD', null, null, null, 'booked', 'Lands 03:40 (next day)', 400);
+  insert into items (trip_id, day_id, type, title, time_start, time_end, vendor, confirmation_code, address, phone, booking_source, status, notes, sort_order, custom_fields) values
+  (v_trip_id, d16, 'other',       'Locker near Placa Catalunya', null,    null, null, null, null, null, null, 'pending', 'Need to book', 200, '{}'),
+  (v_trip_id, d16, 'sightseeing', 'Bunkers of Carmel or Montjuic', null,  null, null, null, null, null, null, 'idea',    null, 300, '{}'),
+  (v_trip_id, d16, 'flight',      'BCN to TLV',                  '22:35', '03:40', 'El Al', 'XWKTMD', null, null, null, 'booked', 'Lands 03:40 (next day)', 400, '{"flight_number": "LY392"}');
 
 end $$;

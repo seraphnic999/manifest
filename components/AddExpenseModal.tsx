@@ -206,7 +206,7 @@ export default function AddExpenseModal({
                 <DateField label="Date" value={date} onChange={setDate} />
 
                 <Text style={styles.label}>Note</Text>
-                <TextInput style={styles.input} value={note} onChangeText={setNote} placeholder="Duty free, dinner, taxi\u2026" />
+                <TextInput style={styles.input} value={note} onChangeText={setNote} placeholder={"Duty free, dinner, taxi\u2026"} />
 
                 {!(presetItemId && !expenseId) && (
                   <>
@@ -224,7 +224,7 @@ export default function AddExpenseModal({
                       )}
                       {linkedItemId && (
                         <Pressable onPress={() => { onClose(); router.push(`/item/${linkedItemId}`); }}>
-                          <Text style={styles.viewLinkText}>View item \u2192</Text>
+                          <Text style={styles.viewLinkText}>{"View item \u2192"}</Text>
                         </Pressable>
                       )}
                     </View>

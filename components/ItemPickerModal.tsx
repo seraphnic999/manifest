@@ -37,7 +37,7 @@ export default function ItemPickerModal({
             style={styles.input}
             value={search}
             onChangeText={setSearch}
-            placeholder="Search items\u2026"
+            placeholder={"Search items\u2026"}
             autoFocus
           />
           <ScrollView style={{ maxHeight: 320, marginTop: 10 }}>

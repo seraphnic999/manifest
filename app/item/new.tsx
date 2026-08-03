@@ -27,6 +27,7 @@ export default function NewItem() {
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
   const [vendor, setVendor] = useState("");
+  const [flightNumber, setFlightNumber] = useState("");
   const [bookingSource, setBookingSource] = useState("");
   const [confirmationCode, setConfirmationCode] = useState("");
   const [link, setLink] = useState("");
@@ -60,6 +61,7 @@ export default function NewItem() {
       confirmation_code: confirmationCode || null,
       link: link || null,
       notes: notes || null,
+      custom_fields: flightNumber ? { flight_number: flightNumber } : {},
     };
 
     async function siblingSortOrder(targetDayId: string, atTime: string | null) {
@@ -183,8 +185,12 @@ export default function NewItem() {
       </View>
 
       {has("vendor") && (
-        <><Text style={styles.label}>{cat.key === "flight" ? "Airline / flight no." : "Vendor"}</Text>
+        <><Text style={styles.label}>{cat.key === "flight" ? "Airline" : "Vendor"}</Text>
         <TextInput style={styles.input} value={vendor} onChangeText={setVendor} /></>
+      )}
+      {has("flightNumber") && (
+        <><Text style={styles.label}>Flight number</Text>
+        <TextInput style={styles.input} value={flightNumber} onChangeText={setFlightNumber} placeholder="LY393" autoCapitalize="characters" /></>
       )}
       {has("address") && (
         <><Text style={styles.label}>Address</Text>

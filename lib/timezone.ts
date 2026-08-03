@@ -16,8 +16,14 @@ export function tzOffsetLabel(tz: string): string {
 }
 
 export const COMMON_TIMEZONES = [
-  "Asia/Jerusalem", "Europe/London", "Europe/Bucharest", "Europe/Madrid",
-  "Europe/Rome", "Europe/Paris", "America/New_York", "Asia/Tokyo",
+  "Asia/Jerusalem", "Europe/London", "Europe/Paris", "Europe/Madrid",
+  "Europe/Rome", "Europe/Bucharest", "Europe/Athens", "Europe/Berlin",
+  "Europe/Amsterdam", "Europe/Lisbon", "Europe/Istanbul", "Europe/Moscow",
+  "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles",
+  "America/Toronto", "America/Mexico_City", "America/Sao_Paulo",
+  "Asia/Tokyo", "Asia/Shanghai", "Asia/Hong_Kong", "Asia/Singapore",
+  "Asia/Bangkok", "Asia/Dubai", "Asia/Kolkata",
+  "Australia/Sydney", "Pacific/Auckland",
 ];
 
 export const COMMON_CURRENCIES = ["EUR", "USD", "GBP", "RON", "TRY", "CHF", "THB", "JPY"];

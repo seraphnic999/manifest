@@ -57,11 +57,11 @@ export default function MoneyScreen() {
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 90 }}>
         <View style={styles.summaryCard}>
           <Text style={styles.totalLabel}>Total spent (NIS)</Text>
-          <Text style={styles.totalAmt}>\u20aa {totalNis.toFixed(0)}</Text>
+          <Text style={styles.totalAmt}>{"\u20aa"} {totalNis.toFixed(0)}</Text>
           {Object.entries(owedByParty).map(([partyId, amt]) => (
             <View key={partyId} style={styles.owedRow}>
               <Text style={styles.owedLabel}>Owed by {partyName(partyId)}</Text>
-              <Text style={styles.owedAmt}>\u20aa {amt.toFixed(0)}</Text>
+              <Text style={styles.owedAmt}>{"\u20aa"} {amt.toFixed(0)}</Text>
             </View>
           ))}
         </View>
@@ -84,7 +84,7 @@ export default function MoneyScreen() {
               <View style={{ alignItems: "flex-end" }}>
                 <Text style={styles.expenseAmt}>{e.amount} {e.currency_code}</Text>
                 {e.currency_code !== "NIS" && (
-                  <Text style={styles.expenseNis}>\u2248 {toNis(e.amount, e.currency_code).toFixed(0)} NIS</Text>
+                  <Text style={styles.expenseNis}>{"\u2248"} {toNis(e.amount, e.currency_code).toFixed(0)} NIS</Text>
                 )}
               </View>
             </Pressable>

@@ -166,7 +166,7 @@ export default function DayView() {
               style={styles.modalInput}
               value={themeDraft}
               onChangeText={setThemeDraft}
-              placeholder="e.g. At sea, Working half day\u2026"
+              placeholder={"e.g. At sea, Working half day\u2026"}
               autoFocus
             />
             <Pressable style={styles.modalSaveBtn} onPress={saveTheme}>

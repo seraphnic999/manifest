@@ -67,12 +67,23 @@ export default function TripOverview() {
             {flights.length > 0 && (
               <>
                 <Text style={styles.sectionLabel}>Flights</Text>
-                {flights.map((f) => (
-                  <Pressable key={f.id} style={styles.highlightRow} onPress={() => router.push(`/item/${f.id}`)}>
-                    <Text style={styles.highlightMono}>{f.vendor || f.title}</Text>
-                    <Text style={styles.highlightMeta}>{f.start_date ?? ""} {f.time_start ?? ""}</Text>
-                  </Pressable>
-                ))}
+                {flights.map((f) => {
+                  const flightNumber = (f.custom_fields as any)?.flight_number as string | undefined;
+                  return (
+                    <Pressable key={f.id} style={styles.flightRow} onPress={() => router.push(`/item/${f.id}`)}>
+                      <View style={styles.flightTimeCol}>
+                        <Text style={styles.flightTimeText}>{f.time_start ?? "\u2014"}</Text>
+                        <Text style={styles.flightDateText}>{f.start_date ?? ""}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.highlightTitle}>{f.title}</Text>
+                        <Text style={styles.highlightMeta}>
+                          {[f.vendor, flightNumber].filter(Boolean).join(" \u00b7 ") || "No airline set"}
+                        </Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
               </>
             )}
 
@@ -80,9 +91,15 @@ export default function TripOverview() {
               <>
                 <Text style={styles.sectionLabel}>Lodging</Text>
                 {lodgings.map((l) => (
-                  <Pressable key={l.id} style={styles.highlightRow} onPress={() => router.push(`/item/${l.id}`)}>
-                    <Text style={styles.highlightTitle}>{l.title}</Text>
-                    <Text style={styles.highlightMeta}>{l.start_date} {"\u2192"} {l.end_date}</Text>
+                  <Pressable key={l.id} style={styles.flightRow} onPress={() => router.push(`/item/${l.id}`)}>
+                    <View style={styles.flightTimeCol}>
+                      <Text style={styles.flightTimeText}>{l.time_start ?? "\u2014"}</Text>
+                      <Text style={styles.flightDateText}>{l.start_date ?? ""}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.highlightTitle}>{l.title}</Text>
+                      <Text style={styles.highlightMeta}>Until {l.end_date}</Text>
+                    </View>
                   </Pressable>
                 ))}
               </>
@@ -135,9 +152,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,
     borderRadius: radius.md, padding: 12, marginBottom: 6,
   },
+  flightRow: {
+    flexDirection: "row", alignItems: "center", backgroundColor: colors.paperRaised,
+    borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, marginBottom: 6, overflow: "hidden",
+  },
+  flightTimeCol: {
+    width: 72, alignSelf: "stretch", backgroundColor: colors.ink,
+    alignItems: "center", justifyContent: "center", paddingVertical: 10,
+  },
+  flightTimeText: { fontFamily: "IBMPlexMono_500Medium", color: colors.paper, fontWeight: "700", fontSize: 13 },
+  flightDateText: { fontFamily: "IBMPlexMono_500Medium", color: colors.amberSoft, fontSize: 9, marginTop: 2 },
   highlightMono: { fontFamily: "IBMPlexMono_500Medium", color: colors.ink, fontWeight: "600", fontSize: 13 },
-  highlightTitle: { color: colors.ink, fontWeight: "600", fontSize: 13 },
-  highlightMeta: { color: colors.inkSoft, fontSize: 11 },
+  highlightTitle: { color: colors.ink, fontWeight: "600", fontSize: 13, paddingLeft: 12, paddingTop: 10 },
+  highlightMeta: { color: colors.inkSoft, fontSize: 11, paddingLeft: 12, paddingBottom: 10, paddingTop: 2 },
   dayRow: {
     backgroundColor: colors.paperRaised,
     borderWidth: 1, borderColor: colors.line,
