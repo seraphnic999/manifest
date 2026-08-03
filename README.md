@@ -45,15 +45,23 @@ item editing/delete (soft), drag-and-drop reordering, day titles, trip
 summary/overview page, lodging check-in/out auto-move, photo upload per
 item, expenses with split allocations and owed-by-party rollup, expenses
 linked to items (from either the Money screen's item picker or directly
-on an item's details page — an item can have multiple expenses).
+on an item's details page — an item can have multiple expenses), shopping
+list (general or linked to an activity) with bought-status derived from
+linked expense allocations, and expense splits linkable to both a party
+and a shopping list item per row.
 
 Still TODO:
-- Shop tab (shopping list, linked to items/expenses)
 - Alternatives ("pick one of") UI
 - Multi-leg sub-step UI (note: needs its own relationship, since
   parent_item_id is now used for lodging check-in/out linkage too)
 - PDF itinerary export
 - Trip editing (currently create-only)
+- Editing/deleting shopping list items and expenses from the Money/
+  Shopping screens (expense editing currently only works via the item
+  details page's Edit action on the item itself, not on the expense row)
+- Quick "add to shopping list" shortcut directly from an item's details
+  page (currently only via the Shopping screen's own add form, using the
+  item picker to link back)
 
 See `supabase/schema.sql` comments for the intended app-level logic behind
 allocations, lodging spans, timezones, and soft delete.

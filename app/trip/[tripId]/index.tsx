@@ -59,6 +59,10 @@ export default function TripOverview() {
                 {totalNis === null ? "\u2014" : `\u20aa ${totalNis.toFixed(0)}`}
               </Text>
             </Pressable>
+            <Pressable style={styles.shoppingRow} onPress={() => router.push(`/trip/${tripId}/shopping`)}>
+              <Text style={styles.shoppingLabel}>Shopping list</Text>
+              <Text style={styles.shoppingArrow}>{"\u2192"}</Text>
+            </Pressable>
 
             {flights.length > 0 && (
               <>
@@ -115,6 +119,13 @@ const styles = StyleSheet.create({
   },
   moneyLabel: { color: colors.amberSoft, fontWeight: "700", fontSize: 13 },
   moneyAmt: { color: colors.paper, fontWeight: "800", fontSize: 16, fontFamily: "IBMPlexMono_500Medium" },
+  shoppingRow: {
+    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+    backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,
+    borderRadius: radius.md, padding: 14, marginTop: 8,
+  },
+  shoppingLabel: { color: colors.ink, fontWeight: "700", fontSize: 13 },
+  shoppingArrow: { color: colors.inkSoft, fontSize: 14 },
   sectionLabel: {
     color: colors.inkSoft, fontWeight: "700", fontSize: 12,
     textTransform: "uppercase", letterSpacing: 1, marginTop: 18, marginBottom: 8,
