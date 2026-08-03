@@ -9,7 +9,7 @@
 
 do $$
 declare
-  v_user_id  uuid := 'PASTE-YOUR-USER-ID-HERE';
+  v_user_id  uuid := '027c3ff2-90b0-4a4c-ab90-b96afebea27c';
   v_trip_id  uuid;
   v_airbnb   uuid;
   v_cruise   uuid;
