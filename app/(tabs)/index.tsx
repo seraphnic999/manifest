@@ -36,8 +36,15 @@ export default function TripList() {
   return (
     <View style={styles.container}>
       <View style={styles.topbar}>
-        <Text style={styles.eyebrow}>YOUR TRIPS</Text>
-        <Text style={styles.title}>Where next?</Text>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end" }}>
+          <View>
+            <Text style={styles.eyebrow}>YOUR TRIPS</Text>
+            <Text style={styles.title}>Where next?</Text>
+          </View>
+          <Pressable style={styles.newButton} onPress={() => router.push("/trip/new")}>
+            <Text style={styles.newButtonText}>+ New trip</Text>
+          </Pressable>
+        </View>
       </View>
       <FlatList
         contentContainerStyle={{ padding: 16 }}
@@ -94,4 +101,6 @@ const styles = StyleSheet.create({
   cardTitle: { color: colors.ink, fontWeight: "700", fontSize: 18, marginTop: 4 },
   dates: { color: colors.inkSoft, fontSize: 12, marginTop: 2 },
   empty: { textAlign: "center", color: colors.inkSoft, marginTop: 40 },
+  newButton: { backgroundColor: colors.ink, borderRadius: radius.md, paddingVertical: 8, paddingHorizontal: 12 },
+  newButtonText: { color: colors.paper, fontWeight: "700", fontSize: 12 },
 });
