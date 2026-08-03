@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { View, Text, ScrollView, StyleSheet, Linking, Pressable } from "react-native";
-import { useLocalSearchParams, Stack } from "expo-router";
+import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
 import { Item } from "@/lib/types";
@@ -10,6 +10,7 @@ import { Item } from "@/lib/types";
 // notes, plus (TODO) sub-steps, alternatives, linked expenses, photos.
 export default function ItemDetails() {
   const { itemId } = useLocalSearchParams<{ itemId: string }>();
+  const router = useRouter();
   const [item, setItem] = useState<Item | null>(null);
 
   useEffect(() => {
@@ -29,7 +30,14 @@ export default function ItemDetails() {
 
   return (
     <ScrollView style={styles.container}>
-      <Stack.Screen options={{ title: item.title }} />
+      <Stack.Screen options={{
+        title: item.title,
+        headerRight: () => (
+          <Pressable onPress={() => router.push(`/item/${itemId}/edit`)}>
+            <Text style={{ color: colors.amber, fontWeight: "700" }}>Edit</Text>
+          </Pressable>
+        ),
+      }} />
       <Text style={styles.typeTag}>{item.type.toUpperCase()}</Text>
       <Text style={styles.title}>{item.title}</Text>
 

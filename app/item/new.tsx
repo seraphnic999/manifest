@@ -7,6 +7,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
 import { categoryByKey } from "@/lib/itemTypeMeta";
+import { computeInsertSortOrder } from "@/lib/reorder";
 import { ItemStatus } from "@/lib/types";
 
 const STATUSES: ItemStatus[] = ["booked", "optional", "idea", "pending"];
@@ -125,6 +126,13 @@ export default function NewItem() {
       notes: notes || null,
     };
 
+    async function siblingSortOrder(targetDayId: string, atTime: string | null) {
+      const { data: siblings } = await supabase
+        .from("items").select("id, sort_order, time_start")
+        .eq("day_id", targetDayId).is("deleted_at", null).is("parent_item_id", null);
+      return computeInsertSortOrder(siblings ?? [], atTime);
+    }
+
     if (has("lodgingDates")) {
       // The stay itself: a trip-level span item, shown at a fixed spot on
       // every day it covers — not part of the ordered day timeline.
@@ -157,14 +165,16 @@ export default function NewItem() {
           await supabase.from("items").insert({
             trip_id: tripId, day_id: checkInDay.id, parent_item_id: span.id,
             type: "lodging", title: `Check in — ${title}`, status: "booked",
-            time_start: checkInTime || null, sort_order: 999,
+            time_start: checkInTime || null,
+            sort_order: await siblingSortOrder(checkInDay.id, checkInTime || null),
           });
         }
         if (checkOutDay) {
           await supabase.from("items").insert({
             trip_id: tripId, day_id: checkOutDay.id, parent_item_id: span.id,
             type: "lodging", title: `Check out — ${title}`, status: "booked",
-            time_start: checkOutTime || null, sort_order: -1,
+            time_start: checkOutTime || null,
+            sort_order: await siblingSortOrder(checkOutDay.id, checkOutTime || null),
           });
         }
       }
@@ -173,7 +183,7 @@ export default function NewItem() {
         ...base,
         day_id: dayId,
         time_start: time || null,
-        sort_order: 999, // TODO: proper ordering UI; appends to end for now
+        sort_order: await siblingSortOrder(dayId, time || null),
       });
       if (error) {
         setSaving(false);

@@ -65,3 +65,8 @@ export const ITEM_CATEGORIES: ItemCategory[] = [
 export function categoryByKey(key: string) {
   return ITEM_CATEGORIES.find((c) => c.key === key) ?? ITEM_CATEGORIES[ITEM_CATEGORIES.length - 1];
 }
+
+/** Reverse lookup: which UI category owns a given DB item_type (for editing). */
+export function categoryForDbType(type: ItemType) {
+  return ITEM_CATEGORIES.find((c) => c.dbTypes.includes(type)) ?? ITEM_CATEGORIES[ITEM_CATEGORIES.length - 1];
+}
