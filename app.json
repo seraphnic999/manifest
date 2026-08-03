@@ -1,0 +1,18 @@
+{
+  "expo": {
+    "name": "Manifest",
+    "slug": "manifest",
+    "scheme": "manifest",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": ["**/*"],
+    "ios": { "supportsTablet": false },
+    "android": {
+      "package": "com.seraphnic999.manifest",
+      "adaptiveIcon": { "backgroundColor": "#212F3D" }
+    },
+    "web": { "bundler": "metro", "output": "static" },
+    "plugins": ["expo-router"]
+  }
+}
