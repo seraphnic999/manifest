@@ -1,51 +1,15 @@
 import { useEffect, useState } from "react";
 import {
-  View, Text, TextInput, Pressable, StyleSheet, ScrollView, Alert, Platform,
+  View, Text, TextInput, Pressable, StyleSheet, ScrollView, Alert, Switch,
 } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
-import DateTimePicker from "@react-native-community/datetimepicker";
 import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
 import { categoryForDbType, FieldKey } from "@/lib/itemTypeMeta";
+import { DateField, TimeField } from "@/components/DateTimeFields";
 import { Item, ItemStatus } from "@/lib/types";
 
 const STATUSES: ItemStatus[] = ["booked", "optional", "idea", "pending"];
-
-function webStyle(extra = {}) {
-  return {
-    backgroundColor: colors.paperRaised, border: `1px solid ${colors.line}`,
-    borderRadius: radius.md, padding: 12, fontSize: 15, color: colors.ink,
-    width: "100%", boxSizing: "border-box" as const, fontFamily: "inherit", ...extra,
-  };
-}
-
-function TimeField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-  const [show, setShow] = useState(false);
-  if (Platform.OS === "web") {
-    return (
-      <View style={{ flex: 1 }}>
-        <Text style={styles.label}>{label}</Text>
-        {/* @ts-ignore */}
-        <input type="time" value={value} onChange={(e: any) => onChange(e.target.value)} style={webStyle()} />
-      </View>
-    );
-  }
-  return (
-    <View style={{ flex: 1 }}>
-      <Text style={styles.label}>{label}</Text>
-      <Pressable style={styles.input} onPress={() => setShow(true)}>
-        <Text style={{ color: value ? colors.ink : colors.inkSoft }}>{value || "Optional"}</Text>
-      </Pressable>
-      {show && (
-        <DateTimePicker
-          value={value ? new Date(`1970-01-01T${value}`) : new Date()}
-          mode="time"
-          onChange={(_, d) => { setShow(false); if (d) onChange(d.toTimeString().slice(0, 5)); }}
-        />
-      )}
-    </View>
-  );
-}
 
 export default function EditItem() {
   const { itemId } = useLocalSearchParams<{ itemId: string }>();
@@ -65,6 +29,12 @@ export default function EditItem() {
   const [confirmationCode, setConfirmationCode] = useState("");
   const [link, setLink] = useState("");
   const [notes, setNotes] = useState("");
+
+  // Lodging span only
+  const [checkInDate, setCheckInDate] = useState("");
+  const [checkInTime, setCheckInTime] = useState("");
+  const [checkOutDate, setCheckOutDate] = useState("");
+  const [checkOutTime, setCheckOutTime] = useState("");
 
   useEffect(() => {
     supabase.from("items").select("*").eq("id", itemId).single().then(({ data }) => {
@@ -86,6 +56,10 @@ export default function EditItem() {
       setConfirmationCode(item.confirmation_code ?? "");
       setLink(item.link ?? "");
       setNotes(item.notes ?? "");
+      setCheckInDate(item.start_date ?? "");
+      setCheckInTime(item.time_start ?? "");
+      setCheckOutDate(item.end_date ?? "");
+      setCheckOutTime(item.time_end ?? "");
       setLoaded(true);
     });
   }, [itemId]);
@@ -94,10 +68,17 @@ export default function EditItem() {
 
   async function save() {
     if (!title) { Alert.alert("Missing info", "Title is required."); return; }
+    if (isStaySpan && (!checkInDate || !checkOutDate)) {
+      Alert.alert("Missing info", "Check-in and check-out dates are required.");
+      return;
+    }
     setSaving(true);
     const { error } = await supabase.from("items").update({
       title, status,
-      time_start: time || null,
+      time_start: isStaySpan ? (checkInTime || null) : (time || null),
+      time_end: isStaySpan ? (checkOutTime || null) : undefined,
+      start_date: isStaySpan ? checkInDate : undefined,
+      end_date: isStaySpan ? checkOutDate : undefined,
       address: address || null,
       phone: phone || null,
       vendor: vendor || null,
@@ -135,7 +116,21 @@ export default function EditItem() {
       <TextInput style={styles.input} value={title} onChangeText={setTitle} />
 
       {isStaySpan ? (
-        <Text style={styles.hint}>Check-in/check-out dates aren't editable here yet — recreate the lodging item if the dates changed.</Text>
+        <>
+          <View style={styles.row}>
+            <DateField label="Check-in date" value={checkInDate} onChange={setCheckInDate} />
+            <View style={{ width: 10 }} />
+            <TimeField label="Check-in time" value={checkInTime} onChange={setCheckInTime} />
+          </View>
+          <View style={styles.row}>
+            <DateField label="Check-out date" value={checkOutDate} onChange={setCheckOutDate} />
+            <View style={{ width: 10 }} />
+            <TimeField label="Check-out time" value={checkOutTime} onChange={setCheckOutTime} />
+          </View>
+          <Text style={styles.hint}>
+            If you change these dates, any auto-created "Check in"/"Check out" items on the old days won't move automatically — edit or recreate them separately if needed.
+          </Text>
+        </>
       ) : has("time") ? (
         <TimeField label="Time (optional)" value={time} onChange={setTime} />
       ) : null}
@@ -196,6 +191,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md, padding: 12, fontSize: 15, color: colors.ink,
   },
   hint: { color: colors.inkSoft, fontSize: 11, marginTop: 6, fontStyle: "italic" },
+  row: { flexDirection: "row" },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.paperRaised },
   chipActive: { backgroundColor: colors.amber, borderColor: colors.amber },
