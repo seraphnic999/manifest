@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
 import { categoryForDbType, FieldKey } from "@/lib/itemTypeMeta";
 import { DateField, TimeField } from "@/components/DateTimeFields";
+import { computeInsertSortOrder } from "@/lib/reorder";
 import { Item, ItemStatus } from "@/lib/types";
 
 const STATUSES: ItemStatus[] = ["booked", "optional", "idea", "pending"];
@@ -35,6 +36,8 @@ export default function EditItem() {
   const [checkInTime, setCheckInTime] = useState("");
   const [checkOutDate, setCheckOutDate] = useState("");
   const [checkOutTime, setCheckOutTime] = useState("");
+  const [origCheckInDate, setOrigCheckInDate] = useState("");
+  const [origCheckOutDate, setOrigCheckOutDate] = useState("");
 
   useEffect(() => {
     supabase.from("items").select("*").eq("id", itemId).single().then(({ data }) => {
@@ -60,6 +63,8 @@ export default function EditItem() {
       setCheckInTime(item.time_start ?? "");
       setCheckOutDate(item.end_date ?? "");
       setCheckOutTime(item.time_end ?? "");
+      setOrigCheckInDate(item.start_date ?? "");
+      setOrigCheckOutDate(item.end_date ?? "");
       setLoaded(true);
     });
   }, [itemId]);
@@ -89,7 +94,42 @@ export default function EditItem() {
     }).eq("id", itemId);
     setSaving(false);
     if (error) { Alert.alert("Couldn't save", error.message); return; }
+
+    if (isStaySpan && (checkInDate !== origCheckInDate || checkOutDate !== origCheckOutDate)) {
+      await moveCheckInOutChildren();
+    }
     router.back();
+  }
+
+  // Keeps the auto-created "Check in"/"Check out" day items in sync when
+  // the stay's dates change — same trip_id, new day_id, hour untouched.
+  async function moveCheckInOutChildren() {
+    const { data: children } = await supabase
+      .from("items").select("*").eq("parent_item_id", itemId).is("deleted_at", null);
+    if (!children || children.length === 0) return;
+
+    for (const child of children as Item[]) {
+      const isCheckIn = child.title.startsWith("Check in");
+      const isCheckOut = child.title.startsWith("Check out");
+      if (!isCheckIn && !isCheckOut) continue;
+
+      const targetDate = isCheckIn ? checkInDate : checkOutDate;
+      if (!targetDate) continue;
+
+      const { data: targetDay } = await supabase
+        .from("days").select("id").eq("trip_id", child.trip_id).eq("date", targetDate).single();
+      if (!targetDay || targetDay.id === child.day_id) continue; // no day for that date, or unchanged
+
+      const { data: siblings } = await supabase
+        .from("items").select("id, sort_order, time_start")
+        .eq("day_id", targetDay.id).is("deleted_at", null);
+      // child.time_start (the hour) is left exactly as it was.
+      const newSortOrder = computeInsertSortOrder(siblings ?? [], child.time_start);
+
+      await supabase.from("items")
+        .update({ day_id: targetDay.id, sort_order: newSortOrder })
+        .eq("id", child.id);
+    }
   }
 
   async function archiveItem() {
@@ -128,7 +168,7 @@ export default function EditItem() {
             <TimeField label="Check-out time" value={checkOutTime} onChange={setCheckOutTime} />
           </View>
           <Text style={styles.hint}>
-            If you change these dates, any auto-created "Check in"/"Check out" items on the old days won't move automatically — edit or recreate them separately if needed.
+            Changing these dates will move the auto-created "Check in"/"Check out" items to the new days (their times stay the same).
           </Text>
         </>
       ) : has("time") ? (

@@ -65,7 +65,7 @@ export default function NewItem() {
     async function siblingSortOrder(targetDayId: string, atTime: string | null) {
       const { data: siblings } = await supabase
         .from("items").select("id, sort_order, time_start")
-        .eq("day_id", targetDayId).is("deleted_at", null).is("parent_item_id", null);
+        .eq("day_id", targetDayId).is("deleted_at", null);
       return computeInsertSortOrder(siblings ?? [], atTime);
     }
 

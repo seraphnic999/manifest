@@ -42,7 +42,12 @@ export default function DayView() {
     const { data: dayItems } = await supabase
       .from("items").select("*")
       .eq("day_id", day.id).is("deleted_at", null)
-      .is("parent_item_id", null)
+      // Note: not filtering out items with a parent_item_id — that field is
+      // also used to link check-in/check-out events back to their lodging
+      // span, and those DO belong in the ordered day timeline. Once true
+      // multi-leg sub-steps are added, they'll need their own way to be
+      // excluded here (e.g. a separate is_substep flag) rather than reusing
+      // parent_item_id for both relationships.
       .order("sort_order");
 
     const { data: spanningLodging } = await supabase
