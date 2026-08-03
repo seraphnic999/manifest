@@ -4,20 +4,25 @@ import { useLocalSearchParams, useRouter, Stack, useFocusEffect } from "expo-rou
 import * as ImagePicker from "expo-image-picker";
 import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
-import { Item, ItemPhoto } from "@/lib/types";
+import { Item, ItemPhoto, Expense, TripCurrency, TripParty } from "@/lib/types";
 import { uploadItemPhoto, fetchItemPhotosWithUrls, deleteItemPhoto } from "@/lib/photos";
+import AddExpenseModal from "@/components/AddExpenseModal";
 
 type PhotoWithUrl = ItemPhoto & { url: string };
 
 // Everything that's deliberately hidden from the day view lives here:
 // booking_source, vendor, link, confirmation_code, address, phone,
-// notes, photos, plus (TODO) sub-steps, alternatives, linked expenses.
+// notes, photos, expenses, plus (TODO) sub-steps, alternatives.
 export default function ItemDetails() {
   const { itemId } = useLocalSearchParams<{ itemId: string }>();
   const router = useRouter();
   const [item, setItem] = useState<Item | null>(null);
   const [photos, setPhotos] = useState<PhotoWithUrl[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [currencies, setCurrencies] = useState<TripCurrency[]>([]);
+  const [parties, setParties] = useState<TripParty[]>([]);
+  const [expenseFormOpen, setExpenseFormOpen] = useState(false);
 
   const loadItem = useCallback(() => {
     supabase.from("items").select("*").eq("id", itemId).single()
@@ -28,8 +33,21 @@ export default function ItemDetails() {
     fetchItemPhotosWithUrls(itemId).then(setPhotos);
   }, [itemId]);
 
-  useEffect(() => { loadItem(); loadPhotos(); }, [loadItem, loadPhotos]);
-  useFocusEffect(useCallback(() => { loadItem(); loadPhotos(); }, [loadItem, loadPhotos]));
+  const loadExpenses = useCallback(() => {
+    supabase.from("expenses").select("*").eq("item_id", itemId).order("expense_date", { ascending: false })
+      .then(({ data }) => data && setExpenses(data as Expense[]));
+  }, [itemId]);
+
+  useEffect(() => { loadItem(); loadPhotos(); loadExpenses(); }, [loadItem, loadPhotos, loadExpenses]);
+  useFocusEffect(useCallback(() => { loadItem(); loadPhotos(); loadExpenses(); }, [loadItem, loadPhotos, loadExpenses]));
+
+  useEffect(() => {
+    if (!item) return;
+    supabase.from("trip_currencies").select("*").eq("trip_id", item.trip_id)
+      .then(({ data }) => data && setCurrencies(data as TripCurrency[]));
+    supabase.from("trip_parties").select("*").eq("trip_id", item.trip_id)
+      .then(({ data }) => data && setParties(data as TripParty[]));
+  }, [item?.trip_id]);
 
   async function addPhoto() {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -117,6 +135,33 @@ export default function ItemDetails() {
         </Pressable>
       </ScrollView>
       {photos.length > 0 && <Text style={styles.hint}>Long-press a photo to remove it.</Text>}
+
+      <Text style={styles.sectionLabel}>Expenses</Text>
+      {expenses.map((e) => (
+        <View key={e.id} style={styles.expenseRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.expenseDesc}>{e.note || "Expense"}</Text>
+            {e.expense_date && <Text style={styles.expenseDate}>{e.expense_date}</Text>}
+          </View>
+          <Text style={styles.expenseAmt}>{e.amount} {e.currency_code}</Text>
+        </View>
+      ))}
+      {expenses.length === 0 && <Text style={styles.empty}>No expenses linked yet.</Text>}
+      <Pressable style={styles.addExpenseButton} onPress={() => setExpenseFormOpen(true)}>
+        <Text style={styles.addExpenseButtonText}>+ Add expense</Text>
+      </Pressable>
+
+      {item && (
+        <AddExpenseModal
+          visible={expenseFormOpen}
+          onClose={() => setExpenseFormOpen(false)}
+          onSaved={() => { setExpenseFormOpen(false); loadExpenses(); }}
+          tripId={item.trip_id}
+          currencies={currencies}
+          parties={parties}
+          presetItemId={item.id}
+        />
+      )}
     </ScrollView>
   );
 }
@@ -145,4 +190,17 @@ const styles = StyleSheet.create({
   },
   addPhotoText: { color: colors.inkSoft, fontWeight: "600", fontSize: 12 },
   hint: { color: colors.inkSoft, fontSize: 11, marginTop: 6, fontStyle: "italic", marginBottom: 30 },
+  expenseRow: {
+    flexDirection: "row", alignItems: "center", backgroundColor: colors.paperRaised,
+    borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, padding: 12, marginBottom: 6,
+  },
+  expenseDesc: { color: colors.ink, fontWeight: "600", fontSize: 13 },
+  expenseDate: { color: colors.inkSoft, fontSize: 11, marginTop: 2 },
+  expenseAmt: { fontFamily: "IBMPlexMono_500Medium", color: colors.ink, fontWeight: "600", fontSize: 13 },
+  empty: { color: colors.inkSoft, fontSize: 12, fontStyle: "italic", marginTop: 4 },
+  addExpenseButton: {
+    borderWidth: 1, borderColor: colors.line, borderStyle: "dashed", borderRadius: radius.md,
+    padding: 12, alignItems: "center", marginTop: 8, marginBottom: 30,
+  },
+  addExpenseButtonText: { color: colors.teal, fontWeight: "700", fontSize: 13 },
 });
