@@ -12,7 +12,7 @@
       "package": "com.seraphnic999.manifest",
       "adaptiveIcon": { "backgroundColor": "#212F3D" }
     },
-    "web": { "bundler": "metro", "output": "static" },
+    "web": { "bundler": "metro", "output": "single" },
     "plugins": [
       "expo-router",
       [
