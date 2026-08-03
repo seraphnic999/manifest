@@ -1,23 +1,97 @@
 import { useState } from "react";
 import {
-  View, Text, TextInput, Pressable, StyleSheet, ScrollView, Alert,
+  View, Text, TextInput, Pressable, StyleSheet, ScrollView, Alert, Platform, Modal,
 } from "react-native";
 import { useRouter, Stack } from "expo-router";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
 import { TripType } from "@/lib/types";
 
 const TYPES: TripType[] = ["pleasure", "business", "mixed"];
 
+const COMMON_TIMEZONES = [
+  "Asia/Jerusalem", "Europe/London", "Europe/Bucharest", "Europe/Madrid",
+  "Europe/Rome", "Europe/Paris", "America/New_York", "Asia/Tokyo",
+];
+
+interface CurrencyRow {
+  code: string;
+  rate: string; // kept as text while editing
+}
+
+// --- Cross-platform date field: native <input type="date"> on web,
+// DateTimePicker modal on native (Android/iOS). ---
+function DateField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  const [showPicker, setShowPicker] = useState(false);
+
+  if (Platform.OS === "web") {
+    return (
+      <View style={{ flex: 1 }}>
+        <Text style={styles.label}>{label}</Text>
+        {/* @ts-ignore — plain DOM input, react-native-web passes through */}
+        <input
+          type="date"
+          value={value}
+          onChange={(e: any) => onChange(e.target.value)}
+          style={webInputStyle}
+        />
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      <Text style={styles.label}>{label}</Text>
+      <Pressable style={styles.input} onPress={() => setShowPicker(true)}>
+        <Text style={{ color: value ? colors.ink : colors.inkSoft }}>{value || "Select date"}</Text>
+      </Pressable>
+      {showPicker && (
+        <DateTimePicker
+          value={value ? new Date(value) : new Date()}
+          mode="date"
+          display="default"
+          onChange={(_, selected) => {
+            setShowPicker(false);
+            if (selected) onChange(selected.toISOString().slice(0, 10));
+          }}
+        />
+      )}
+    </View>
+  );
+}
+
+const webInputStyle = {
+  backgroundColor: colors.paperRaised, border: `1px solid ${colors.line}`,
+  borderRadius: radius.md, padding: 12, fontSize: 15, color: colors.ink,
+  width: "100%", boxSizing: "border-box" as const, fontFamily: "inherit",
+};
+
 export default function NewTrip() {
   const router = useRouter();
   const [name, setName] = useState("");
-  const [startDate, setStartDate] = useState(""); // YYYY-MM-DD
+  const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [type, setType] = useState<TripType>("pleasure");
-  const [destinations, setDestinations] = useState(""); // comma-separated
+  const [destinations, setDestinations] = useState("");
   const [timezone, setTimezone] = useState("Asia/Jerusalem");
+  const [tzPickerOpen, setTzPickerOpen] = useState(false);
+  const [customTz, setCustomTz] = useState(false);
+  const [currencies, setCurrencies] = useState<CurrencyRow[]>([]); // NIS is implicit, always added
+  const [newCode, setNewCode] = useState("");
+  const [newRate, setNewRate] = useState("");
   const [saving, setSaving] = useState(false);
+
+  function addCurrency() {
+    if (!newCode || !newRate) return;
+    setCurrencies([...currencies, { code: newCode.toUpperCase(), rate: newRate }]);
+    setNewCode("");
+    setNewRate("");
+  }
+
+  function removeCurrency(code: string) {
+    setCurrencies(currencies.filter((c) => c.code !== code));
+  }
 
   async function save() {
     if (!name || !startDate || !endDate) {
@@ -45,13 +119,16 @@ export default function NewTrip() {
       return;
     }
 
-    // App-level seeding (not enforced in SQL — see schema.sql notes):
-    // 1. NIS is always the default currency.
-    await supabase.from("trip_currencies").insert({
-      trip_id: trip.id, code: "NIS", rate_to_nis: 1, is_default: true,
-    });
+    // NIS is always the default currency, plus any extra currencies added here.
+    const currencyRows = [
+      { trip_id: trip.id, code: "NIS", rate_to_nis: 1, is_default: true },
+      ...currencies.map((c) => ({
+        trip_id: trip.id, code: c.code, rate_to_nis: parseFloat(c.rate) || 1, is_default: false,
+      })),
+    ];
+    await supabase.from("trip_currencies").insert(currencyRows);
 
-    // 2. "Work" party is auto-added only for business/mixed trips.
+    // "Work" party is auto-added only for business/mixed trips.
     if (type === "business" || type === "mixed") {
       await supabase.from("trip_parties").insert({
         trip_id: trip.id, name: "Work", is_work: true,
@@ -70,15 +147,9 @@ export default function NewTrip() {
       <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Barcelona & Cruise" />
 
       <View style={styles.row}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.label}>Start date</Text>
-          <TextInput style={styles.input} value={startDate} onChangeText={setStartDate} placeholder="2026-08-05" />
-        </View>
+        <DateField label="Start date" value={startDate} onChange={setStartDate} />
         <View style={{ width: 12 }} />
-        <View style={{ flex: 1 }}>
-          <Text style={styles.label}>End date</Text>
-          <TextInput style={styles.input} value={endDate} onChangeText={setEndDate} placeholder="2026-08-16" />
-        </View>
+        <DateField label="End date" value={endDate} onChange={setEndDate} />
       </View>
 
       <Text style={styles.label}>Type</Text>
@@ -102,12 +173,72 @@ export default function NewTrip() {
       <Text style={styles.label}>Destinations (comma-separated)</Text>
       <TextInput style={styles.input} value={destinations} onChangeText={setDestinations} placeholder="Barcelona, Palma, Rome, Naples" />
 
-      <Text style={styles.label}>Default timezone (IANA name)</Text>
-      <TextInput style={styles.input} value={timezone} onChangeText={setTimezone} placeholder="Asia/Jerusalem" />
+      {/* --- Timezone --- */}
+      <Text style={styles.label}>Default timezone</Text>
+      {!customTz ? (
+        <Pressable style={styles.input} onPress={() => setTzPickerOpen(true)}>
+          <Text style={{ color: colors.ink }}>{timezone}</Text>
+        </Pressable>
+      ) : (
+        <TextInput style={styles.input} value={timezone} onChangeText={setTimezone} placeholder="e.g. Pacific/Auckland" />
+      )}
+      <Pressable onPress={() => setCustomTz(!customTz)}>
+        <Text style={styles.linkText}>{customTz ? "Choose from list instead" : "Type a custom timezone instead"}</Text>
+      </Pressable>
       <Text style={styles.hint}>New items inherit this; individual items can override it (e.g. the airport taxi in local time).</Text>
 
+      <Modal visible={tzPickerOpen} transparent animationType="fade">
+        <Pressable style={styles.modalBackdrop} onPress={() => setTzPickerOpen(false)}>
+          <View style={styles.modalCard}>
+            {COMMON_TIMEZONES.map((tz) => (
+              <Pressable key={tz} style={styles.modalRow} onPress={() => { setTimezone(tz); setTzPickerOpen(false); }}>
+                <Text style={styles.modalRowText}>{tz}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* --- Currencies --- */}
+      <Text style={styles.label}>Currencies</Text>
+      <View style={styles.currencyRow}>
+        <Text style={styles.currencyCode}>NIS</Text>
+        <Text style={styles.currencyRate}>1.000 (default)</Text>
+      </View>
+      {currencies.map((c) => (
+        <View key={c.code} style={styles.currencyRow}>
+          <Text style={styles.currencyCode}>{c.code}</Text>
+          <Text style={styles.currencyRate}>{c.rate} -> NIS</Text>
+          <Pressable onPress={() => removeCurrency(c.code)}>
+            <Text style={styles.removeText}>Remove</Text>
+          </Pressable>
+        </View>
+      ))}
+      <View style={styles.row}>
+        <TextInput
+          style={[styles.input, { flex: 1 }]}
+          value={newCode}
+          onChangeText={setNewCode}
+          placeholder="EUR"
+          autoCapitalize="characters"
+          maxLength={3}
+        />
+        <View style={{ width: 8 }} />
+        <TextInput
+          style={[styles.input, { flex: 1 }]}
+          value={newRate}
+          onChangeText={setNewRate}
+          placeholder="Rate to NIS (e.g. 4.05)"
+          keyboardType="decimal-pad"
+        />
+        <View style={{ width: 8 }} />
+        <Pressable style={styles.addCurrencyButton} onPress={addCurrency}>
+          <Text style={styles.buttonText}>Add</Text>
+        </Pressable>
+      </View>
+
       <Pressable style={styles.button} onPress={save} disabled={saving}>
-        <Text style={styles.buttonText}>{saving ? "Creating…" : "Create trip"}</Text>
+        <Text style={styles.buttonText}>{saving ? "Creating..." : "Create trip"}</Text>
       </Pressable>
     </ScrollView>
   );
@@ -120,7 +251,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,
     borderRadius: radius.md, padding: 12, fontSize: 15, color: colors.ink,
   },
-  row: { flexDirection: "row" },
+  row: { flexDirection: "row", alignItems: "center" },
   typeRow: { flexDirection: "row", gap: 8 },
   typeChip: {
     paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20,
@@ -130,6 +261,20 @@ const styles = StyleSheet.create({
   typeChipText: { color: colors.inkSoft, fontWeight: "600", fontSize: 13 },
   typeChipTextActive: { color: "#fff" },
   hint: { color: colors.inkSoft, fontSize: 11, marginTop: 6, fontStyle: "italic" },
+  linkText: { color: colors.teal, fontSize: 12, fontWeight: "600", marginTop: 8 },
   button: { backgroundColor: colors.ink, borderRadius: radius.md, padding: 14, alignItems: "center", marginTop: 28 },
   buttonText: { color: colors.paper, fontWeight: "700" },
+  modalBackdrop: { flex: 1, backgroundColor: "rgba(33,47,61,0.4)", justifyContent: "center", padding: 30 },
+  modalCard: { backgroundColor: colors.paperRaised, borderRadius: radius.lg, padding: 8 },
+  modalRow: { padding: 12, borderBottomWidth: 1, borderBottomColor: colors.line },
+  modalRowText: { color: colors.ink, fontSize: 15 },
+  currencyRow: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,
+    borderRadius: radius.md, padding: 10, marginBottom: 6,
+  },
+  currencyCode: { fontFamily: "IBMPlexMono_500Medium", fontWeight: "700", color: colors.ink, width: 44 },
+  currencyRate: { color: colors.inkSoft, fontSize: 13, flex: 1 },
+  removeText: { color: colors.coral, fontSize: 12, fontWeight: "600" },
+  addCurrencyButton: { backgroundColor: colors.teal, borderRadius: radius.md, paddingVertical: 12, paddingHorizontal: 14 },
 });
