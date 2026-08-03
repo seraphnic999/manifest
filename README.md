@@ -42,16 +42,19 @@ supabase/
 Scaffolded and wired to real data for: auth, trip list, day list, day
 itinerary, item details, item creation (type-picker + per-category forms),
 item editing/delete (soft), drag-and-drop reordering, day titles, trip
-summary/overview page, lodging check-in/out auto-move, photo upload per item.
+summary/overview page, lodging check-in/out auto-move, photo upload per
+item, expenses with split allocations and owed-by-party rollup.
 
 Still TODO:
-- Money tab (expense entry, split allocations, owed-by-party rollup)
 - Shop tab (shopping list, linked to items/expenses)
 - Alternatives ("pick one of") UI
 - Multi-leg sub-step UI (note: needs its own relationship, since
   parent_item_id is now used for lodging check-in/out linkage too)
 - PDF itinerary export
 - Trip editing (currently create-only)
+- Linking an expense to a specific item from the expense form (currently
+  expenses are trip-level only; item_id is in the schema but not yet
+  exposed in the Add Expense UI)
 
 See `supabase/schema.sql` comments for the intended app-level logic behind
 allocations, lodging spans, timezones, and soft delete.
