@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
-import { useLocalSearchParams, Stack, useFocusEffect, useRouter } from "expo-router";
+import { useLocalSearchParams, Stack, useFocusEffect } from "expo-router";
 import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
 import { TripCurrency, TripParty, Expense, Allocation } from "@/lib/types";
@@ -10,11 +10,11 @@ type ExpenseWithAllocations = Expense & { allocations: Allocation[] };
 
 export default function MoneyScreen() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
-  const router = useRouter();
   const [currencies, setCurrencies] = useState<TripCurrency[]>([]);
   const [parties, setParties] = useState<TripParty[]>([]);
   const [expenses, setExpenses] = useState<ExpenseWithAllocations[]>([]);
   const [formOpen, setFormOpen] = useState(false);
+  const [editExpenseId, setEditExpenseId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const { data: c } = await supabase.from("trip_currencies").select("*").eq("trip_id", tripId);
@@ -73,7 +73,7 @@ export default function MoneyScreen() {
             <Pressable
               key={e.id}
               style={styles.expenseRow}
-              onPress={() => e.item_id && router.push(`/item/${e.item_id}`)}
+              onPress={() => setEditExpenseId(e.id)}
             >
               <View style={{ flex: 1 }}>
                 <Text style={styles.expenseDesc}>{e.note || "Expense"}</Text>
@@ -104,6 +104,16 @@ export default function MoneyScreen() {
         tripId={tripId}
         currencies={currencies}
         parties={parties}
+      />
+
+      <AddExpenseModal
+        visible={!!editExpenseId}
+        onClose={() => setEditExpenseId(null)}
+        onSaved={() => { setEditExpenseId(null); load(); }}
+        tripId={tripId}
+        currencies={currencies}
+        parties={parties}
+        expenseId={editExpenseId ?? undefined}
       />
     </View>
   );

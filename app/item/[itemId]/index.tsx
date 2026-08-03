@@ -7,12 +7,14 @@ import { colors, radius } from "@/lib/theme";
 import { Item, ItemPhoto, Expense, TripCurrency, TripParty } from "@/lib/types";
 import { uploadItemPhoto, fetchItemPhotosWithUrls, deleteItemPhoto } from "@/lib/photos";
 import AddExpenseModal from "@/components/AddExpenseModal";
+import AddShoppingItemModal from "@/components/AddShoppingItemModal";
 
 type PhotoWithUrl = ItemPhoto & { url: string };
 
 // Everything that's deliberately hidden from the day view lives here:
 // booking_source, vendor, link, confirmation_code, address, phone,
-// notes, photos, expenses, plus (TODO) sub-steps, alternatives.
+// notes, photos, expenses, shopping list links, plus (TODO) sub-steps,
+// alternatives.
 export default function ItemDetails() {
   const { itemId } = useLocalSearchParams<{ itemId: string }>();
   const router = useRouter();
@@ -23,6 +25,17 @@ export default function ItemDetails() {
   const [currencies, setCurrencies] = useState<TripCurrency[]>([]);
   const [parties, setParties] = useState<TripParty[]>([]);
   const [expenseFormOpen, setExpenseFormOpen] = useState(false);
+  const [editExpenseId, setEditExpenseId] = useState<string | null>(null);
+  const [shoppingFormOpen, setShoppingFormOpen] = useState(false);
+  const [editShoppingId, setEditShoppingId] = useState<string | null>(null);
+  const [linkedShoppingItems, setLinkedShoppingItems] = useState<
+    { id: string; name: string; quantity: number; allocations: { id: string }[] }[]
+  >([]);
+
+  const loadShopping = useCallback(() => {
+    supabase.from("shopping_list_items").select("id, name, quantity, allocations(id)").eq("item_id", itemId)
+      .then(({ data }) => data && setLinkedShoppingItems(data as any));
+  }, [itemId]);
 
   const loadItem = useCallback(() => {
     supabase.from("items").select("*").eq("id", itemId).single()
@@ -38,8 +51,8 @@ export default function ItemDetails() {
       .then(({ data }) => data && setExpenses(data as Expense[]));
   }, [itemId]);
 
-  useEffect(() => { loadItem(); loadPhotos(); loadExpenses(); }, [loadItem, loadPhotos, loadExpenses]);
-  useFocusEffect(useCallback(() => { loadItem(); loadPhotos(); loadExpenses(); }, [loadItem, loadPhotos, loadExpenses]));
+  useEffect(() => { loadItem(); loadPhotos(); loadExpenses(); loadShopping(); }, [loadItem, loadPhotos, loadExpenses, loadShopping]);
+  useFocusEffect(useCallback(() => { loadItem(); loadPhotos(); loadExpenses(); loadShopping(); }, [loadItem, loadPhotos, loadExpenses, loadShopping]));
 
   useEffect(() => {
     if (!item) return;
@@ -138,29 +151,71 @@ export default function ItemDetails() {
 
       <Text style={styles.sectionLabel}>Expenses</Text>
       {expenses.map((e) => (
-        <View key={e.id} style={styles.expenseRow}>
+        <Pressable key={e.id} style={styles.expenseRow} onPress={() => setEditExpenseId(e.id)}>
           <View style={{ flex: 1 }}>
             <Text style={styles.expenseDesc}>{e.note || "Expense"}</Text>
             {e.expense_date && <Text style={styles.expenseDate}>{e.expense_date}</Text>}
           </View>
           <Text style={styles.expenseAmt}>{e.amount} {e.currency_code}</Text>
-        </View>
+        </Pressable>
       ))}
       {expenses.length === 0 && <Text style={styles.empty}>No expenses linked yet.</Text>}
       <Pressable style={styles.addExpenseButton} onPress={() => setExpenseFormOpen(true)}>
         <Text style={styles.addExpenseButtonText}>+ Add expense</Text>
       </Pressable>
 
+      <Text style={styles.sectionLabel}>Shopping list</Text>
+      {linkedShoppingItems.map((s) => {
+        const bought = s.allocations.length > 0;
+        return (
+          <Pressable key={s.id} style={styles.expenseRow} onPress={() => setEditShoppingId(s.id)}>
+            <View style={[styles.miniCheckbox, bought && styles.miniCheckboxChecked]} />
+            <Text style={[styles.expenseDesc, bought && styles.shoppingBought, { flex: 1 }]}>
+              {s.name}{s.quantity > 1 ? ` \u00d7${s.quantity}` : ""}
+            </Text>
+          </Pressable>
+        );
+      })}
+      {linkedShoppingItems.length === 0 && <Text style={styles.empty}>Nothing on the shopping list for this yet.</Text>}
+      <Pressable style={styles.addExpenseButton} onPress={() => setShoppingFormOpen(true)}>
+        <Text style={styles.addExpenseButtonText}>+ Add to shopping list</Text>
+      </Pressable>
+
       {item && (
-        <AddExpenseModal
-          visible={expenseFormOpen}
-          onClose={() => setExpenseFormOpen(false)}
-          onSaved={() => { setExpenseFormOpen(false); loadExpenses(); }}
-          tripId={item.trip_id}
-          currencies={currencies}
-          parties={parties}
-          presetItemId={item.id}
-        />
+        <>
+          <AddExpenseModal
+            visible={expenseFormOpen}
+            onClose={() => setExpenseFormOpen(false)}
+            onSaved={() => { setExpenseFormOpen(false); loadExpenses(); }}
+            tripId={item.trip_id}
+            currencies={currencies}
+            parties={parties}
+            presetItemId={item.id}
+          />
+          <AddExpenseModal
+            visible={!!editExpenseId}
+            onClose={() => setEditExpenseId(null)}
+            onSaved={() => { setEditExpenseId(null); loadExpenses(); }}
+            tripId={item.trip_id}
+            currencies={currencies}
+            parties={parties}
+            expenseId={editExpenseId ?? undefined}
+          />
+          <AddShoppingItemModal
+            visible={shoppingFormOpen}
+            onClose={() => setShoppingFormOpen(false)}
+            onSaved={() => { setShoppingFormOpen(false); loadShopping(); }}
+            tripId={item.trip_id}
+            presetItemId={item.id}
+          />
+          <AddShoppingItemModal
+            visible={!!editShoppingId}
+            onClose={() => setEditShoppingId(null)}
+            onSaved={() => { setEditShoppingId(null); loadShopping(); }}
+            tripId={item.trip_id}
+            editId={editShoppingId ?? undefined}
+          />
+        </>
       )}
     </ScrollView>
   );
@@ -203,4 +258,7 @@ const styles = StyleSheet.create({
     padding: 12, alignItems: "center", marginTop: 8, marginBottom: 30,
   },
   addExpenseButtonText: { color: colors.teal, fontWeight: "700", fontSize: 13 },
+  miniCheckbox: { width: 16, height: 16, borderRadius: 5, borderWidth: 2, borderColor: colors.teal, marginRight: 10 },
+  miniCheckboxChecked: { backgroundColor: colors.teal },
+  shoppingBought: { color: colors.inkSoft, textDecorationLine: "line-through" },
 });

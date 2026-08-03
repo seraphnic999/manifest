@@ -1,11 +1,11 @@
 import { useState, useCallback } from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, Modal, Alert } from "react-native";
+import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
 import { useLocalSearchParams, Stack, useFocusEffect } from "expo-router";
 import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
 import { TripCurrency, TripParty } from "@/lib/types";
-import ItemPickerModal from "@/components/ItemPickerModal";
 import AddExpenseModal from "@/components/AddExpenseModal";
+import AddShoppingItemModal from "@/components/AddShoppingItemModal";
 
 interface AllocationInfo {
   id: string;
@@ -30,6 +30,7 @@ export default function ShoppingScreen() {
   const [currencies, setCurrencies] = useState<TripCurrency[]>([]);
   const [parties, setParties] = useState<TripParty[]>([]);
   const [addFormOpen, setAddFormOpen] = useState(false);
+  const [editRowId, setEditRowId] = useState<string | null>(null);
   const [expenseTarget, setExpenseTarget] = useState<ShoppingRow | null>(null);
 
   const load = useCallback(async () => {
@@ -64,29 +65,33 @@ export default function ShoppingScreen() {
   function renderRow(row: ShoppingRow) {
     const bought = row.allocations.length > 0;
     return (
-      <Pressable
-        key={row.id}
-        style={styles.row}
-        onPress={() => !bought && setExpenseTarget(row)}
-      >
-        <View style={[styles.checkbox, bought && styles.checkboxChecked]} />
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.name, bought && styles.nameBought]}>
-            {row.name}{row.quantity > 1 ? ` \u00d7${row.quantity}` : ""}
-          </Text>
-          {row.note && <Text style={styles.note}>{row.note}</Text>}
-        </View>
-        {bought && (
-          <View style={{ alignItems: "flex-end" }}>
-            {row.allocations.map((a) => (
-              <Text key={a.id} style={styles.paid}>
-                {a.amount} {a.expenses?.currency_code ?? ""}
-                {a.party_id ? ` \u00b7 ${partyName(a.party_id)}` : ""}
-              </Text>
-            ))}
+      <View key={row.id} style={styles.row}>
+        <Pressable
+          style={styles.rowMain}
+          onPress={() => !bought && setExpenseTarget(row)}
+        >
+          <View style={[styles.checkbox, bought && styles.checkboxChecked]} />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.name, bought && styles.nameBought]}>
+              {row.name}{row.quantity > 1 ? ` \u00d7${row.quantity}` : ""}
+            </Text>
+            {row.note && <Text style={styles.note}>{row.note}</Text>}
           </View>
-        )}
-      </Pressable>
+          {bought && (
+            <View style={{ alignItems: "flex-end" }}>
+              {row.allocations.map((a) => (
+                <Text key={a.id} style={styles.paid}>
+                  {a.amount} {a.expenses?.currency_code ?? ""}
+                  {a.party_id ? ` \u00b7 ${partyName(a.party_id)}` : ""}
+                </Text>
+              ))}
+            </View>
+          )}
+        </Pressable>
+        <Pressable style={styles.editBtn} onPress={() => setEditRowId(row.id)}>
+          <Text style={styles.editBtnText}>Edit</Text>
+        </Pressable>
+      </View>
     );
   }
 
@@ -121,6 +126,14 @@ export default function ShoppingScreen() {
         tripId={tripId}
       />
 
+      <AddShoppingItemModal
+        visible={!!editRowId}
+        onClose={() => setEditRowId(null)}
+        onSaved={() => { setEditRowId(null); load(); }}
+        tripId={tripId}
+        editId={editRowId ?? undefined}
+      />
+
       {expenseTarget && (
         <AddExpenseModal
           visible={!!expenseTarget}
@@ -136,81 +149,15 @@ export default function ShoppingScreen() {
   );
 }
 
-function AddShoppingItemModal({
-  visible, onClose, onSaved, tripId,
-}: { visible: boolean; onClose: () => void; onSaved: () => void; tripId: string }) {
-  const [name, setName] = useState("");
-  const [quantity, setQuantity] = useState("1");
-  const [note, setNote] = useState("");
-  const [linkedItemId, setLinkedItemId] = useState<string | null>(null);
-  const [linkedItemTitle, setLinkedItemTitle] = useState<string | null>(null);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
-
-  async function save() {
-    if (!name) { Alert.alert("Missing info", "Enter an item name."); return; }
-    setSaving(true);
-    const { error } = await supabase.from("shopping_list_items").insert({
-      trip_id: tripId, item_id: linkedItemId, name,
-      quantity: parseInt(quantity, 10) || 1, note: note || null,
-    });
-    setSaving(false);
-    if (error) { Alert.alert("Couldn't save", error.message); return; }
-    setName(""); setQuantity("1"); setNote(""); setLinkedItemId(null); setLinkedItemTitle(null);
-    onSaved();
-  }
-
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.modalBackdrop} onPress={onClose}>
-        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-          <ScrollView contentContainerStyle={{ padding: 20 }}>
-            <Text style={styles.sheetTitle}>Add shopping item</Text>
-
-            <Text style={styles.label}>Name</Text>
-            <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Olive oil, perfume\u2026" />
-
-            <Text style={styles.label}>Quantity</Text>
-            <TextInput style={styles.input} value={quantity} onChangeText={setQuantity} keyboardType="number-pad" />
-
-            <Text style={styles.label}>Note</Text>
-            <TextInput style={styles.input} value={note} onChangeText={setNote} placeholder="Optional" />
-
-            <Text style={styles.label}>Linked activity (optional)</Text>
-            <Pressable style={styles.input} onPress={() => setPickerOpen(true)}>
-              <Text style={{ color: linkedItemTitle ? colors.ink : colors.inkSoft }}>
-                {linkedItemTitle || "General \u2014 tap to link to duty free, a mall, etc."}
-              </Text>
-            </Pressable>
-            {linkedItemId && (
-              <Pressable onPress={() => { setLinkedItemId(null); setLinkedItemTitle(null); }}>
-                <Text style={styles.removeText}>Make it general</Text>
-              </Pressable>
-            )}
-
-            <Pressable style={styles.button} onPress={save} disabled={saving}>
-              <Text style={styles.buttonText}>{saving ? "Saving\u2026" : "Add to list"}</Text>
-            </Pressable>
-          </ScrollView>
-        </Pressable>
-      </Pressable>
-
-      <ItemPickerModal
-        visible={pickerOpen}
-        onClose={() => setPickerOpen(false)}
-        onSelect={(i) => { setLinkedItemId(i.id); setLinkedItemTitle(i.title); setPickerOpen(false); }}
-        tripId={tripId}
-      />
-    </Modal>
-  );
-}
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   sectionLabel: { color: colors.inkSoft, fontWeight: "700", fontSize: 12, textTransform: "uppercase", letterSpacing: 1, marginTop: 14, marginBottom: 8 },
   row: {
-    flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.paperRaised,
-    borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, padding: 12, marginBottom: 6,
+    flexDirection: "row", alignItems: "stretch", gap: 6, marginBottom: 6,
+  },
+  rowMain: {
+    flex: 1, flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.paperRaised,
+    borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, padding: 12,
   },
   checkbox: { width: 20, height: 20, borderRadius: 6, borderWidth: 2, borderColor: colors.teal },
   checkboxChecked: { backgroundColor: colors.teal },
@@ -220,21 +167,15 @@ const styles = StyleSheet.create({
   paid: { fontFamily: "IBMPlexMono_500Medium", color: colors.teal, fontSize: 11, fontWeight: "600" },
   empty: { textAlign: "center", color: colors.inkSoft, marginTop: 30 },
   hint: { color: colors.inkSoft, fontSize: 11, fontStyle: "italic", textAlign: "center", marginTop: 16 },
+  editBtn: {
+    justifyContent: "center", paddingHorizontal: 10, borderRadius: radius.md,
+    borderWidth: 1, borderColor: colors.line, backgroundColor: colors.paperRaised,
+  },
+  editBtnText: { color: colors.inkSoft, fontWeight: "600", fontSize: 11 },
   fab: {
     position: "absolute", bottom: 20, alignSelf: "center",
     backgroundColor: colors.ink, borderRadius: 24, paddingVertical: 14, paddingHorizontal: 24,
     shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4,
   },
   fabText: { color: colors.paper, fontWeight: "700" },
-  modalBackdrop: { flex: 1, backgroundColor: "rgba(33,47,61,0.5)", justifyContent: "flex-end" },
-  sheet: { backgroundColor: colors.paper, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: "88%" },
-  sheetTitle: { fontFamily: "Archivo_700Bold" as any, fontWeight: "800", fontSize: 18, color: colors.ink, marginBottom: 12 },
-  label: { color: colors.inkSoft, fontSize: 12, fontWeight: "600", marginTop: 14, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 },
-  input: {
-    backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,
-    borderRadius: radius.md, padding: 12, fontSize: 15, color: colors.ink,
-  },
-  removeText: { color: colors.coral, fontSize: 11, fontWeight: "600", marginTop: 6 },
-  button: { backgroundColor: colors.ink, borderRadius: radius.md, padding: 14, alignItems: "center", marginTop: 24, marginBottom: 20 },
-  buttonText: { color: colors.paper, fontWeight: "700" },
 });
