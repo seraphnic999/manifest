@@ -394,4 +394,23 @@ create policy item_photos_owner on item_photos
       join trips on trips.id = items.trip_id
       where items.id = item_photos.item_id and trips.user_id = auth.uid()
     ));
+
+-- ---------- Storage: item photo files ----------
+-- Objects are stored at path "{user_id}/{item_id}/{filename}" — the policies
+-- below trust that convention to scope access without a join, since storage
+-- RLS can't easily join back to the items/trips tables per-request.
+
+insert into storage.buckets (id, name, public)
+values ('item-photos', 'item-photos', false)
+on conflict (id) do nothing;
+
+create policy item_photos_storage_owner on storage.objects
+  for all using (
+    bucket_id = 'item-photos'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  )
+  with check (
+    bucket_id = 'item-photos'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
 -- ============================================================
