@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { View, Text, FlatList, StyleSheet, Pressable } from "react-native";
-import { useLocalSearchParams, useRouter, Stack } from "expo-router";
+import { useLocalSearchParams, useRouter, Stack, useFocusEffect } from "expo-router";
 import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
 import { Item } from "@/lib/types";
+import ItemTypePickerModal from "@/components/ItemTypePickerModal";
 
 const STATUS_LABEL: Record<string, string> = {
   booked: "Booked", optional: "Optional", idea: "Idea", pending: "Pending",
@@ -12,37 +13,46 @@ const STATUS_LABEL: Record<string, string> = {
 export default function DayView() {
   const { tripId, date } = useLocalSearchParams<{ tripId: string; date: string }>();
   const [items, setItems] = useState<Item[]>([]);
+  const [dayId, setDayId] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const router = useRouter();
 
-  useEffect(() => {
-    async function load() {
-      // Resolve the day row for this date, then fetch its ordered items,
-      // plus any multi-day (lodging) items whose range touches this date.
-      const { data: day } = await supabase
-        .from("days").select("id").eq("trip_id", tripId).eq("date", date).single();
-      if (!day) return;
+  const load = useCallback(async () => {
+    // Resolve the day row for this date, then fetch its ordered items,
+    // plus any multi-day (lodging) items whose range touches this date.
+    const { data: day } = await supabase
+      .from("days").select("id").eq("trip_id", tripId).eq("date", date).single();
+    if (!day) return;
+    setDayId(day.id);
 
-      const { data: dayItems } = await supabase
-        .from("items").select("*")
-        .eq("day_id", day.id).is("deleted_at", null)
-        .is("parent_item_id", null) // top-level only; sub-steps fetched on details page
-        .order("sort_order");
+    const { data: dayItems } = await supabase
+      .from("items").select("*")
+      .eq("day_id", day.id).is("deleted_at", null)
+      .is("parent_item_id", null) // top-level only; sub-steps fetched on details page
+      .order("sort_order");
 
-      const { data: spanningLodging } = await supabase
-        .from("items").select("*")
-        .eq("trip_id", tripId).eq("is_stay_span", true).is("deleted_at", null)
-        .lte("start_date", date).gte("end_date", date);
+    const { data: spanningLodging } = await supabase
+      .from("items").select("*")
+      .eq("trip_id", tripId).eq("is_stay_span", true).is("deleted_at", null)
+      .lte("start_date", date).gte("end_date", date);
 
-      setItems([...(spanningLodging ?? []), ...(dayItems ?? [])]);
-    }
-    load();
+    setItems([...(spanningLodging ?? []), ...(dayItems ?? [])]);
   }, [tripId, date]);
+
+  useEffect(() => { load(); }, [load]);
+  // Refresh whenever we come back from the add-item form.
+  useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  function handleSelectCategory(categoryKey: string) {
+    setPickerOpen(false);
+    router.push(`/item/new?tripId=${tripId}&dayId=${dayId}&date=${date}&category=${categoryKey}`);
+  }
 
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ title: date }} />
       <FlatList
-        contentContainerStyle={{ padding: 16 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 90 }}
         data={items}
         keyExtractor={(i) => i.id}
         renderItem={({ item }) => (
@@ -52,7 +62,7 @@ export default function DayView() {
           >
             <View style={[styles.timeCol, !item.time_start && styles.timeColMuted]}>
               <Text style={styles.timeText}>
-                {item.is_stay_span ? "STAY" : item.time_start ?? "—"}
+                {item.is_stay_span ? "STAY" : item.time_start ?? "\u2014"}
               </Text>
             </View>
             <View style={styles.body}>
@@ -65,6 +75,16 @@ export default function DayView() {
           </Pressable>
         )}
         ListEmptyComponent={<Text style={styles.empty}>Nothing planned yet.</Text>}
+      />
+
+      <Pressable style={styles.fab} onPress={() => setPickerOpen(true)}>
+        <Text style={styles.fabText}>+ Add item</Text>
+      </Pressable>
+
+      <ItemTypePickerModal
+        visible={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onSelect={handleSelectCategory}
       />
     </View>
   );
@@ -86,4 +106,10 @@ const styles = StyleSheet.create({
   statusBadge: { fontSize: 9, color: colors.inkSoft, marginLeft: "auto" },
   itemTitle: { color: colors.ink, fontWeight: "600", fontSize: 14, marginTop: 2 },
   empty: { textAlign: "center", color: colors.inkSoft, marginTop: 40 },
+  fab: {
+    position: "absolute", bottom: 20, alignSelf: "center",
+    backgroundColor: colors.ink, borderRadius: 24, paddingVertical: 14, paddingHorizontal: 24,
+    shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4,
+  },
+  fabText: { color: colors.paper, fontWeight: "700" },
 });

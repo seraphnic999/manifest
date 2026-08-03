@@ -7,13 +7,9 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
 import { TripType } from "@/lib/types";
+import { tzOffsetLabel, COMMON_TIMEZONES, COMMON_CURRENCIES } from "@/lib/timezone";
 
 const TYPES: TripType[] = ["pleasure", "business", "mixed"];
-
-const COMMON_TIMEZONES = [
-  "Asia/Jerusalem", "Europe/London", "Europe/Bucharest", "Europe/Madrid",
-  "Europe/Rome", "Europe/Paris", "America/New_York", "Asia/Tokyo",
-];
 
 interface CurrencyRow {
   code: string;
@@ -177,7 +173,7 @@ export default function NewTrip() {
       <Text style={styles.label}>Default timezone</Text>
       {!customTz ? (
         <Pressable style={styles.input} onPress={() => setTzPickerOpen(true)}>
-          <Text style={{ color: colors.ink }}>{timezone}</Text>
+          <Text style={{ color: colors.ink }}>{timezone} <Text style={styles.offsetText}>({tzOffsetLabel(timezone)})</Text></Text>
         </Pressable>
       ) : (
         <TextInput style={styles.input} value={timezone} onChangeText={setTimezone} placeholder="e.g. Pacific/Auckland" />
@@ -193,6 +189,7 @@ export default function NewTrip() {
             {COMMON_TIMEZONES.map((tz) => (
               <Pressable key={tz} style={styles.modalRow} onPress={() => { setTimezone(tz); setTzPickerOpen(false); }}>
                 <Text style={styles.modalRowText}>{tz}</Text>
+                <Text style={styles.offsetText}>{tzOffsetLabel(tz)}</Text>
               </Pressable>
             ))}
           </View>
@@ -214,12 +211,19 @@ export default function NewTrip() {
           </Pressable>
         </View>
       ))}
+      <View style={styles.currencyChipRow}>
+        {COMMON_CURRENCIES.filter((c) => !currencies.some((r) => r.code === c)).map((c) => (
+          <Pressable key={c} style={styles.currencyChip} onPress={() => setNewCode(c)}>
+            <Text style={styles.currencyChipText}>{c}</Text>
+          </Pressable>
+        ))}
+      </View>
       <View style={styles.row}>
         <TextInput
           style={[styles.input, { flex: 1 }]}
           value={newCode}
           onChangeText={setNewCode}
-          placeholder="EUR"
+          placeholder="Code"
           autoCapitalize="characters"
           maxLength={3}
         />
@@ -266,8 +270,18 @@ const styles = StyleSheet.create({
   buttonText: { color: colors.paper, fontWeight: "700" },
   modalBackdrop: { flex: 1, backgroundColor: "rgba(33,47,61,0.4)", justifyContent: "center", padding: 30 },
   modalCard: { backgroundColor: colors.paperRaised, borderRadius: radius.lg, padding: 8 },
-  modalRow: { padding: 12, borderBottomWidth: 1, borderBottomColor: colors.line },
+  modalRow: {
+    padding: 12, borderBottomWidth: 1, borderBottomColor: colors.line,
+    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+  },
   modalRowText: { color: colors.ink, fontSize: 15 },
+  offsetText: { color: colors.inkSoft, fontSize: 12, fontFamily: "IBMPlexMono_500Medium" },
+  currencyChipRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 8 },
+  currencyChip: {
+    paddingVertical: 6, paddingHorizontal: 12, borderRadius: 16,
+    borderWidth: 1, borderColor: colors.line, backgroundColor: colors.paperRaised,
+  },
+  currencyChipText: { color: colors.ink, fontWeight: "600", fontSize: 12 },
   currencyRow: {
     flexDirection: "row", alignItems: "center", gap: 10,
     backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,
