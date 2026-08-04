@@ -15,6 +15,25 @@ export function tzOffsetLabel(tz: string): string {
   }
 }
 
+// Numeric offset in minutes (e.g. UTC+3 -> 180), for sorting — the display
+// label above is derived separately since Intl gives us a formatted string,
+// not a number, and re-parsing that string is more fragile than asking
+// Intl for the numeric offset directly via a second, explicit computation.
+export function tzOffsetMinutes(tz: string): number {
+  try {
+    const now = new Date();
+    const utcDate = new Date(now.toLocaleString("en-US", { timeZone: "UTC" }));
+    const tzDate = new Date(now.toLocaleString("en-US", { timeZone: tz }));
+    return Math.round((tzDate.getTime() - utcDate.getTime()) / 60000);
+  } catch {
+    return 0;
+  }
+}
+
+export function sortedByOffsetDesc(zones: string[]): string[] {
+  return [...zones].sort((a, b) => tzOffsetMinutes(b) - tzOffsetMinutes(a));
+}
+
 export const COMMON_TIMEZONES = [
   "Asia/Jerusalem", "Europe/London", "Europe/Paris", "Europe/Madrid",
   "Europe/Rome", "Europe/Bucharest", "Europe/Athens", "Europe/Berlin",

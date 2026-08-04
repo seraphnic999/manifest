@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Slot, useRouter, useSegments } from "expo-router";
+import { Stack, useRouter, useSegments } from "expo-router";
 import { Session } from "@supabase/supabase-js";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { View, Platform, StyleSheet } from "react-native";
@@ -30,7 +30,18 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={styles.outer}>
       <View style={styles.inner}>
-        <Slot />
+        <Stack
+          screenOptions={{
+            headerStyle: { backgroundColor: colors.paperRaised },
+            headerTintColor: colors.ink,
+            headerTitleStyle: { fontWeight: "700" },
+            headerBackTitle: "Back",
+            contentStyle: { backgroundColor: colors.paper },
+          }}
+        >
+          <Stack.Screen name="index" options={{ title: "Trips" }} />
+          <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
+        </Stack>
       </View>
     </GestureHandlerRootView>
   );

@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
 import { Day, Item, Trip } from "@/lib/types";
+import TripNavBar from "@/components/TripNavBar";
 
 export default function TripOverview() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
@@ -41,6 +42,7 @@ export default function TripOverview() {
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ title: "Overview" }} />
+      <TripNavBar tripId={tripId} active="overview" />
       <FlatList
         contentContainerStyle={{ padding: 16 }}
         ListHeaderComponent={

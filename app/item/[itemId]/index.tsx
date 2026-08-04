@@ -93,13 +93,28 @@ export default function ItemDetails() {
 
   if (!item) return null;
 
-  const fields: [string, string | null][] = [
-    ["Booking source", item.booking_source],
-    ["Confirmation", item.confirmation_code],
-    ["Vendor", item.vendor],
-    ["Address", item.address],
-    ["Phone", item.phone],
-  ];
+  const flightNumber = (item.custom_fields as any)?.flight_number as string | undefined;
+
+  const fields: [string, string | null][] = item.is_stay_span
+    ? [
+        ["Check-in", [item.start_date, item.time_start].filter(Boolean).join(" \u00b7 ") || null],
+        ["Check-out", [item.end_date, item.time_end].filter(Boolean).join(" \u00b7 ") || null],
+        ["Booking source", item.booking_source],
+        ["Confirmation", item.confirmation_code],
+        ["Vendor", item.vendor],
+        ["Address", item.address],
+        ["Phone", item.phone],
+      ]
+    : [
+        ["Date", item.start_date],
+        ["Time", item.time_start],
+        ["Vendor", item.vendor],
+        ["Flight number", flightNumber ?? null],
+        ["Booking source", item.booking_source],
+        ["Confirmation", item.confirmation_code],
+        ["Address", item.address],
+        ["Phone", item.phone],
+      ];
 
   return (
     <ScrollView style={styles.container}>
@@ -136,19 +151,6 @@ export default function ItemDetails() {
         </View>
       ) : null}
 
-      <Text style={styles.sectionLabel}>Photos</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4 }}>
-        {photos.map((p) => (
-          <Pressable key={p.id} onLongPress={() => removePhoto(p)} style={styles.photoWrap}>
-            <Image source={{ uri: p.url }} style={styles.photo} />
-          </Pressable>
-        ))}
-        <Pressable style={styles.addPhotoTile} onPress={addPhoto} disabled={uploading}>
-          {uploading ? <ActivityIndicator color={colors.inkSoft} /> : <Text style={styles.addPhotoText}>+ Add</Text>}
-        </Pressable>
-      </ScrollView>
-      {photos.length > 0 && <Text style={styles.hint}>Long-press a photo to remove it.</Text>}
-
       <Text style={styles.sectionLabel}>Expenses</Text>
       {expenses.map((e) => (
         <Pressable key={e.id} style={styles.expenseRow} onPress={() => setEditExpenseId(e.id)}>
@@ -180,6 +182,19 @@ export default function ItemDetails() {
       <Pressable style={styles.addExpenseButton} onPress={() => setShoppingFormOpen(true)}>
         <Text style={styles.addExpenseButtonText}>+ Add to shopping list</Text>
       </Pressable>
+
+      <Text style={styles.sectionLabel}>Photos</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4 }}>
+        {photos.map((p) => (
+          <Pressable key={p.id} onLongPress={() => removePhoto(p)} style={styles.photoWrap}>
+            <Image source={{ uri: p.url }} style={styles.photo} />
+          </Pressable>
+        ))}
+        <Pressable style={styles.addPhotoTile} onPress={addPhoto} disabled={uploading}>
+          {uploading ? <ActivityIndicator color={colors.inkSoft} /> : <Text style={styles.addPhotoText}>+ Add</Text>}
+        </Pressable>
+      </ScrollView>
+      {photos.length > 0 && <Text style={styles.hint}>Long-press a photo to remove it.</Text>}
 
       {item && (
         <>

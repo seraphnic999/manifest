@@ -23,6 +23,7 @@ export default function NewItem() {
   const [title, setTitle] = useState("");
   const [subtype, setSubtype] = useState(cat.dbTypes[0]);
   const [status, setStatus] = useState<ItemStatus>("booked");
+  const [itemDate, setItemDate] = useState(date ?? "");
   const [time, setTime] = useState("");
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
@@ -117,11 +118,23 @@ export default function NewItem() {
         }
       }
     } else {
+      let targetDayId = dayId;
+      if (itemDate && itemDate !== date) {
+        const { data: targetDay } = await supabase
+          .from("days").select("id").eq("trip_id", tripId).eq("date", itemDate).single();
+        if (!targetDay) {
+          setSaving(false);
+          Alert.alert("No such day", "That date is outside the trip's date range.");
+          return;
+        }
+        targetDayId = targetDay.id;
+      }
       const { error } = await supabase.from("items").insert({
         ...base,
-        day_id: dayId,
+        day_id: targetDayId,
+        start_date: itemDate || null,
         time_start: time || null,
-        sort_order: await siblingSortOrder(dayId, time || null),
+        sort_order: await siblingSortOrder(targetDayId, time || null),
       });
       if (error) {
         setSaving(false);
@@ -171,9 +184,13 @@ export default function NewItem() {
             <Text style={styles.switchLabel}>Also add check-in / check-out to the day timeline</Text>
           </View>
         </>
-      ) : has("time") ? (
-        <TimeField label="Time (optional)" value={time} onChange={setTime} />
-      ) : null}
+      ) : (
+        <View style={styles.row}>
+          <DateField label="Date" value={itemDate} onChange={setItemDate} />
+          <View style={{ width: 10 }} />
+          <TimeField label="Time (optional)" value={time} onChange={setTime} />
+        </View>
+      )}
 
       <Text style={styles.label}>Status</Text>
       <View style={styles.chipRow}>

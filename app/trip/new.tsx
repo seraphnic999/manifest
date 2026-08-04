@@ -7,7 +7,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
 import { TripType } from "@/lib/types";
-import { tzOffsetLabel, COMMON_TIMEZONES, COMMON_CURRENCIES } from "@/lib/timezone";
+import { tzOffsetLabel, sortedByOffsetDesc, COMMON_TIMEZONES, COMMON_CURRENCIES } from "@/lib/timezone";
 
 const TYPES: TripType[] = ["pleasure", "business", "mixed"];
 
@@ -76,6 +76,8 @@ export default function NewTrip() {
   const [currencies, setCurrencies] = useState<CurrencyRow[]>([]); // NIS is implicit, always added
   const [newCode, setNewCode] = useState("");
   const [newRate, setNewRate] = useState("");
+  const [currencyPickerOpen, setCurrencyPickerOpen] = useState(false);
+  const [customCurrencyInput, setCustomCurrencyInput] = useState("");
   const [saving, setSaving] = useState(false);
 
   function addCurrency() {
@@ -187,7 +189,7 @@ export default function NewTrip() {
         <Pressable style={styles.modalBackdrop} onPress={() => setTzPickerOpen(false)}>
           <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
             <ScrollView style={{ maxHeight: 420 }}>
-              {COMMON_TIMEZONES.map((tz) => (
+              {sortedByOffsetDesc(COMMON_TIMEZONES).map((tz) => (
                 <Pressable key={tz} style={styles.modalRow} onPress={() => { setTimezone(tz); setTzPickerOpen(false); }}>
                   <Text style={styles.modalRowText}>{tz}</Text>
                   <Text style={styles.offsetText}>{tzOffsetLabel(tz)}</Text>
@@ -216,23 +218,13 @@ export default function NewTrip() {
           </Pressable>
         </View>
       ))}
-      <Text style={styles.hint}>Tap a common one below, or type any currency code directly.</Text>
-      <View style={styles.currencyChipRow}>
-        {COMMON_CURRENCIES.filter((c) => !currencies.some((r) => r.code === c)).map((c) => (
-          <Pressable key={c} style={styles.currencyChip} onPress={() => setNewCode(c)}>
-            <Text style={styles.currencyChipText}>{c}</Text>
-          </Pressable>
-        ))}
-      </View>
+      <Text style={styles.hint}>Pick a currency, set its rate to NIS, then add it.</Text>
       <View style={styles.row}>
-        <TextInput
-          style={[styles.input, { flex: 1 }]}
-          value={newCode}
-          onChangeText={setNewCode}
-          placeholder="Code (e.g. USD)"
-          autoCapitalize="characters"
-          maxLength={3}
-        />
+        <View style={{ flex: 1 }}>
+          <Pressable style={styles.input} onPress={() => setCurrencyPickerOpen(true)}>
+            <Text style={{ color: newCode ? colors.ink : colors.inkSoft }}>{newCode || "Choose currency"}</Text>
+          </Pressable>
+        </View>
         <View style={{ width: 8 }} />
         <TextInput
           style={[styles.input, { flex: 1 }]}
@@ -246,6 +238,37 @@ export default function NewTrip() {
           <Text style={styles.buttonText}>Add</Text>
         </Pressable>
       </View>
+
+      <Modal visible={currencyPickerOpen} transparent animationType="fade">
+        <Pressable style={styles.modalBackdrop} onPress={() => setCurrencyPickerOpen(false)}>
+          <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
+            <ScrollView style={{ maxHeight: 300 }}>
+              {COMMON_CURRENCIES.filter((c) => !currencies.some((r) => r.code === c)).map((c) => (
+                <Pressable key={c} style={styles.modalRow} onPress={() => { setNewCode(c); setCurrencyPickerOpen(false); }}>
+                  <Text style={styles.modalRowText}>{c}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+            <View style={styles.currencyCustomRow}>
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                value={customCurrencyInput}
+                onChangeText={(t) => setCustomCurrencyInput(t.toUpperCase())}
+                placeholder="Other code (e.g. AED)"
+                autoCapitalize="characters"
+                maxLength={3}
+              />
+              <View style={{ width: 8 }} />
+              <Pressable
+                style={styles.addCurrencyButton}
+                onPress={() => { if (customCurrencyInput) { setNewCode(customCurrencyInput); setCustomCurrencyInput(""); setCurrencyPickerOpen(false); } }}
+              >
+                <Text style={styles.buttonText}>Use</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <Pressable style={styles.button} onPress={save} disabled={saving}>
         <Text style={styles.buttonText}>{saving ? "Creating..." : "Create trip"}</Text>
@@ -297,4 +320,5 @@ const styles = StyleSheet.create({
   currencyRate: { color: colors.inkSoft, fontSize: 13, flex: 1 },
   removeText: { color: colors.coral, fontSize: 12, fontWeight: "600" },
   addCurrencyButton: { backgroundColor: colors.teal, borderRadius: radius.md, paddingVertical: 12, paddingHorizontal: 14 },
+  currencyCustomRow: { flexDirection: "row", marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.line },
 });

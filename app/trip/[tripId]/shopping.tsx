@@ -6,6 +6,7 @@ import { colors, radius } from "@/lib/theme";
 import { TripCurrency, TripParty } from "@/lib/types";
 import AddExpenseModal from "@/components/AddExpenseModal";
 import AddShoppingItemModal from "@/components/AddShoppingItemModal";
+import TripNavBar from "@/components/TripNavBar";
 
 interface AllocationInfo {
   id: string;
@@ -98,6 +99,7 @@ export default function ShoppingScreen() {
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ title: "Shopping List" }} />
+      <TripNavBar tripId={tripId} active="shopping" />
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 90 }}>
         {general.length > 0 && (
           <>

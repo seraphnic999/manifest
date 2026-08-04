@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
 import { TripCurrency, TripParty, Expense, Allocation } from "@/lib/types";
 import AddExpenseModal from "@/components/AddExpenseModal";
+import TripNavBar from "@/components/TripNavBar";
 
 type ExpenseWithAllocations = Expense & { allocations: Allocation[] };
 
@@ -54,6 +55,7 @@ export default function MoneyScreen() {
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ title: "Money" }} />
+      <TripNavBar tripId={tripId} active="money" />
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 90 }}>
         <View style={styles.summaryCard}>
           <Text style={styles.totalLabel}>Total spent (NIS)</Text>

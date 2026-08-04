@@ -175,4 +175,12 @@ begin
   (v_trip_id, d16, 'sightseeing', 'Bunkers of Carmel or Montjuic', null,  null, null, null, null, null, null, 'idea',    null, 300, '{}'),
   (v_trip_id, d16, 'flight',      'BCN to TLV',                  '22:35', '03:40', 'El Al', 'XWKTMD', null, null, null, 'booked', 'Lands 03:40 (next day)', 400, '{"flight_number": "LY392"}');
 
+  -- Every regular day item now carries an explicit start_date (matching
+  -- its day) so date shows up consistently everywhere, not just for
+  -- lodging spans. Only fills rows that don't already have one (the
+  -- lodging spans set their own explicit start_date/end_date above).
+  update items set start_date = days.date
+  from days
+  where items.day_id = days.id and items.trip_id = v_trip_id and items.start_date is null;
+
 end $$;

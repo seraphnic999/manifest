@@ -7,6 +7,7 @@ import { colors, radius } from "@/lib/theme";
 import { Item, Day } from "@/lib/types";
 import { renumberedOrders } from "@/lib/reorder";
 import ItemTypePickerModal from "@/components/ItemTypePickerModal";
+import TripNavBar from "@/components/TripNavBar";
 
 const STATUS_LABEL: Record<string, string> = {
   booked: "Booked", optional: "Optional", idea: "Idea", pending: "Pending",
@@ -109,6 +110,8 @@ export default function DayView() {
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ title: date }} />
+
+      <TripNavBar tripId={tripId} active="day" />
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dayStrip} contentContainerStyle={{ paddingHorizontal: 12 }}>
         {allDays.map((d) => (

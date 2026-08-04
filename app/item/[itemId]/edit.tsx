@@ -22,6 +22,8 @@ export default function EditItem() {
 
   const [title, setTitle] = useState("");
   const [status, setStatus] = useState<ItemStatus>("booked");
+  const [itemDate, setItemDate] = useState("");
+  const [origItemDate, setOrigItemDate] = useState("");
   const [time, setTime] = useState("");
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
@@ -53,6 +55,8 @@ export default function EditItem() {
       setTitle(item.title);
       setStatus(item.status);
       setTime(item.time_start ?? "");
+      setItemDate(item.start_date ?? "");
+      setOrigItemDate(item.start_date ?? "");
       setAddress(item.address ?? "");
       setPhone(item.phone ?? "");
       setVendor(item.vendor ?? "");
@@ -80,11 +84,13 @@ export default function EditItem() {
       return;
     }
     setSaving(true);
+    const { data: current } = await supabase.from("items").select("trip_id, day_id").eq("id", itemId).single();
+
     const { error } = await supabase.from("items").update({
       title, status,
       time_start: isStaySpan ? (checkInTime || null) : (time || null),
       time_end: isStaySpan ? (checkOutTime || null) : undefined,
-      start_date: isStaySpan ? checkInDate : undefined,
+      start_date: isStaySpan ? checkInDate : (itemDate || null),
       end_date: isStaySpan ? checkOutDate : undefined,
       address: address || null,
       phone: phone || null,
@@ -101,7 +107,27 @@ export default function EditItem() {
     if (isStaySpan && (checkInDate !== origCheckInDate || checkOutDate !== origCheckOutDate)) {
       await moveCheckInOutChildren();
     }
+    if (!isStaySpan && itemDate && itemDate !== origItemDate && current) {
+      await moveToDay(current.trip_id, itemDate);
+    }
     router.back();
+  }
+
+  // Moves a regular (non-span) item to the day matching its new date,
+  // slotting it chronologically among that day's items — same pattern as
+  // the lodging check-in/out mover below.
+  async function moveToDay(tripId: string, newDate: string) {
+    const { data: targetDay } = await supabase
+      .from("days").select("id").eq("trip_id", tripId).eq("date", newDate).single();
+    if (!targetDay) {
+      Alert.alert("No such day", "That date is outside the trip's date range — the item's date was saved, but it wasn't moved.");
+      return;
+    }
+    const { data: siblings } = await supabase
+      .from("items").select("id, sort_order, time_start")
+      .eq("day_id", targetDay.id).is("deleted_at", null);
+    const newSortOrder = computeInsertSortOrder(siblings ?? [], time || null);
+    await supabase.from("items").update({ day_id: targetDay.id, sort_order: newSortOrder }).eq("id", itemId);
   }
 
   // Keeps the auto-created "Check in"/"Check out" day items in sync when
@@ -174,9 +200,13 @@ export default function EditItem() {
             Changing these dates will move the auto-created "Check in"/"Check out" items to the new days (their times stay the same).
           </Text>
         </>
-      ) : has("time") ? (
-        <TimeField label="Time (optional)" value={time} onChange={setTime} />
-      ) : null}
+      ) : (
+        <View style={styles.row}>
+          <DateField label="Date" value={itemDate} onChange={setItemDate} />
+          <View style={{ width: 10 }} />
+          <TimeField label="Time (optional)" value={time} onChange={setTime} />
+        </View>
+      )}
 
       <Text style={styles.label}>Status</Text>
       <View style={styles.chipRow}>
