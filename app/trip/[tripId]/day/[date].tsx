@@ -113,24 +113,26 @@ export default function DayView() {
 
       <TripNavBar tripId={tripId} active="day" />
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dayStrip} contentContainerStyle={{ paddingHorizontal: 12 }}>
-        {allDays.map((d) => (
-          <Pressable
-            key={d.id}
-            style={[styles.dayPill, d.date === date && styles.dayPillActive]}
-            onPress={() => router.replace(`/trip/${tripId}/day/${d.date}`)}
-          >
-            <Text style={[styles.dayPillText, d.date === date && styles.dayPillTextActive]}>
-              {d.date.slice(5)}
-            </Text>
-            {trimTheme(d.theme) && (
-              <Text style={[styles.dayPillTheme, d.date === date && styles.dayPillTextActive]} numberOfLines={1}>
-                {trimTheme(d.theme)}
+      <View style={styles.dayStripOuter}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dayStripContent}>
+          {allDays.map((d) => (
+            <Pressable
+              key={d.id}
+              style={[styles.dayPill, d.date === date && styles.dayPillActive]}
+              onPress={() => router.replace(`/trip/${tripId}/day/${d.date}`)}
+            >
+              <Text style={[styles.dayPillText, d.date === date && styles.dayPillTextActive]}>
+                {d.date.slice(5)}
               </Text>
-            )}
-          </Pressable>
-        ))}
-      </ScrollView>
+              {trimTheme(d.theme) && (
+                <Text style={[styles.dayPillTheme, d.date === date && styles.dayPillTextActive]} numberOfLines={1}>
+                  {trimTheme(d.theme)}
+                </Text>
+              )}
+            </Pressable>
+          ))}
+        </ScrollView>
+      </View>
 
       <Pressable style={styles.themeRow} onPress={() => { setThemeDraft(theme ?? ""); setThemeModalOpen(true); }}>
         <Text style={theme ? styles.themeText : styles.themePlaceholder}>
@@ -184,8 +186,13 @@ export default function DayView() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
-  dayStrip: { flexGrow: 0, backgroundColor: colors.paperRaised, borderBottomWidth: 1, borderBottomColor: colors.line, paddingVertical: 8 },
+  dayStripOuter: {
+    height: 56, backgroundColor: colors.paperRaised,
+    borderBottomWidth: 1, borderBottomColor: colors.line,
+  },
+  dayStripContent: { alignItems: "center", paddingHorizontal: 12 },
   dayPill: {
+    height: 40, justifyContent: "center",
     paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, marginRight: 6,
     backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.line, minWidth: 56, alignItems: "center",
   },
