@@ -105,6 +105,31 @@ export default function EditTrip() {
     ]);
   }
 
+  function deleteTrip() {
+    Alert.alert(
+      "Delete trip",
+      `Permanently delete "${name}" and everything in it — days, items, shopping list, and expenses? This can't be undone.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete", style: "destructive",
+          onPress: async () => {
+            const { error } = await supabase.from("trips").delete().eq("id", tripId);
+            if (error) {
+              Alert.alert("Couldn't delete trip", error.message);
+              return;
+            }
+            if (router.canDismiss()) {
+              router.dismissAll();
+            } else {
+              router.replace("/");
+            }
+          },
+        },
+      ]
+    );
+  }
+
   async function save() {
     if (!name || !startDate || !endDate) {
       Alert.alert("Missing info", "Name, start date, and end date are required.");
@@ -316,6 +341,10 @@ export default function EditTrip() {
       <Pressable style={styles.button} onPress={save} disabled={saving}>
         <Text style={styles.buttonText}>{saving ? "Saving…" : "Save changes"}</Text>
       </Pressable>
+
+      <Pressable style={styles.deleteButton} onPress={deleteTrip}>
+        <Text style={styles.deleteButtonText}>Delete trip</Text>
+      </Pressable>
     </ScrollView>
   );
 }
@@ -340,6 +369,11 @@ const styles = StyleSheet.create({
   linkText: { color: colors.teal, fontSize: 12, fontWeight: "600", marginTop: 8 },
   button: { backgroundColor: colors.ink, borderRadius: radius.md, padding: 14, alignItems: "center", marginTop: 28 },
   buttonText: { color: colors.paper, fontWeight: "700" },
+  deleteButton: {
+    borderWidth: 1, borderColor: colors.coral, borderRadius: radius.md,
+    padding: 14, alignItems: "center", marginTop: 12, marginBottom: 20,
+  },
+  deleteButtonText: { color: colors.coral, fontWeight: "700" },
   modalBackdrop: { flex: 1, backgroundColor: "rgba(33,47,61,0.4)", justifyContent: "center", padding: 30 },
   modalCard: { backgroundColor: colors.paperRaised, borderRadius: radius.lg, padding: 8, width: "100%", maxWidth: 420, alignSelf: "center" },
   modalRow: {
