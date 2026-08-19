@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { View, Text, TextInput, Pressable, StyleSheet, ScrollView, Alert, Modal } from "react-native";
+import { View, Text, TextInput, Pressable, StyleSheet, ScrollView, Modal } from "react-native";
+import { Alert } from "@/lib/alert";
 import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
 import ItemPickerModal from "@/components/ItemPickerModal";
@@ -126,7 +127,10 @@ export default function AddShoppingItemModal({
 
 const styles = StyleSheet.create({
   modalBackdrop: { flex: 1, backgroundColor: "rgba(33,47,61,0.5)", justifyContent: "flex-end" },
-  sheet: { backgroundColor: colors.paper, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: "88%" },
+  sheet: {
+    backgroundColor: colors.paper, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: "88%",
+    width: "100%", maxWidth: 480, alignSelf: "center",
+  },
   sheetTitle: { fontFamily: "Archivo_700Bold" as any, fontWeight: "800", fontSize: 18, color: colors.ink, marginBottom: 12 },
   label: { color: colors.inkSoft, fontSize: 12, fontWeight: "600", marginTop: 14, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 },
   input: {

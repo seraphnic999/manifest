@@ -1,13 +1,26 @@
 import { useEffect, useState, useCallback } from "react";
-import { View, Text, ScrollView, StyleSheet, Linking, Pressable, Image, ActivityIndicator, Alert } from "react-native";
+import { View, Text, ScrollView, StyleSheet, Linking, Pressable, Image, ActivityIndicator } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Alert } from "@/lib/alert";
 import { useLocalSearchParams, useRouter, Stack, useFocusEffect } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
+import * as DocumentPicker from "expo-document-picker";
+import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
 import { Item, ItemPhoto, Expense, TripCurrency, TripParty } from "@/lib/types";
-import { uploadItemPhoto, fetchItemPhotosWithUrls, deleteItemPhoto } from "@/lib/photos";
+import { uploadItemPhoto, uploadItemDocument, fetchItemPhotosWithUrls, deleteItemPhoto, isImageAttachment } from "@/lib/photos";
+import { downloadAttachment } from "@/lib/downloadAttachment";
+import { fetchLinkedItems, LinkedItemSummary } from "@/lib/itemLinks";
+import { categoryForDbType } from "@/lib/itemTypeMeta";
+import { computeDurationMinutes, formatDuration } from "@/lib/duration";
+import { formatDateDDMMYYYY, formatDateDDMM } from "@/lib/dateFormat";
+import { normalizeTimeHHMM } from "@/lib/timeFormat";
 import AddExpenseModal from "@/components/AddExpenseModal";
 import AddShoppingItemModal from "@/components/AddShoppingItemModal";
+import QuickNotesList from "@/components/QuickNotesList";
+import HeaderIconButton from "@/components/HeaderIconButton";
+import HomeButton from "@/components/HomeButton";
 
 type PhotoWithUrl = ItemPhoto & { url: string };
 
@@ -18,6 +31,7 @@ type PhotoWithUrl = ItemPhoto & { url: string };
 export default function ItemDetails() {
   const { itemId } = useLocalSearchParams<{ itemId: string }>();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [item, setItem] = useState<Item | null>(null);
   const [photos, setPhotos] = useState<PhotoWithUrl[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -31,6 +45,7 @@ export default function ItemDetails() {
   const [linkedShoppingItems, setLinkedShoppingItems] = useState<
     { id: string; name: string; quantity: number; allocations: { id: string }[] }[]
   >([]);
+  const [linkedItems, setLinkedItems] = useState<LinkedItemSummary[]>([]);
 
   const loadShopping = useCallback(() => {
     supabase.from("shopping_list_items").select("id, name, quantity, allocations(id)").eq("item_id", itemId)
@@ -51,8 +66,12 @@ export default function ItemDetails() {
       .then(({ data }) => data && setExpenses(data as Expense[]));
   }, [itemId]);
 
-  useEffect(() => { loadItem(); loadPhotos(); loadExpenses(); loadShopping(); }, [loadItem, loadPhotos, loadExpenses, loadShopping]);
-  useFocusEffect(useCallback(() => { loadItem(); loadPhotos(); loadExpenses(); loadShopping(); }, [loadItem, loadPhotos, loadExpenses, loadShopping]));
+  const loadLinkedItems = useCallback(() => {
+    fetchLinkedItems(itemId).then(setLinkedItems);
+  }, [itemId]);
+
+  useEffect(() => { loadItem(); loadPhotos(); loadExpenses(); loadShopping(); loadLinkedItems(); }, [loadItem, loadPhotos, loadExpenses, loadShopping, loadLinkedItems]);
+  useFocusEffect(useCallback(() => { loadItem(); loadPhotos(); loadExpenses(); loadShopping(); loadLinkedItems(); }, [loadItem, loadPhotos, loadExpenses, loadShopping, loadLinkedItems]));
 
   useEffect(() => {
     if (!item) return;
@@ -76,7 +95,7 @@ export default function ItemDetails() {
 
     setUploading(true);
     try {
-      await uploadItemPhoto(itemId, result.assets[0].uri);
+      await uploadItemPhoto(itemId, result.assets[0]);
       loadPhotos();
     } catch (e: any) {
       Alert.alert("Upload failed", e.message ?? "Unknown error");
@@ -84,30 +103,96 @@ export default function ItemDetails() {
     setUploading(false);
   }
 
+  async function addDocument() {
+    const result = await DocumentPicker.getDocumentAsync({ multiple: false, copyToCacheDirectory: true });
+    if (result.canceled || !result.assets?.[0]) return;
+
+    setUploading(true);
+    try {
+      await uploadItemDocument(itemId, result.assets[0]);
+      loadPhotos();
+    } catch (e: any) {
+      Alert.alert("Upload failed", e.message ?? "Unknown error");
+    }
+    setUploading(false);
+  }
+
+  function attachmentDisplayName(photo: PhotoWithUrl): string {
+    return photo.file_name || photo.storage_path.split("/").pop() || "attachment";
+  }
+
+  function openAttachment(photo: PhotoWithUrl) {
+    downloadAttachment(photo.url, attachmentDisplayName(photo)).catch((e: any) => {
+      Alert.alert("Download failed", e.message ?? "Unknown error");
+    });
+  }
+
   async function removePhoto(photo: PhotoWithUrl) {
-    Alert.alert("Remove photo", "Delete this photo?", [
+    Alert.alert("Remove attachment", "Delete this attachment?", [
       { text: "Cancel", style: "cancel" },
       { text: "Delete", style: "destructive", onPress: async () => { await deleteItemPhoto(photo); loadPhotos(); } },
+    ]);
+  }
+
+  function duplicateItem() {
+    if (!item) return;
+    const category = categoryForDbType(item.type).key;
+    const params = new URLSearchParams({
+      tripId: item.trip_id,
+      dayId: item.day_id ?? "",
+      date: item.start_date ?? "",
+      category,
+      duplicateFrom: item.id,
+    });
+    router.push(`/item/new?${params.toString()}`);
+  }
+
+  function deleteItem() {
+    Alert.alert("Delete item", "Move this item to the archive?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete", style: "destructive",
+        onPress: async () => {
+          await supabase.from("items").update({ deleted_at: new Date().toISOString() }).eq("id", itemId);
+          router.back();
+        },
+      },
     ]);
   }
 
   if (!item) return null;
 
   const flightNumber = (item.custom_fields as any)?.flight_number as string | undefined;
+  const isFlight = item.type === "flight" && !item.is_stay_span;
+  const flightDurationMinutes = isFlight
+    ? computeDurationMinutes(item.start_date, item.time_start, item.end_date, item.time_end)
+    : null;
 
   const fields: [string, string | null][] = item.is_stay_span
     ? [
-        ["Check-in", [item.start_date, item.time_start].filter(Boolean).join(" \u00b7 ") || null],
-        ["Check-out", [item.end_date, item.time_end].filter(Boolean).join(" \u00b7 ") || null],
+        ["Check-in", [formatDateDDMMYYYY(item.start_date), normalizeTimeHHMM(item.time_start)].filter(Boolean).join(" \u00b7 ") || null],
+        ["Check-out", [formatDateDDMMYYYY(item.end_date), normalizeTimeHHMM(item.time_end)].filter(Boolean).join(" \u00b7 ") || null],
         ["Booking source", item.booking_source],
         ["Confirmation", item.confirmation_code],
         ["Vendor", item.vendor],
         ["Address", item.address],
         ["Phone", item.phone],
       ]
+    : isFlight
+    ? [
+        ["Departure", [formatDateDDMMYYYY(item.start_date), normalizeTimeHHMM(item.time_start)].filter(Boolean).join(" \u00b7 ") || null],
+        ["Arrival", [formatDateDDMMYYYY(item.end_date), normalizeTimeHHMM(item.time_end)].filter(Boolean).join(" \u00b7 ") || null],
+        ["Duration", flightDurationMinutes !== null && flightDurationMinutes >= 0 ? formatDuration(flightDurationMinutes) : null],
+        ["Vendor", item.vendor],
+        ["Flight number", flightNumber ?? null],
+        ["Booking source", item.booking_source],
+        ["Confirmation", item.confirmation_code],
+        ["Address", item.address],
+        ["Phone", item.phone],
+      ]
     : [
-        ["Date", item.start_date],
-        ["Time", item.time_start],
+        ["Date", formatDateDDMMYYYY(item.start_date) || null],
+        ["Time", normalizeTimeHHMM(item.time_start) || null],
         ["Vendor", item.vendor],
         ["Flight number", flightNumber ?? null],
         ["Booking source", item.booking_source],
@@ -117,15 +202,39 @@ export default function ItemDetails() {
       ];
 
   return (
-    <ScrollView style={styles.container}>
-      <Stack.Screen options={{
-        title: item.title,
-        headerRight: () => (
-          <Pressable onPress={() => router.push(`/item/${itemId}/edit`)}>
-            <Text style={{ color: colors.amber, fontWeight: "700" }}>Edit</Text>
-          </Pressable>
-        ),
-      }} />
+    <View style={{ flex: 1, backgroundColor: colors.paper }}>
+      <Stack.Screen options={{ headerShown: false }} />
+
+      {/* A fully custom header, not react-navigation's: its web header
+          didn't reliably constrain a long title against these header-right
+          buttons — at some viewport widths the title text overflowed
+          straight past them instead of truncating, since our headerTitle
+          override's flex:1 was sized against the library's own internal
+          layout assumptions rather than this row's actual content. Owning
+          the row directly makes the title/buttons split a plain flexbox
+          fact we control. */}
+      <View style={[styles.customHeader, { paddingTop: insets.top + 10 }]}>
+        <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={8}>
+          <Ionicons name="chevron-back" size={24} color={colors.ink} />
+        </Pressable>
+        <View style={styles.customHeaderTitleWrap}>
+          <Text numberOfLines={1} ellipsizeMode="tail" style={styles.headerTitleText}>{item.title}</Text>
+        </View>
+        <View style={styles.headerButtons}>
+          <HeaderIconButton onPress={deleteItem}>
+            <Ionicons name="trash" size={16} color={colors.coral} />
+          </HeaderIconButton>
+          <HeaderIconButton onPress={duplicateItem} accessibilityLabel="Duplicate item">
+            <Ionicons name="copy-outline" size={16} color={colors.teal} />
+          </HeaderIconButton>
+          <HeaderIconButton onPress={() => router.push(`/item/${itemId}/edit`)}>
+            <Ionicons name="pencil" size={16} color={colors.amber} />
+          </HeaderIconButton>
+          <HomeButton />
+        </View>
+      </View>
+
+      <ScrollView style={styles.container}>
       <Text style={styles.typeTag}>{item.type.toUpperCase()}</Text>
       <Text style={styles.title}>{item.title}</Text>
 
@@ -144,19 +253,12 @@ export default function ItemDetails() {
         </Pressable>
       ) : null}
 
-      {item.notes ? (
-        <View style={styles.notesBox}>
-          <Text style={styles.fieldLabel}>Notes</Text>
-          <Text style={styles.notesText}>{item.notes}</Text>
-        </View>
-      ) : null}
-
       <Text style={styles.sectionLabel}>Expenses</Text>
       {expenses.map((e) => (
         <Pressable key={e.id} style={styles.expenseRow} onPress={() => setEditExpenseId(e.id)}>
           <View style={{ flex: 1 }}>
             <Text style={styles.expenseDesc}>{e.note || "Expense"}</Text>
-            {e.expense_date && <Text style={styles.expenseDate}>{e.expense_date}</Text>}
+            {e.expense_date && <Text style={styles.expenseDate}>{formatDateDDMMYYYY(e.expense_date)}</Text>}
           </View>
           <Text style={styles.expenseAmt}>{e.amount} {e.currency_code}</Text>
         </Pressable>
@@ -183,18 +285,49 @@ export default function ItemDetails() {
         <Text style={styles.addExpenseButtonText}>+ Add to shopping list</Text>
       </Pressable>
 
-      <Text style={styles.sectionLabel}>Photos</Text>
+      <QuickNotesList itemId={itemId} />
+
+      {linkedItems.length > 0 && (
+        <>
+          <Text style={styles.sectionLabel}>Linked items</Text>
+          {linkedItems.map((li) => (
+            <Pressable key={li.id} style={styles.expenseRow} onPress={() => router.push(`/item/${li.id}`)}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.expenseDesc}>{li.title}</Text>
+                <Text style={styles.expenseDate}>
+                  {[li.day_date ? formatDateDDMM(li.day_date) : null, normalizeTimeHHMM(li.time_start)].filter(Boolean).join(" · ") || li.type.toUpperCase()}
+                </Text>
+              </View>
+              <Ionicons name="arrow-forward" size={16} color={colors.inkSoft} />
+            </Pressable>
+          ))}
+        </>
+      )}
+
+      <Text style={styles.sectionLabel}>Attachments</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4 }}>
-        {photos.map((p) => (
-          <Pressable key={p.id} onLongPress={() => removePhoto(p)} style={styles.photoWrap}>
-            <Image source={{ uri: p.url }} style={styles.photo} />
-          </Pressable>
-        ))}
+        {photos.map((p) =>
+          isImageAttachment(p) ? (
+            <Pressable key={p.id} onPress={() => openAttachment(p)} onLongPress={() => removePhoto(p)} style={styles.photoWrap}>
+              <Image source={{ uri: p.url }} style={styles.photo} />
+            </Pressable>
+          ) : (
+            <Pressable key={p.id} onPress={() => openAttachment(p)} onLongPress={() => removePhoto(p)} style={styles.photoWrap}>
+              <View style={styles.fileTile}>
+                <Ionicons name="document-text" size={28} color={colors.inkSoft} />
+                <Text numberOfLines={2} style={styles.fileTileName}>{attachmentDisplayName(p)}</Text>
+              </View>
+            </Pressable>
+          )
+        )}
         <Pressable style={styles.addPhotoTile} onPress={addPhoto} disabled={uploading}>
-          {uploading ? <ActivityIndicator color={colors.inkSoft} /> : <Text style={styles.addPhotoText}>+ Add</Text>}
+          {uploading ? <ActivityIndicator color={colors.inkSoft} /> : <Text style={styles.addPhotoText}>+ Photo</Text>}
+        </Pressable>
+        <Pressable style={styles.addPhotoTile} onPress={addDocument} disabled={uploading}>
+          {uploading ? <ActivityIndicator color={colors.inkSoft} /> : <Text style={styles.addPhotoText}>+ File</Text>}
         </Pressable>
       </ScrollView>
-      {photos.length > 0 && <Text style={styles.hint}>Long-press a photo to remove it.</Text>}
+      {photos.length > 0 && <Text style={styles.hint}>Tap an attachment to download it, long-press to remove it.</Text>}
 
       {item && (
         <>
@@ -232,12 +365,21 @@ export default function ItemDetails() {
           />
         </>
       )}
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper, padding: 20 },
+  customHeader: {
+    flexDirection: "row", alignItems: "center", paddingHorizontal: 8, paddingBottom: 10,
+    backgroundColor: colors.paperRaised, borderBottomWidth: 1, borderBottomColor: colors.line,
+  },
+  backBtn: { padding: 6, marginRight: 4 },
+  customHeaderTitleWrap: { flex: 1, minWidth: 0, marginHorizontal: 4 },
+  headerButtons: { flexDirection: "row", alignItems: "center", gap: 8, marginLeft: 8 },
+  headerTitleText: { fontSize: 17, fontWeight: "700", color: colors.ink },
   typeTag: { fontFamily: "IBMPlexMono_500Medium", color: colors.teal, fontWeight: "600", fontSize: 11 },
   title: { color: colors.ink, fontWeight: "800", fontSize: 22, marginVertical: 6 },
   fieldRow: { paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.line },
@@ -245,14 +387,17 @@ const styles = StyleSheet.create({
   fieldValue: { color: colors.ink, fontSize: 15, marginTop: 2 },
   linkButton: { backgroundColor: colors.ink, borderRadius: radius.md, padding: 12, alignItems: "center", marginTop: 16 },
   linkButtonText: { color: colors.paper, fontWeight: "700" },
-  notesBox: { backgroundColor: colors.paperRaised, borderRadius: radius.md, padding: 14, marginTop: 16, borderWidth: 1, borderColor: colors.line },
-  notesText: { color: colors.ink, fontSize: 14, marginTop: 4, lineHeight: 20 },
   sectionLabel: {
     color: colors.inkSoft, fontWeight: "700", fontSize: 12,
     textTransform: "uppercase", letterSpacing: 1, marginTop: 20, marginBottom: 4,
   },
   photoWrap: { marginRight: 8 },
   photo: { width: 90, height: 90, borderRadius: radius.md, backgroundColor: colors.paperRaised },
+  fileTile: {
+    width: 90, height: 90, borderRadius: radius.md, backgroundColor: colors.paperRaised,
+    borderWidth: 1, borderColor: colors.line, alignItems: "center", justifyContent: "center", padding: 6,
+  },
+  fileTileName: { color: colors.inkSoft, fontSize: 10, textAlign: "center", marginTop: 4 },
   addPhotoTile: {
     width: 90, height: 90, borderRadius: radius.md, backgroundColor: colors.paperRaised,
     borderWidth: 1, borderColor: colors.line, borderStyle: "dashed",

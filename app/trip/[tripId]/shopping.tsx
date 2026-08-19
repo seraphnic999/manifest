@@ -1,18 +1,21 @@
 import { useState, useCallback } from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
+import { View, Text, StyleSheet, Pressable, ScrollView, Modal } from "react-native";
 import { useLocalSearchParams, Stack, useFocusEffect } from "expo-router";
 import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
 import { TripCurrency, TripParty } from "@/lib/types";
+import { formatDateDDMMYYYY } from "@/lib/dateFormat";
 import AddExpenseModal from "@/components/AddExpenseModal";
 import AddShoppingItemModal from "@/components/AddShoppingItemModal";
 import TripNavBar from "@/components/TripNavBar";
+import HomeButton from "@/components/HomeButton";
 
 interface AllocationInfo {
   id: string;
   amount: number;
   party_id: string | null;
-  expenses: { currency_code: string } | null;
+  expense_id: string;
+  expenses: { currency_code: string; note: string | null; expense_date: string | null } | null;
 }
 interface ShoppingRow {
   id: string;
@@ -33,11 +36,13 @@ export default function ShoppingScreen() {
   const [addFormOpen, setAddFormOpen] = useState(false);
   const [editRowId, setEditRowId] = useState<string | null>(null);
   const [expenseTarget, setExpenseTarget] = useState<ShoppingRow | null>(null);
+  const [editExpenseId, setEditExpenseId] = useState<string | null>(null);
+  const [relatedExpensesTarget, setRelatedExpensesTarget] = useState<ShoppingRow | null>(null);
 
   const load = useCallback(async () => {
     const { data } = await supabase
       .from("shopping_list_items")
-      .select("*, items(title), allocations(id, amount, party_id, expenses(currency_code))")
+      .select("*, items(title), allocations(id, amount, party_id, expense_id, expenses(currency_code, note, expense_date))")
       .eq("trip_id", tripId)
       .order("name");
     if (data) setRows(data as unknown as ShoppingRow[]);
@@ -63,13 +68,20 @@ export default function ShoppingScreen() {
     byActivity.set(key, [...(byActivity.get(key) ?? []), r]);
   }
 
+  function handleRowTap(row: ShoppingRow) {
+    if (row.allocations.length === 0) { setExpenseTarget(row); return; }
+    const distinctExpenseIds = [...new Set(row.allocations.map((a) => a.expense_id))];
+    if (distinctExpenseIds.length === 1) setEditExpenseId(distinctExpenseIds[0]);
+    else setRelatedExpensesTarget(row);
+  }
+
   function renderRow(row: ShoppingRow) {
     const bought = row.allocations.length > 0;
     return (
       <View key={row.id} style={styles.row}>
         <Pressable
           style={styles.rowMain}
-          onPress={() => !bought && setExpenseTarget(row)}
+          onPress={() => handleRowTap(row)}
         >
           <View style={[styles.checkbox, bought && styles.checkboxChecked]} />
           <View style={{ flex: 1 }}>
@@ -98,7 +110,14 @@ export default function ShoppingScreen() {
 
   return (
     <View style={styles.container}>
-      <Stack.Screen options={{ title: "Shopping List" }} />
+      <Stack.Screen options={{
+        title: "Shopping List",
+        headerRight: () => (
+          <View style={{ marginRight: 14 }}>
+            <HomeButton />
+          </View>
+        ),
+      }} />
       <TripNavBar tripId={tripId} active="shopping" />
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 90 }}>
         {general.length > 0 && (
@@ -114,7 +133,7 @@ export default function ShoppingScreen() {
           </View>
         ))}
         {rows.length === 0 && <Text style={styles.empty}>Nothing on the list yet.</Text>}
-        <Text style={styles.hint}>Tap an unbought item to record what you paid for it.</Text>
+        <Text style={styles.hint}>Tap an unbought item to record what you paid for it, or a bought item to view its expense.</Text>
       </ScrollView>
 
       <Pressable style={styles.fab} onPress={() => setAddFormOpen(true)}>
@@ -147,6 +166,40 @@ export default function ShoppingScreen() {
           presetShoppingItemId={expenseTarget.id}
         />
       )}
+
+      {editExpenseId && (
+        <AddExpenseModal
+          visible={!!editExpenseId}
+          onClose={() => setEditExpenseId(null)}
+          onSaved={() => { setEditExpenseId(null); load(); }}
+          tripId={tripId}
+          currencies={currencies}
+          parties={parties}
+          expenseId={editExpenseId}
+        />
+      )}
+
+      <Modal visible={!!relatedExpensesTarget} transparent animationType="fade" onRequestClose={() => setRelatedExpensesTarget(null)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setRelatedExpensesTarget(null)}>
+          <Pressable style={styles.relatedCard} onPress={(e) => e.stopPropagation()}>
+            <Text style={styles.relatedTitle}>Related expenses</Text>
+            {relatedExpensesTarget &&
+              [...new Map(relatedExpensesTarget.allocations.map((a) => [a.expense_id, a])).values()].map((a) => (
+                <Pressable
+                  key={a.expense_id}
+                  style={styles.relatedRow}
+                  onPress={() => { setEditExpenseId(a.expense_id); setRelatedExpensesTarget(null); }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.relatedNote}>{a.expenses?.note || "Expense"}</Text>
+                    {a.expenses?.expense_date && <Text style={styles.relatedDate}>{formatDateDDMMYYYY(a.expenses.expense_date)}</Text>}
+                  </View>
+                  <Text style={styles.relatedAmt}>{a.amount} {a.expenses?.currency_code ?? ""}</Text>
+                </Pressable>
+              ))}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -180,4 +233,17 @@ const styles = StyleSheet.create({
     shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4,
   },
   fabText: { color: colors.paper, fontWeight: "700" },
+  modalBackdrop: { flex: 1, backgroundColor: "rgba(33,47,61,0.5)", justifyContent: "center", padding: 24 },
+  relatedCard: {
+    backgroundColor: colors.paper, borderRadius: radius.lg, padding: 20,
+    width: "100%", maxWidth: 420, alignSelf: "center",
+  },
+  relatedTitle: { fontFamily: "Archivo_700Bold" as any, fontWeight: "800", fontSize: 18, color: colors.ink, marginBottom: 12 },
+  relatedRow: {
+    flexDirection: "row", alignItems: "center", backgroundColor: colors.paperRaised,
+    borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, padding: 12, marginBottom: 6,
+  },
+  relatedNote: { color: colors.ink, fontWeight: "600", fontSize: 13 },
+  relatedDate: { color: colors.inkSoft, fontSize: 11, marginTop: 2 },
+  relatedAmt: { fontFamily: "IBMPlexMono_500Medium", color: colors.ink, fontWeight: "600", fontSize: 13 },
 });

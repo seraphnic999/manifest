@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { View, Text, TextInput, Pressable, StyleSheet, Alert } from "react-native";
+import { View, Text, TextInput, Pressable, StyleSheet } from "react-native";
+import { Alert } from "@/lib/alert";
 import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
 

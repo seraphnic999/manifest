@@ -1,16 +1,25 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-  View, Text, TextInput, Pressable, StyleSheet, ScrollView, Alert, Switch,
+  View, Text, TextInput, Pressable, StyleSheet, ScrollView, Switch, Modal,
 } from "react-native";
+import { Alert } from "@/lib/alert";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
 import { categoryForDbType, FieldKey } from "@/lib/itemTypeMeta";
 import { DateField, TimeField } from "@/components/DateTimeFields";
 import { computeInsertSortOrder } from "@/lib/reorder";
+import { computeDurationMinutes, formatDuration } from "@/lib/duration";
+import { useUnsavedChangesGuard } from "@/lib/useUnsavedChangesGuard";
 import { Item, ItemStatus } from "@/lib/types";
+import { linkItems, unlinkItems, fetchLinkedItems, LinkedItemSummary } from "@/lib/itemLinks";
+import { formatDateDDMM } from "@/lib/dateFormat";
+import { normalizeTimeHHMM } from "@/lib/timeFormat";
+import ItemPickerModal from "@/components/ItemPickerModal";
+import QuickNotesList from "@/components/QuickNotesList";
+import HomeButton from "@/components/HomeButton";
 
-const STATUSES: ItemStatus[] = ["booked", "optional", "idea", "pending"];
+const STATUSES: ItemStatus[] = ["planned", "booked", "optional", "idea"];
 
 export default function EditItem() {
   const { itemId } = useLocalSearchParams<{ itemId: string }>();
@@ -19,6 +28,9 @@ export default function EditItem() {
   const [isStaySpan, setIsStaySpan] = useState(false);
   const [fields, setFields] = useState<FieldKey[]>([]);
   const [saving, setSaving] = useState(false);
+  const [tripId, setTripId] = useState("");
+  const [linkedItems, setLinkedItems] = useState<LinkedItemSummary[]>([]);
+  const [linkPickerOpen, setLinkPickerOpen] = useState(false);
 
   const [title, setTitle] = useState("");
   const [status, setStatus] = useState<ItemStatus>("booked");
@@ -32,7 +44,6 @@ export default function EditItem() {
   const [bookingSource, setBookingSource] = useState("");
   const [confirmationCode, setConfirmationCode] = useState("");
   const [link, setLink] = useState("");
-  const [notes, setNotes] = useState("");
 
   // Lodging span only
   const [checkInDate, setCheckInDate] = useState("");
@@ -41,6 +52,37 @@ export default function EditItem() {
   const [checkOutTime, setCheckOutTime] = useState("");
   const [origCheckInDate, setOrigCheckInDate] = useState("");
   const [origCheckOutDate, setOrigCheckOutDate] = useState("");
+
+  // Flight-specific (departure reuses itemDate/time above)
+  const [arrivalDate, setArrivalDate] = useState("");
+  const [arrivalTime, setArrivalTime] = useState("");
+
+  // Unsaved-changes guard: compares a live snapshot of the form against the
+  // snapshot captured right after load, so navigating away (back, Home, a
+  // day-pill switch — anything that removes this screen) can prompt to
+  // save/discard instead of silently losing edits.
+  const originalSnapshotRef = useRef("");
+  const latestSnapshotRef = useRef("");
+  function currentSnapshot() {
+    return JSON.stringify({
+      title, status, itemDate, time, address, phone, vendor, flightNumber,
+      bookingSource, confirmationCode, link,
+      checkInDate, checkInTime, checkOutDate, checkOutTime,
+      arrivalDate, arrivalTime,
+    });
+  }
+  useEffect(() => { latestSnapshotRef.current = currentSnapshot(); });
+  const { promptVisible, proceed, cancel } = useUnsavedChangesGuard(
+    () => latestSnapshotRef.current !== originalSnapshotRef.current
+  );
+
+  const durationMinutes = computeDurationMinutes(itemDate, time, arrivalDate, arrivalTime);
+  const durationInvalid = durationMinutes !== null && durationMinutes < 0;
+  const durationLabel = durationMinutes === null
+    ? null
+    : durationInvalid
+      ? "Arrival must be after departure."
+      : `Flight duration: ${formatDuration(durationMinutes)}`;
 
   useEffect(() => {
     supabase.from("items").select("*").eq("id", itemId).single().then(({ data }) => {
@@ -64,24 +106,73 @@ export default function EditItem() {
       setBookingSource(item.booking_source ?? "");
       setConfirmationCode(item.confirmation_code ?? "");
       setLink(item.link ?? "");
-      setNotes(item.notes ?? "");
       setCheckInDate(item.start_date ?? "");
       setCheckInTime(item.time_start ?? "");
       setCheckOutDate(item.end_date ?? "");
       setCheckOutTime(item.time_end ?? "");
       setOrigCheckInDate(item.start_date ?? "");
       setOrigCheckOutDate(item.end_date ?? "");
+      setArrivalDate(item.end_date ?? "");
+      setArrivalTime(item.time_end ?? "");
+      // Key order must match currentSnapshot()'s object exactly, since
+      // JSON.stringify preserves insertion order and the dirty check is a
+      // plain string comparison.
+      originalSnapshotRef.current = JSON.stringify({
+        title: item.title, status: item.status,
+        itemDate: item.start_date ?? "", time: item.time_start ?? "",
+        address: item.address ?? "", phone: item.phone ?? "", vendor: item.vendor ?? "",
+        flightNumber: (item.custom_fields as any)?.flight_number ?? "",
+        bookingSource: item.booking_source ?? "", confirmationCode: item.confirmation_code ?? "",
+        link: item.link ?? "",
+        checkInDate: item.start_date ?? "", checkInTime: item.time_start ?? "",
+        checkOutDate: item.end_date ?? "", checkOutTime: item.time_end ?? "",
+        arrivalDate: item.end_date ?? "", arrivalTime: item.time_end ?? "",
+      });
+      setTripId(item.trip_id);
       setLoaded(true);
     });
+    loadLinkedItems();
   }, [itemId]);
+
+  function loadLinkedItems() {
+    fetchLinkedItems(itemId).then(setLinkedItems);
+  }
+
+  async function handleLinkSelect(picked: { id: string }) {
+    setLinkPickerOpen(false);
+    try {
+      await linkItems(itemId, picked.id);
+      loadLinkedItems();
+    } catch (e: any) {
+      Alert.alert("Couldn't link item", e.message ?? "Unknown error");
+    }
+  }
+
+  async function handleUnlink(linkedId: string) {
+    try {
+      await unlinkItems(itemId, linkedId);
+      loadLinkedItems();
+    } catch (e: any) {
+      Alert.alert("Couldn't remove link", e.message ?? "Unknown error");
+    }
+  }
 
   const has = (f: FieldKey) => fields.includes(f);
 
-  async function save() {
-    if (!title) { Alert.alert("Missing info", "Title is required."); return; }
+  // Returns whether the save succeeded — it doesn't navigate itself, since
+  // the two callers need different post-save navigation: the plain "Save
+  // changes" button just goes back one screen, but the unsaved-changes
+  // prompt's Save option needs to resume whatever navigation (e.g. Home)
+  // was originally blocked, via proceed().
+  async function save(): Promise<boolean> {
+    if (!title) { Alert.alert("Missing info", "Title is required."); return false; }
     if (isStaySpan && (!checkInDate || !checkOutDate)) {
       Alert.alert("Missing info", "Check-in and check-out dates are required.");
-      return;
+      return false;
+    }
+    if (has("flightTimes") && durationInvalid) {
+      Alert.alert("Check the times", "Arrival must be after departure.");
+      return false;
     }
     setSaving(true);
     const { data: current } = await supabase.from("items").select("trip_id, day_id").eq("id", itemId).single();
@@ -89,20 +180,24 @@ export default function EditItem() {
     const { error } = await supabase.from("items").update({
       title, status,
       time_start: isStaySpan ? (checkInTime || null) : (time || null),
-      time_end: isStaySpan ? (checkOutTime || null) : undefined,
+      time_end: isStaySpan ? (checkOutTime || null) : (has("flightTimes") ? (arrivalTime || null) : undefined),
       start_date: isStaySpan ? checkInDate : (itemDate || null),
-      end_date: isStaySpan ? checkOutDate : undefined,
+      end_date: isStaySpan ? checkOutDate : (has("flightTimes") ? (arrivalDate || null) : undefined),
       address: address || null,
       phone: phone || null,
       vendor: vendor || null,
       booking_source: bookingSource || null,
       confirmation_code: confirmationCode || null,
       link: link || null,
-      notes: notes || null,
       custom_fields: flightNumber ? { flight_number: flightNumber } : {},
     }).eq("id", itemId);
     setSaving(false);
-    if (error) { Alert.alert("Couldn't save", error.message); return; }
+    if (error) { Alert.alert("Couldn't save", error.message); return false; }
+
+    // Mark the form clean relative to what was just saved — otherwise a
+    // subsequent navigation attempt would immediately re-trigger the
+    // unsaved-changes prompt against the (now stale) original snapshot.
+    originalSnapshotRef.current = currentSnapshot();
 
     if (isStaySpan && (checkInDate !== origCheckInDate || checkOutDate !== origCheckOutDate)) {
       await moveCheckInOutChildren();
@@ -110,7 +205,19 @@ export default function EditItem() {
     if (!isStaySpan && itemDate && itemDate !== origItemDate && current) {
       await moveToDay(current.trip_id, itemDate);
     }
-    router.back();
+    return true;
+  }
+
+  async function handleSavePress() {
+    if (await save()) router.back();
+  }
+
+  // Used by the unsaved-changes prompt: on success, resume whatever
+  // navigation was originally blocked (Home, back, etc.) instead of just
+  // going back one screen, so choosing "Save" ends up wherever the user was
+  // actually trying to go.
+  async function handlePromptSave() {
+    if (await save()) proceed();
   }
 
   // Moves a regular (non-span) item to the day matching its new date,
@@ -161,25 +268,19 @@ export default function EditItem() {
     }
   }
 
-  async function archiveItem() {
-    Alert.alert("Delete item", "Move this item to the archive?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete", style: "destructive",
-        onPress: async () => {
-          await supabase.from("items").update({ deleted_at: new Date().toISOString() }).eq("id", itemId);
-          router.back();
-          router.back(); // also leave the (now-gone) details page
-        },
-      },
-    ]);
-  }
-
   if (!loaded) return null;
 
   return (
+    <>
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 20 }}>
-      <Stack.Screen options={{ title: "Edit item" }} />
+      <Stack.Screen options={{
+        title: "Edit item",
+        headerRight: () => (
+          <View style={{ marginRight: 14 }}>
+            <HomeButton />
+          </View>
+        ),
+      }} />
 
       <Text style={styles.label}>Title</Text>
       <TextInput style={styles.input} value={title} onChangeText={setTitle} />
@@ -199,6 +300,22 @@ export default function EditItem() {
           <Text style={styles.hint}>
             Changing these dates will move the auto-created "Check in"/"Check out" items to the new days (their times stay the same).
           </Text>
+        </>
+      ) : has("flightTimes") ? (
+        <>
+          <View style={styles.row}>
+            <DateField label="Departure date" value={itemDate} onChange={setItemDate} />
+            <View style={{ width: 10 }} />
+            <TimeField label="Departure time" value={time} onChange={setTime} />
+          </View>
+          <View style={styles.row}>
+            <DateField label="Arrival date" value={arrivalDate} onChange={setArrivalDate} />
+            <View style={{ width: 10 }} />
+            <TimeField label="Arrival time (landing)" value={arrivalTime} onChange={setArrivalTime} />
+          </View>
+          {durationLabel && (
+            <Text style={[styles.hint, durationInvalid && styles.hintError]}>{durationLabel}</Text>
+          )}
         </>
       ) : (
         <View style={styles.row}>
@@ -245,18 +362,58 @@ export default function EditItem() {
         <><Text style={styles.label}>Link</Text>
         <TextInput style={styles.input} value={link} onChangeText={setLink} autoCapitalize="none" /></>
       )}
-      {has("notes") && (
-        <><Text style={styles.label}>Notes</Text>
-        <TextInput style={[styles.input, { height: 90 }]} value={notes} onChangeText={setNotes} multiline /></>
-      )}
+      <QuickNotesList itemId={itemId} />
 
-      <Pressable style={styles.button} onPress={save} disabled={saving}>
+      <Text style={styles.label}>Linked items</Text>
+      {linkedItems.map((li) => (
+        <View key={li.id} style={styles.linkedRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.linkedTitle}>{li.title}</Text>
+            <Text style={styles.linkedMeta}>
+              {[li.day_date ? formatDateDDMM(li.day_date) : null, normalizeTimeHHMM(li.time_start)].filter(Boolean).join(" · ") || li.type.toUpperCase()}
+            </Text>
+          </View>
+          <Pressable onPress={() => handleUnlink(li.id)} hitSlop={8} style={styles.unlinkBtn}>
+            <Text style={styles.unlinkBtnText}>Remove</Text>
+          </Pressable>
+        </View>
+      ))}
+      {linkedItems.length === 0 && <Text style={styles.empty}>No linked items yet.</Text>}
+      <Pressable style={styles.linkAddButton} onPress={() => setLinkPickerOpen(true)}>
+        <Text style={styles.linkAddButtonText}>+ Link item</Text>
+      </Pressable>
+
+      <Pressable style={styles.button} onPress={handleSavePress} disabled={saving}>
         <Text style={styles.buttonText}>{saving ? "Saving…" : "Save changes"}</Text>
       </Pressable>
-      <Pressable style={styles.deleteButton} onPress={archiveItem}>
-        <Text style={styles.deleteButtonText}>Delete item</Text>
-      </Pressable>
     </ScrollView>
+
+    <ItemPickerModal
+      visible={linkPickerOpen}
+      onClose={() => setLinkPickerOpen(false)}
+      onSelect={handleLinkSelect}
+      tripId={tripId}
+      excludeIds={[itemId, ...linkedItems.map((li) => li.id)]}
+    />
+
+    <Modal visible={promptVisible} transparent animationType="fade">
+      <View style={styles.promptBackdrop}>
+        <View style={styles.promptCard}>
+          <Text style={styles.promptTitle}>Unsaved changes</Text>
+          <Text style={styles.promptBody}>Save your changes before leaving, or discard them?</Text>
+          <Pressable style={styles.promptSaveBtn} onPress={handlePromptSave} disabled={saving}>
+            <Text style={styles.promptSaveBtnText}>{saving ? "Saving…" : "Save changes"}</Text>
+          </Pressable>
+          <Pressable style={styles.promptDiscardBtn} onPress={proceed}>
+            <Text style={styles.promptDiscardText}>Discard changes</Text>
+          </Pressable>
+          <Pressable style={styles.promptCancelBtn} onPress={cancel}>
+            <Text style={styles.promptCancelText}>Keep editing</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+    </>
   );
 }
 
@@ -268,6 +425,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md, padding: 12, fontSize: 15, color: colors.ink,
   },
   hint: { color: colors.inkSoft, fontSize: 11, marginTop: 6, fontStyle: "italic" },
+  hintError: { color: colors.coral, fontStyle: "normal", fontWeight: "600" },
   row: { flexDirection: "row" },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.paperRaised },
@@ -276,6 +434,28 @@ const styles = StyleSheet.create({
   chipTextActive: { color: "#fff" },
   button: { backgroundColor: colors.ink, borderRadius: radius.md, padding: 14, alignItems: "center", marginTop: 28 },
   buttonText: { color: colors.paper, fontWeight: "700" },
-  deleteButton: { alignItems: "center", marginTop: 14, padding: 10 },
-  deleteButtonText: { color: colors.coral, fontWeight: "600", fontSize: 13 },
+  linkedRow: {
+    flexDirection: "row", alignItems: "center", backgroundColor: colors.paperRaised,
+    borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, padding: 12, marginBottom: 6,
+  },
+  linkedTitle: { color: colors.ink, fontWeight: "600", fontSize: 13 },
+  linkedMeta: { color: colors.inkSoft, fontSize: 11, marginTop: 2 },
+  unlinkBtn: { paddingHorizontal: 10, paddingVertical: 6 },
+  unlinkBtnText: { color: colors.coral, fontWeight: "700", fontSize: 12 },
+  empty: { color: colors.inkSoft, fontSize: 12, fontStyle: "italic", marginTop: 2, marginBottom: 8 },
+  linkAddButton: {
+    borderWidth: 1, borderColor: colors.line, borderStyle: "dashed", borderRadius: radius.md,
+    padding: 12, alignItems: "center", marginTop: 4,
+  },
+  linkAddButtonText: { color: colors.teal, fontWeight: "700", fontSize: 13 },
+  promptBackdrop: { flex: 1, backgroundColor: "rgba(33,47,61,0.5)", justifyContent: "center", padding: 30 },
+  promptCard: { backgroundColor: colors.paperRaised, borderRadius: radius.lg, padding: 20, width: "100%", maxWidth: 420, alignSelf: "center" },
+  promptTitle: { color: colors.ink, fontWeight: "800", fontSize: 17, marginBottom: 6 },
+  promptBody: { color: colors.inkSoft, fontSize: 13, marginBottom: 18, lineHeight: 18 },
+  promptSaveBtn: { backgroundColor: colors.ink, borderRadius: radius.md, padding: 14, alignItems: "center" },
+  promptSaveBtnText: { color: colors.paper, fontWeight: "700" },
+  promptDiscardBtn: { alignItems: "center", padding: 14, marginTop: 8 },
+  promptDiscardText: { color: colors.coral, fontWeight: "700", fontSize: 14 },
+  promptCancelBtn: { alignItems: "center", padding: 10, marginTop: 2 },
+  promptCancelText: { color: colors.inkSoft, fontWeight: "600", fontSize: 13 },
 });

@@ -3,9 +3,9 @@ export type TripStatus = "future" | "current" | "past"; // derived, not stored
 
 export type ItemType =
   | "flight" | "transfer" | "transport" | "lodging" | "activity"
-  | "meal" | "bar" | "sightseeing" | "shopping" | "work" | "other";
+  | "meal" | "bar" | "sightseeing" | "attraction" | "shopping" | "work" | "other";
 
-export type ItemStatus = "booked" | "optional" | "idea" | "pending";
+export type ItemStatus = "booked" | "optional" | "idea" | "planned";
 
 export interface Trip {
   id: string;
@@ -63,7 +63,15 @@ export interface ItemPhoto {
   item_id: string;
   storage_path: string;
   caption: string | null;
+  file_name: string | null;
+  mime_type: string | null;
   sort_order: number;
+}
+
+export interface ItemLink {
+  id: string;
+  item_id_a: string;
+  item_id_b: string;
 }
 
 export interface TripParty {
@@ -90,6 +98,8 @@ export interface ShoppingListItem {
   note: string | null;
 }
 
+export type ExpenseType = "flight" | "lodging" | "transport" | "meals" | "attractions" | "shopping" | "other";
+
 export interface Expense {
   id: string;
   trip_id: string;
@@ -98,6 +108,9 @@ export interface Expense {
   amount: number;
   expense_date: string | null;
   note: string | null;
+  type: ExpenseType;
+  refund_amount: number | null;   // optional; same currency as this expense; not part of the split
+  refund_company: string | null; // e.g. "Global Blue"
 }
 
 export interface Allocation {
@@ -106,6 +119,7 @@ export interface Allocation {
   amount: number;
   shopping_list_item_id: string | null;
   party_id: string | null;
+  note: string | null;
 }
 
 export function tripStatus(trip: Pick<Trip, "start_date" | "end_date">): TripStatus {

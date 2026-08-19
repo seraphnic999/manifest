@@ -1,49 +1,108 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   View, Text, TextInput, Pressable, StyleSheet, ScrollView, Modal,
 } from "react-native";
 import { Alert } from "@/lib/alert";
-import { useRouter, Stack } from "expo-router";
+import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
-import { TripType } from "@/lib/types";
+import { Trip, TripType, TripCurrency } from "@/lib/types";
 import { tzOffsetLabel, sortedByOffsetDesc, COMMON_TIMEZONES, COMMON_CURRENCIES } from "@/lib/timezone";
 import { DateField } from "@/components/DateTimeFields";
 import HomeButton from "@/components/HomeButton";
 
 const TYPES: TripType[] = ["pleasure", "business", "mixed"];
 
-interface CurrencyRow {
-  code: string;
-  rate: string; // kept as text while editing
-}
-
-export default function NewTrip() {
+// Parties (Work, Mom, etc.) aren't editable here — existing allocations
+// reference them, so adding/removing needs its own careful design, unlike
+// currencies below where "in use" is a simple, checkable question.
+export default function EditTrip() {
+  const { tripId } = useLocalSearchParams<{ tripId: string }>();
   const router = useRouter();
+  const [loaded, setLoaded] = useState(false);
   const [name, setName] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [type, setType] = useState<TripType>("pleasure");
+  const [origType, setOrigType] = useState<TripType>("pleasure");
   const [destinations, setDestinations] = useState("");
   const [timezone, setTimezone] = useState("Asia/Jerusalem");
   const [tzPickerOpen, setTzPickerOpen] = useState(false);
   const [customTz, setCustomTz] = useState(false);
-  const [currencies, setCurrencies] = useState<CurrencyRow[]>([]); // NIS is implicit, always added
+  const [saving, setSaving] = useState(false);
+
+  const [currencies, setCurrencies] = useState<TripCurrency[]>([]);
+  const [rateEdits, setRateEdits] = useState<Record<string, string>>({});
   const [newCode, setNewCode] = useState("");
   const [newRate, setNewRate] = useState("");
   const [currencyPickerOpen, setCurrencyPickerOpen] = useState(false);
   const [customCurrencyInput, setCustomCurrencyInput] = useState("");
-  const [saving, setSaving] = useState(false);
 
-  function addCurrency() {
-    if (!newCode || !newRate) return;
-    setCurrencies([...currencies, { code: newCode.toUpperCase(), rate: newRate }]);
-    setNewCode("");
-    setNewRate("");
+  function loadCurrencies() {
+    supabase.from("trip_currencies").select("*").eq("trip_id", tripId)
+      .order("is_default", { ascending: false }).order("code")
+      .then(({ data }) => data && setCurrencies(data as TripCurrency[]));
   }
 
-  function removeCurrency(code: string) {
-    setCurrencies(currencies.filter((c) => c.code !== code));
+  useEffect(() => {
+    supabase.from("trips").select("*").eq("id", tripId).single().then(({ data }) => {
+      if (!data) return;
+      const trip = data as Trip;
+      setName(trip.name);
+      setStartDate(trip.start_date);
+      setEndDate(trip.end_date);
+      setType(trip.type);
+      setOrigType(trip.type);
+      setDestinations(trip.destinations.join(", "));
+      setTimezone(trip.default_timezone);
+      setCustomTz(!COMMON_TIMEZONES.includes(trip.default_timezone));
+      setLoaded(true);
+    });
+    loadCurrencies();
+  }, [tripId]);
+
+  async function addCurrency() {
+    const code = newCode.toUpperCase();
+    const rate = parseFloat(newRate);
+    if (!code || !rate || rate <= 0) {
+      Alert.alert("Missing info", "Choose a currency and enter a valid rate to NIS.");
+      return;
+    }
+    const { error } = await supabase.from("trip_currencies").insert({
+      trip_id: tripId, code, rate_to_nis: rate, is_default: false,
+    });
+    if (error) {
+      Alert.alert("Couldn't add currency", error.message);
+      return;
+    }
+    setNewCode("");
+    setNewRate("");
+    loadCurrencies();
+  }
+
+  async function removeCurrency(currency: TripCurrency) {
+    const { count } = await supabase
+      .from("expenses").select("id", { count: "exact", head: true })
+      .eq("trip_id", tripId).eq("currency_code", currency.code);
+
+    if ((count ?? 0) > 0) {
+      Alert.alert(
+        "Currency in use",
+        `${count} expense${count === 1 ? "" : "s"} use${count === 1 ? "s" : ""} ${currency.code} — remove or change those first.`
+      );
+      return;
+    }
+
+    Alert.alert("Remove currency", `Remove ${currency.code} from this trip?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Remove", style: "destructive",
+        onPress: async () => {
+          await supabase.from("trip_currencies").delete().eq("id", currency.id);
+          loadCurrencies();
+        },
+      },
+    ]);
   }
 
   async function save() {
@@ -51,51 +110,63 @@ export default function NewTrip() {
       Alert.alert("Missing info", "Name, start date, and end date are required.");
       return;
     }
+
+    // Validate any pending currency-rate edits before saving anything.
+    const rateUpdates: { id: string; rate: number }[] = [];
+    for (const c of currencies) {
+      if (c.is_default) continue;
+      const raw = rateEdits[c.id];
+      if (raw === undefined) continue;
+      const rate = parseFloat(raw);
+      if (!rate || rate <= 0) {
+        Alert.alert("Invalid rate", `Enter a valid rate to NIS for ${c.code}.`);
+        return;
+      }
+      if (rate !== c.rate_to_nis) rateUpdates.push({ id: c.id, rate });
+    }
+
     setSaving(true);
 
-    const { data: trip, error } = await supabase
-      .from("trips")
-      .insert({
-        name,
-        start_date: startDate,
-        end_date: endDate,
-        type,
-        destinations: destinations.split(",").map((d) => d.trim()).filter(Boolean),
-        default_timezone: timezone,
-      })
-      .select()
-      .single();
+    const { error } = await supabase.from("trips").update({
+      name,
+      start_date: startDate,
+      end_date: endDate,
+      type,
+      destinations: destinations.split(",").map((d) => d.trim()).filter(Boolean),
+      default_timezone: timezone,
+    }).eq("id", tripId);
 
-    if (error || !trip) {
+    if (error) {
       setSaving(false);
-      Alert.alert("Couldn't create trip", error?.message ?? "Unknown error");
+      Alert.alert("Couldn't save", error.message);
       return;
     }
 
-    // NIS is always the default currency, plus any extra currencies added here.
-    const currencyRows = [
-      { trip_id: trip.id, code: "NIS", rate_to_nis: 1, is_default: true },
-      ...currencies.map((c) => ({
-        trip_id: trip.id, code: c.code, rate_to_nis: parseFloat(c.rate) || 1, is_default: false,
-      })),
-    ];
-    await supabase.from("trip_currencies").insert(currencyRows);
+    for (const u of rateUpdates) {
+      await supabase.from("trip_currencies").update({ rate_to_nis: u.rate }).eq("id", u.id);
+    }
 
-    // "Work" party is auto-added only for business/mixed trips.
-    if (type === "business" || type === "mixed") {
-      await supabase.from("trip_parties").insert({
-        trip_id: trip.id, name: "Work", is_work: true,
-      });
+    // Newly business/mixed and no "Work" party yet — add one, same as at
+    // creation time. Downgrading away from business doesn't remove it:
+    // existing allocations may already reference it.
+    if ((type === "business" || type === "mixed") && origType === "pleasure") {
+      const { data: existing } = await supabase
+        .from("trip_parties").select("id").eq("trip_id", tripId).eq("is_work", true).maybeSingle();
+      if (!existing) {
+        await supabase.from("trip_parties").insert({ trip_id: tripId, name: "Work", is_work: true });
+      }
     }
 
     setSaving(false);
-    router.replace(`/trip/${trip.id}`);
+    router.back();
   }
+
+  if (!loaded) return null;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 20 }}>
       <Stack.Screen options={{
-        title: "New Trip",
+        title: "Edit trip",
         headerRight: () => (
           <View style={{ marginRight: 14 }}>
             <HomeButton />
@@ -126,7 +197,7 @@ export default function NewTrip() {
           </Pressable>
         ))}
       </View>
-      {(type === "business" || type === "mixed") && (
+      {(type === "business" || type === "mixed") && origType === "pleasure" && (
         <Text style={styles.hint}>A "Work" party will be added automatically for expense tracking.</Text>
       )}
 
@@ -167,20 +238,30 @@ export default function NewTrip() {
 
       {/* --- Currencies --- */}
       <Text style={styles.label}>Currencies</Text>
-      <View style={styles.currencyRow}>
-        <Text style={styles.currencyCode}>NIS</Text>
-        <Text style={styles.currencyRate}>1.000 (default)</Text>
-      </View>
       {currencies.map((c) => (
-        <View key={c.code} style={styles.currencyRow}>
+        <View key={c.id} style={styles.currencyRow}>
           <Text style={styles.currencyCode}>{c.code}</Text>
-          <Text style={styles.currencyRate}>{c.rate} -&gt; NIS</Text>
-          <Pressable onPress={() => removeCurrency(c.code)}>
-            <Text style={styles.removeText}>Remove</Text>
-          </Pressable>
+          {c.is_default ? (
+            <Text style={styles.currencyRate}>1.000 (default)</Text>
+          ) : (
+            <>
+              <TextInput
+                style={[styles.input, styles.currencyRateInput]}
+                value={rateEdits[c.id] ?? String(c.rate_to_nis)}
+                onChangeText={(v) => setRateEdits((prev) => ({ ...prev, [c.id]: v }))}
+                keyboardType="decimal-pad"
+              />
+              <Pressable onPress={() => removeCurrency(c)}>
+                <Text style={styles.removeText}>Remove</Text>
+              </Pressable>
+            </>
+          )}
         </View>
       ))}
-      <Text style={styles.hint}>Pick a currency, set its rate to NIS, then add it.</Text>
+      <Text style={styles.hint}>
+        Rate changes save with the button below. A currency can only be removed if no expenses use it yet.
+        Parties (Work, Mom, etc.) aren't editable here.
+      </Text>
       <View style={styles.row}>
         <View style={{ flex: 1 }}>
           <Pressable style={styles.input} onPress={() => setCurrencyPickerOpen(true)}>
@@ -233,7 +314,7 @@ export default function NewTrip() {
       </Modal>
 
       <Pressable style={styles.button} onPress={save} disabled={saving}>
-        <Text style={styles.buttonText}>{saving ? "Creating..." : "Create trip"}</Text>
+        <Text style={styles.buttonText}>{saving ? "Saving…" : "Save changes"}</Text>
       </Pressable>
     </ScrollView>
   );
@@ -267,12 +348,6 @@ const styles = StyleSheet.create({
   },
   modalRowText: { color: colors.ink, fontSize: 15 },
   offsetText: { color: colors.inkSoft, fontSize: 12, fontFamily: "IBMPlexMono_500Medium" },
-  currencyChipRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 8 },
-  currencyChip: {
-    paddingVertical: 6, paddingHorizontal: 12, borderRadius: 16,
-    borderWidth: 1, borderColor: colors.line, backgroundColor: colors.paperRaised,
-  },
-  currencyChipText: { color: colors.ink, fontWeight: "600", fontSize: 12 },
   currencyRow: {
     flexDirection: "row", alignItems: "center", gap: 10,
     backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,
@@ -280,6 +355,7 @@ const styles = StyleSheet.create({
   },
   currencyCode: { fontFamily: "IBMPlexMono_500Medium", fontWeight: "700", color: colors.ink, width: 44 },
   currencyRate: { color: colors.inkSoft, fontSize: 13, flex: 1 },
+  currencyRateInput: { flex: 1, padding: 8, fontSize: 13 },
   removeText: { color: colors.coral, fontSize: 12, fontWeight: "600" },
   addCurrencyButton: { backgroundColor: colors.teal, borderRadius: radius.md, paddingVertical: 12, paddingHorizontal: 14 },
   currencyCustomRow: { flexDirection: "row", marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.line },

@@ -2,7 +2,8 @@ import { ItemType } from "./types";
 
 export type FieldKey =
   | "time" | "address" | "phone" | "vendor" | "bookingSource"
-  | "confirmationCode" | "link" | "notes" | "lodgingDates" | "flightNumber";
+  | "confirmationCode" | "link" | "notes" | "lodgingDates" | "flightNumber"
+  | "flightTimes";
 
 export interface ItemCategory {
   key: string;               // UI key, may map to >1 db item_type
@@ -18,7 +19,7 @@ export const ITEM_CATEGORIES: ItemCategory[] = [
   {
     key: "flight", label: "Flight", icon: "airplane", tileColor: "#5B9BD5",
     dbTypes: ["flight"],
-    fields: ["time", "vendor", "flightNumber", "confirmationCode", "bookingSource", "notes"],
+    fields: ["flightTimes", "vendor", "flightNumber", "confirmationCode", "bookingSource", "notes"],
   },
   {
     key: "transfer", label: "Transfer", icon: "car-sport", tileColor: "#E0623C",
@@ -42,7 +43,8 @@ export const ITEM_CATEGORIES: ItemCategory[] = [
   },
   {
     key: "activity", label: "Activity", icon: "walk", tileColor: "#4C9A6A",
-    dbTypes: ["activity", "sightseeing"], subtypeLabels: { activity: "Activity", sightseeing: "Attraction" },
+    dbTypes: ["activity", "attraction", "sightseeing"],
+    subtypeLabels: { activity: "Activity", attraction: "Attraction", sightseeing: "Sightseeing" },
     fields: ["time", "address", "bookingSource", "confirmationCode", "link", "notes"],
   },
   {

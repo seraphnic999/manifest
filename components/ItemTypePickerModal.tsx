@@ -42,6 +42,7 @@ const styles = StyleSheet.create({
   sheet: {
     backgroundColor: colors.ink, borderTopLeftRadius: 24, borderTopRightRadius: 24,
     padding: 20, maxHeight: "70%",
+    width: "100%", maxWidth: 480, alignSelf: "center",
   },
   title: {
     color: colors.paper, fontFamily: "Archivo_700Bold" as any, fontWeight: "800",

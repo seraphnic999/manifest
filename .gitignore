@@ -6,3 +6,4 @@ web-build/
 *.log
 /android
 /ios
+/android-keystore

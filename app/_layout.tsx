@@ -2,9 +2,23 @@ import { useEffect, useState } from "react";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { Session } from "@supabase/supabase-js";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { View, Platform, StyleSheet } from "react-native";
+import { View, Platform, StyleSheet, I18nManager } from "react-native";
 import { supabase } from "@/lib/supabase";
+import { claimPendingTripShares } from "@/lib/tripSharing";
 import { colors } from "@/lib/theme";
+
+// This app has no RTL-specific design (no Hebrew/Arabic UI text — the ₪
+// symbol is just a currency glyph). But React Native auto-mirrors every
+// flexDirection:"row" layout when the device's system language is RTL
+// (e.g. Hebrew), which flips things like the day-view row layout (drag
+// handle/time-column swap sides) in ways nothing in this codebase accounts
+// for. Force LTR regardless of device locale. Native requires a full app
+// restart after this changes anything (I18nManager caches the RTL flag at
+// native-module init, before this JS runs) — a no-op if already LTR.
+if (I18nManager.isRTL) {
+  I18nManager.allowRTL(false);
+  I18nManager.forceRTL(false);
+}
 
 export default function RootLayout() {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
@@ -12,8 +26,14 @@ export default function RootLayout() {
   const segments = useSegments();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSession(data.session));
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => setSession(s));
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      if (data.session) claimPendingTripShares().catch(() => {});
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s);
+      if (s) claimPendingTripShares().catch(() => {});
+    });
     return () => sub.subscription.unsubscribe();
   }, []);
 

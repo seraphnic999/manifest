@@ -1,10 +1,19 @@
-import { useEffect, useState } from "react";
-import { View, Text, FlatList, StyleSheet, Pressable } from "react-native";
-import { useLocalSearchParams, useRouter, Stack } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
+import { View, Text, FlatList, StyleSheet, Pressable, ActivityIndicator } from "react-native";
+import { useLocalSearchParams, useRouter, Stack, useFocusEffect } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { Alert } from "@/lib/alert";
 import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
 import { Day, Item, Trip } from "@/lib/types";
 import TripNavBar from "@/components/TripNavBar";
+import { computeDurationMinutes, formatDuration } from "@/lib/duration";
+import { formatDateDDMMYYYY } from "@/lib/dateFormat";
+import { normalizeTimeHHMM } from "@/lib/timeFormat";
+import { exportTripItineraryPdf } from "@/lib/exportItinerary";
+import ShareTripModal from "@/components/ShareTripModal";
+import HeaderIconButton from "@/components/HeaderIconButton";
+import HomeButton from "@/components/HomeButton";
 
 export default function TripOverview() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
@@ -13,9 +22,29 @@ export default function TripOverview() {
   const [flights, setFlights] = useState<Item[]>([]);
   const [lodgings, setLodgings] = useState<Item[]>([]);
   const [totalNis, setTotalNis] = useState<number | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
+    if (!trip) return;
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) setIsOwner(data.user.id === trip.user_id);
+    });
+  }, [trip?.user_id]);
+
+  async function handleExportPdf() {
+    setExporting(true);
+    try {
+      await exportTripItineraryPdf(tripId);
+    } catch (e: any) {
+      Alert.alert("Export failed", e.message ?? "Unknown error");
+    }
+    setExporting(false);
+  }
+
+  const load = useCallback(() => {
     supabase.from("trips").select("*").eq("id", tripId).single()
       .then(({ data }) => data && setTrip(data as Trip));
     supabase.from("days").select("*").eq("trip_id", tripId).order("sort_order")
@@ -37,19 +66,46 @@ export default function TripOverview() {
     })();
   }, [tripId]);
 
+  // Re-fetch every time this screen regains focus (e.g. navigating back
+  // after adding an expense on an item page) — a plain useEffect only runs
+  // once on mount/param-change, so the Money total would otherwise go stale
+  // until the next full reload.
+  useFocusEffect(useCallback(() => { load(); }, [load]));
+
   if (!trip) return null;
 
   return (
     <View style={styles.container}>
-      <Stack.Screen options={{ title: "Overview" }} />
+      <Stack.Screen options={{
+        title: "Overview",
+        headerRight: () => (
+          <View style={styles.headerButtons}>
+            <HeaderIconButton onPress={handleExportPdf} disabled={exporting} accessibilityLabel="Export PDF">
+              {exporting
+                ? <ActivityIndicator size="small" color={colors.teal} />
+                : <Ionicons name="document-text-outline" size={16} color={colors.teal} />}
+            </HeaderIconButton>
+            {isOwner && (
+              <HeaderIconButton onPress={() => setShareOpen(true)} accessibilityLabel="Share trip">
+                <Ionicons name="people-outline" size={16} color={colors.teal} />
+              </HeaderIconButton>
+            )}
+            <HeaderIconButton onPress={() => router.push(`/trip/${tripId}/edit`)}>
+              <Ionicons name="pencil" size={16} color={colors.amber} />
+            </HeaderIconButton>
+            <HomeButton />
+          </View>
+        ),
+      }} />
       <TripNavBar tripId={tripId} active="overview" />
+      <ShareTripModal visible={shareOpen} onClose={() => setShareOpen(false)} tripId={tripId} />
       <FlatList
         contentContainerStyle={{ padding: 16 }}
         ListHeaderComponent={
           <>
             <View style={styles.header}>
               <Text style={styles.tripName}>{trip.name}</Text>
-              <Text style={styles.tripDates}>{trip.start_date} - {trip.end_date}</Text>
+              <Text style={styles.tripDates}>{formatDateDDMMYYYY(trip.start_date)} - {formatDateDDMMYYYY(trip.end_date)}</Text>
               {trip.destinations.length > 0 && (
                 <Text style={styles.destinations}>{trip.destinations.join(" \u00b7 ")}</Text>
               )}
@@ -71,16 +127,23 @@ export default function TripOverview() {
                 <Text style={styles.sectionLabel}>Flights</Text>
                 {flights.map((f) => {
                   const flightNumber = (f.custom_fields as any)?.flight_number as string | undefined;
+                  const durationMinutes = computeDurationMinutes(f.start_date, f.time_start, f.end_date, f.time_end);
+                  const durationText = durationMinutes !== null && durationMinutes >= 0 ? formatDuration(durationMinutes) : null;
+                  const arrivesNextDay = !!(f.start_date && f.end_date && f.end_date !== f.start_date);
                   return (
                     <Pressable key={f.id} style={styles.flightRow} onPress={() => router.push(`/item/${f.id}`)}>
                       <View style={styles.flightTimeCol}>
-                        <Text style={styles.flightTimeText}>{f.time_start ?? "\u2014"}</Text>
-                        <Text style={styles.flightDateText}>{f.start_date ?? ""}</Text>
+                        <Text style={styles.flightTimeText}>{normalizeTimeHHMM(f.time_start) || "\u2014"}</Text>
+                        <Text style={styles.flightArrow}>{"\u2193"}</Text>
+                        <Text style={styles.flightTimeText}>
+                          {normalizeTimeHHMM(f.time_end) || "\u2014"}{arrivesNextDay ? " +1" : ""}
+                        </Text>
+                        <Text style={styles.flightDateText}>{formatDateDDMMYYYY(f.start_date)}</Text>
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.highlightTitle}>{f.title}</Text>
                         <Text style={styles.highlightMeta}>
-                          {[f.vendor, flightNumber].filter(Boolean).join(" \u00b7 ") || "No airline set"}
+                          {[f.vendor, flightNumber, durationText].filter(Boolean).join(" \u00b7 ") || "No airline set"}
                         </Text>
                       </View>
                     </Pressable>
@@ -95,12 +158,12 @@ export default function TripOverview() {
                 {lodgings.map((l) => (
                   <Pressable key={l.id} style={styles.flightRow} onPress={() => router.push(`/item/${l.id}`)}>
                     <View style={styles.flightTimeCol}>
-                      <Text style={styles.flightTimeText}>{l.time_start ?? "\u2014"}</Text>
-                      <Text style={styles.flightDateText}>{l.start_date ?? ""}</Text>
+                      <Text style={styles.flightTimeText}>{normalizeTimeHHMM(l.time_start) || "\u2014"}</Text>
+                      <Text style={styles.flightDateText}>{formatDateDDMMYYYY(l.start_date)}</Text>
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.highlightTitle}>{l.title}</Text>
-                      <Text style={styles.highlightMeta}>Until {l.end_date}</Text>
+                      <Text style={styles.highlightMeta}>Until {formatDateDDMMYYYY(l.end_date)}</Text>
                     </View>
                   </Pressable>
                 ))}
@@ -117,7 +180,7 @@ export default function TripOverview() {
             style={styles.dayRow}
             onPress={() => router.push(`/trip/${tripId}/day/${item.date}`)}
           >
-            <Text style={styles.date}>{item.date}</Text>
+            <Text style={styles.date}>{formatDateDDMMYYYY(item.date)}</Text>
             {item.theme ? <Text style={styles.theme}>{item.theme}</Text> : <Text style={styles.themeEmpty}>No title</Text>}
           </Pressable>
         )}
@@ -128,6 +191,7 @@ export default function TripOverview() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
+  headerButtons: { flexDirection: "row", alignItems: "center", gap: 8, marginRight: 14 },
   header: { marginBottom: 8 },
   tripName: { fontFamily: "Archivo_700Bold" as any, fontWeight: "800", fontSize: 22, color: colors.ink },
   tripDates: { color: colors.inkSoft, fontSize: 13, marginTop: 2 },
@@ -159,10 +223,11 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, marginBottom: 6, overflow: "hidden",
   },
   flightTimeCol: {
-    width: 72, alignSelf: "stretch", backgroundColor: colors.ink,
+    width: 78, alignSelf: "stretch", backgroundColor: colors.ink,
     alignItems: "center", justifyContent: "center", paddingVertical: 10,
   },
   flightTimeText: { fontFamily: "IBMPlexMono_500Medium", color: colors.paper, fontWeight: "700", fontSize: 13 },
+  flightArrow: { color: colors.amberSoft, fontSize: 10, marginVertical: 1 },
   flightDateText: { fontFamily: "IBMPlexMono_500Medium", color: colors.amberSoft, fontSize: 9, marginTop: 2 },
   highlightMono: { fontFamily: "IBMPlexMono_500Medium", color: colors.ink, fontWeight: "600", fontSize: 13 },
   highlightTitle: { color: colors.ink, fontWeight: "600", fontSize: 13, paddingLeft: 12, paddingTop: 10 },

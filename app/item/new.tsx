@@ -1,20 +1,23 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  View, Text, TextInput, Pressable, StyleSheet, ScrollView, Alert, Switch,
+  View, Text, TextInput, Pressable, StyleSheet, ScrollView, Switch,
 } from "react-native";
+import { Alert } from "@/lib/alert";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
 import { categoryByKey } from "@/lib/itemTypeMeta";
 import { computeInsertSortOrder } from "@/lib/reorder";
 import { DateField, TimeField } from "@/components/DateTimeFields";
-import { ItemStatus } from "@/lib/types";
+import { computeDurationMinutes, formatDuration } from "@/lib/duration";
+import { Item, ItemStatus } from "@/lib/types";
+import HomeButton from "@/components/HomeButton";
 
-const STATUSES: ItemStatus[] = ["booked", "optional", "idea", "pending"];
+const STATUSES: ItemStatus[] = ["planned", "booked", "optional", "idea"];
 
 export default function NewItem() {
-  const { tripId, dayId, date, category } = useLocalSearchParams<{
-    tripId: string; dayId: string; date: string; category: string;
+  const { tripId, dayId, date, category, duplicateFrom } = useLocalSearchParams<{
+    tripId: string; dayId: string; date: string; category: string; duplicateFrom?: string;
   }>();
   const router = useRouter();
   const cat = categoryByKey(category ?? "other");
@@ -22,7 +25,7 @@ export default function NewItem() {
 
   const [title, setTitle] = useState("");
   const [subtype, setSubtype] = useState(cat.dbTypes[0]);
-  const [status, setStatus] = useState<ItemStatus>("booked");
+  const [status, setStatus] = useState<ItemStatus>("planned");
   const [itemDate, setItemDate] = useState(date ?? "");
   const [time, setTime] = useState("");
   const [address, setAddress] = useState("");
@@ -32,7 +35,6 @@ export default function NewItem() {
   const [bookingSource, setBookingSource] = useState("");
   const [confirmationCode, setConfirmationCode] = useState("");
   const [link, setLink] = useState("");
-  const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
 
   // Lodging-specific
@@ -42,10 +44,60 @@ export default function NewItem() {
   const [checkOutTime, setCheckOutTime] = useState("");
   const [autoCreateEvents, setAutoCreateEvents] = useState(true);
 
+  // Flight-specific (departure reuses itemDate/time above)
+  const [arrivalDate, setArrivalDate] = useState("");
+  const [arrivalTime, setArrivalTime] = useState("");
+
+  // Duplicating an existing item: this screen is otherwise identical to a
+  // blank "new item" form, so the copy only becomes a real row once Save is
+  // pressed here — nothing is written on tapping Duplicate itself. tripId/
+  // dayId/date/category are pre-derived by the caller from the source item,
+  // so only the descriptive fields need filling in once it loads.
+  useEffect(() => {
+    if (!duplicateFrom) return;
+    supabase.from("items").select("*").eq("id", duplicateFrom).single().then(({ data }) => {
+      if (!data) return;
+      const src = data as Item;
+      setTitle(`${src.title} (copy)`);
+      setSubtype(src.type);
+      setStatus(src.status);
+      setAddress(src.address ?? "");
+      setPhone(src.phone ?? "");
+      setVendor(src.vendor ?? "");
+      setFlightNumber((src.custom_fields as any)?.flight_number ?? "");
+      setBookingSource(src.booking_source ?? "");
+      setConfirmationCode(src.confirmation_code ?? "");
+      setLink(src.link ?? "");
+      if (src.is_stay_span) {
+        setCheckInDate(src.start_date ?? "");
+        setCheckInTime(src.time_start ?? "");
+        setCheckOutDate(src.end_date ?? "");
+        setCheckOutTime(src.time_end ?? "");
+      } else {
+        setItemDate(src.start_date ?? "");
+        setTime(src.time_start ?? "");
+        setArrivalDate(src.end_date ?? "");
+        setArrivalTime(src.time_end ?? "");
+      }
+    });
+  }, [duplicateFrom]);
+
+  const durationMinutes = computeDurationMinutes(itemDate, time, arrivalDate, arrivalTime);
+  const durationInvalid = durationMinutes !== null && durationMinutes < 0;
+  const durationLabel = durationMinutes === null
+    ? null
+    : durationInvalid
+      ? "Arrival must be after departure."
+      : `Flight duration: ${formatDuration(durationMinutes)}`;
+
   async function save() {
     if (!title) { Alert.alert("Missing info", "Title is required."); return; }
     if (has("lodgingDates") && (!checkInDate || !checkOutDate)) {
       Alert.alert("Missing info", "Check-in and check-out dates are required for lodging.");
+      return;
+    }
+    if (has("flightTimes") && durationInvalid) {
+      Alert.alert("Check the times", "Arrival must be after departure.");
       return;
     }
     setSaving(true);
@@ -61,7 +113,6 @@ export default function NewItem() {
       booking_source: bookingSource || null,
       confirmation_code: confirmationCode || null,
       link: link || null,
-      notes: notes || null,
       custom_fields: flightNumber ? { flight_number: flightNumber } : {},
     };
 
@@ -134,6 +185,8 @@ export default function NewItem() {
         day_id: targetDayId,
         start_date: itemDate || null,
         time_start: time || null,
+        end_date: has("flightTimes") ? (arrivalDate || null) : null,
+        time_end: has("flightTimes") ? (arrivalTime || null) : null,
         sort_order: await siblingSortOrder(targetDayId, time || null),
       });
       if (error) {
@@ -149,7 +202,14 @@ export default function NewItem() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 20 }}>
-      <Stack.Screen options={{ title: `Add ${cat.label}` }} />
+      <Stack.Screen options={{
+        title: duplicateFrom ? `Duplicate ${cat.label}` : `Add ${cat.label}`,
+        headerRight: () => (
+          <View style={{ marginRight: 14 }}>
+            <HomeButton />
+          </View>
+        ),
+      }} />
 
       <Text style={styles.label}>Title</Text>
       <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder={cat.label} />
@@ -183,6 +243,22 @@ export default function NewItem() {
             <Switch value={autoCreateEvents} onValueChange={setAutoCreateEvents} />
             <Text style={styles.switchLabel}>Also add check-in / check-out to the day timeline</Text>
           </View>
+        </>
+      ) : has("flightTimes") ? (
+        <>
+          <View style={styles.row}>
+            <DateField label="Departure date" value={itemDate} onChange={setItemDate} />
+            <View style={{ width: 10 }} />
+            <TimeField label="Departure time" value={time} onChange={setTime} />
+          </View>
+          <View style={styles.row}>
+            <DateField label="Arrival date" value={arrivalDate} onChange={setArrivalDate} />
+            <View style={{ width: 10 }} />
+            <TimeField label="Arrival time (landing)" value={arrivalTime} onChange={setArrivalTime} />
+          </View>
+          {durationLabel && (
+            <Text style={[styles.hint, durationInvalid && styles.hintError]}>{durationLabel}</Text>
+          )}
         </>
       ) : (
         <View style={styles.row}>
@@ -229,13 +305,8 @@ export default function NewItem() {
         <><Text style={styles.label}>Link</Text>
         <TextInput style={styles.input} value={link} onChangeText={setLink} autoCapitalize="none" placeholder="https://…" /></>
       )}
-      {has("notes") && (
-        <><Text style={styles.label}>Notes</Text>
-        <TextInput style={[styles.input, { height: 90 }]} value={notes} onChangeText={setNotes} multiline /></>
-      )}
-
       <Pressable style={styles.button} onPress={save} disabled={saving}>
-        <Text style={styles.buttonText}>{saving ? "Saving…" : "Add item"}</Text>
+        <Text style={styles.buttonText}>{saving ? "Saving…" : duplicateFrom ? "Save duplicate" : "Add item"}</Text>
       </Pressable>
     </ScrollView>
   );
@@ -248,6 +319,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,
     borderRadius: radius.md, padding: 12, fontSize: 15, color: colors.ink,
   },
+  hint: { color: colors.inkSoft, fontSize: 11, marginTop: 6, fontStyle: "italic" },
+  hintError: { color: colors.coral, fontStyle: "normal", fontWeight: "600" },
   row: { flexDirection: "row" },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.paperRaised },

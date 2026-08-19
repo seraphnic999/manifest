@@ -10,12 +10,13 @@ interface PickableItem {
 }
 
 export default function ItemPickerModal({
-  visible, onClose, onSelect, tripId,
+  visible, onClose, onSelect, tripId, excludeIds,
 }: {
   visible: boolean;
   onClose: () => void;
   onSelect: (item: PickableItem) => void;
   tripId: string;
+  excludeIds?: string[];
 }) {
   const [allItems, setAllItems] = useState<PickableItem[]>([]);
   const [search, setSearch] = useState("");
@@ -26,7 +27,9 @@ export default function ItemPickerModal({
       .then(({ data }) => data && setAllItems(data as PickableItem[]));
   }, [visible, tripId]);
 
-  const filtered = allItems.filter((i) => i.title.toLowerCase().includes(search.toLowerCase()));
+  const filtered = allItems
+    .filter((i) => !excludeIds?.includes(i.id))
+    .filter((i) => i.title.toLowerCase().includes(search.toLowerCase()));
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -61,7 +64,10 @@ export default function ItemPickerModal({
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: "rgba(33,47,61,0.5)", justifyContent: "flex-end" },
-  sheet: { backgroundColor: colors.paper, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: "80%" },
+  sheet: {
+    backgroundColor: colors.paper, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: "80%",
+    width: "100%", maxWidth: 480, alignSelf: "center",
+  },
   title: { fontFamily: "Archivo_700Bold" as any, fontWeight: "800", fontSize: 18, color: colors.ink, marginBottom: 12 },
   input: {
     backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,

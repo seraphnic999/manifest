@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
 import { Trip, tripStatus } from "@/lib/types";
+import { formatDateDDMMYYYY } from "@/lib/dateFormat";
 
 export default function TripList() {
   const [trips, setTrips] = useState<Trip[]>([]);
@@ -27,11 +28,15 @@ export default function TripList() {
     setRefreshing(false);
   };
 
-  const grouped = {
-    current: trips.filter((t) => tripStatus(t) === "current"),
-    future: trips.filter((t) => tripStatus(t) === "future"),
-    past: trips.filter((t) => tripStatus(t) === "past"),
-  };
+  // Upcoming = not finished yet (already in progress or still to come), soonest
+  // first. Previous = already over, most recently ended first (going further
+  // back in time below that).
+  const upcoming = trips
+    .filter((t) => tripStatus(t) !== "past")
+    .sort((a, b) => a.start_date.localeCompare(b.start_date));
+  const previous = trips
+    .filter((t) => tripStatus(t) === "past")
+    .sort((a, b) => b.start_date.localeCompare(a.start_date));
 
   return (
     <View style={styles.container}>
@@ -50,9 +55,8 @@ export default function TripList() {
         contentContainerStyle={{ padding: 16 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         data={[
-          { label: "Current", items: grouped.current },
-          { label: "Upcoming", items: grouped.future },
-          { label: "Past", items: grouped.past },
+          { label: "Upcoming Trips", items: upcoming },
+          { label: "Previous Trips", items: previous },
         ]}
         keyExtractor={(s) => s.label}
         renderItem={({ item: section }) =>
@@ -68,7 +72,7 @@ export default function TripList() {
                   <Text style={styles.tag}>{trip.type.toUpperCase()}</Text>
                   <Text style={styles.cardTitle}>{trip.name}</Text>
                   <Text style={styles.dates}>
-                    {trip.start_date} – {trip.end_date}
+                    {formatDateDDMMYYYY(trip.start_date)} – {formatDateDDMMYYYY(trip.end_date)}
                   </Text>
                 </Pressable>
               ))}
