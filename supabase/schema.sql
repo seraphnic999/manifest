@@ -389,6 +389,44 @@ create trigger trg_trips_generate_days
   after insert or update of start_date, end_date on trips
   for each row execute function generate_trip_days();
 
+-- ---------- Trip ownership enforcement (insert/update) ----------
+-- RLS's WITH CHECK is unreliable specifically for dedicated FOR INSERT
+-- policies on this project (verified extensively live — see
+-- migration_007/migration_008 for the full diagnosis: a trivial,
+-- unconditional `for insert with check (true)` was still rejected, while
+-- the identical check expressed as a FOR ALL policy works). Ownership is
+-- enforced here instead via triggers, which run through the same
+-- evaluation path already proven reliable (a plain function-body read of
+-- auth.uid()), with the RLS policy itself reduced to a pass-through.
+
+create or replace function trips_force_owner()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.user_id := auth.uid();
+  return new;
+end;
+$$;
+
+create trigger trg_trips_force_owner
+  before insert on trips
+  for each row execute function trips_force_owner();
+
+create or replace function trips_prevent_user_id_change()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.user_id := old.user_id;
+  return new;
+end;
+$$;
+
+create trigger trg_trips_prevent_user_id_change
+  before update on trips
+  for each row execute function trips_prevent_user_id_change();
+
 -- ---------- Row Level Security ----------
 
 alter table trips enable row level security;
@@ -516,8 +554,27 @@ grant execute on function claim_pending_trip_shares() to authenticated;
 
 create policy trips_select on trips for select using (user_has_trip_access(id));
 create policy trips_update on trips for update using (user_has_trip_access(id)) with check (user_has_trip_access(id));
-create policy trips_insert on trips for insert with check (user_id = auth.uid());
-create policy trips_delete on trips for delete using (user_id = auth.uid());
+
+create function user_owns_trip(p_trip_id uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (select 1 from trips where trips.id = p_trip_id and trips.user_id = auth.uid());
+$$;
+
+grant execute on function user_owns_trip(uuid) to authenticated;
+
+-- FOR ALL (not a dedicated FOR INSERT policy) is required — see the
+-- trigger comment above for why. `using` matches what trips_select and
+-- trips_delete already independently allow, so it grants nothing extra
+-- for SELECT/UPDATE-eligibility/DELETE; `with check (true)` permits
+-- INSERT unconditionally since trg_trips_force_owner already guarantees
+-- correct ownership regardless of what the client sends.
+create policy trips_insert_all on trips for all using (user_id = auth.uid()) with check (true);
+create policy trips_delete on trips for delete using (user_owns_trip(id));
 
 create policy trip_currencies_owner on trip_currencies
   for all using (user_has_trip_access(trip_id))
