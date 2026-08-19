@@ -1,6 +1,6 @@
-import { useEffect, useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { View, Text, FlatList, StyleSheet, Pressable, RefreshControl } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
 import { Trip, tripStatus } from "@/lib/types";
@@ -20,7 +20,7 @@ export default function TripList() {
     if (!error && data) setTrips(data as Trip[]);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const onRefresh = async () => {
     setRefreshing(true);

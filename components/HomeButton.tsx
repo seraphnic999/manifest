@@ -17,7 +17,7 @@ export default function HomeButton() {
     }
   }
   return (
-    <HeaderIconButton onPress={goHome}>
+    <HeaderIconButton onPress={goHome} accessibilityLabel="Home">
       <Ionicons name="home" size={16} color={colors.ink} />
     </HeaderIconButton>
   );
