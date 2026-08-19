@@ -171,7 +171,7 @@ begin
 
   -- ---------- 16/08 Sun - Barcelona + flight home ----------
   insert into items (trip_id, day_id, type, title, time_start, time_end, vendor, confirmation_code, address, phone, booking_source, status, notes, sort_order, custom_fields) values
-  (v_trip_id, d16, 'other',       'Locker near Placa Catalunya', null,    null, null, null, null, null, null, 'pending', 'Need to book', 200, '{}'),
+  (v_trip_id, d16, 'other',       'Locker near Placa Catalunya', null,    null, null, null, null, null, null, 'planned', 'Need to book', 200, '{}'),
   (v_trip_id, d16, 'sightseeing', 'Bunkers of Carmel or Montjuic', null,  null, null, null, null, null, null, 'idea',    null, 300, '{}'),
   (v_trip_id, d16, 'flight',      'BCN to TLV',                  '22:35', '03:40', 'El Al', 'XWKTMD', null, null, null, 'booked', 'Lands 03:40 (next day)', 400, '{"flight_number": "LY392"}');
 

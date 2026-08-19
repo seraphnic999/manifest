@@ -13,18 +13,22 @@ create type trip_type as enum ('business', 'pleasure', 'mixed');
 
 create type item_type as enum (
   'flight', 'transfer', 'transport', 'lodging', 'activity',
-  'meal', 'bar', 'sightseeing', 'shopping', 'work', 'other'
+  'meal', 'bar', 'sightseeing', 'attraction', 'shopping', 'work', 'other'
 );
 -- 'transfer'  = pre-booked private transfer (taxi, Transfeero-style car)
 -- 'transport' = public transport instructions/legs (train, bus, shuttle)
 
-create type item_status as enum ('booked', 'optional', 'idea', 'pending');
+create type item_status as enum ('booked', 'optional', 'idea', 'planned');
+-- A closed, smaller list than item_type (transfers fold into 'transport',
+-- bar tabs fold into 'meals') since this drives the expense report's
+-- category breakdown, not a general-purpose taxonomy.
+create type expense_type as enum ('flight', 'lodging', 'transport', 'meals', 'attractions', 'shopping', 'other');
 
 -- ---------- Trips ----------
 
 create table trips (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users(id) on delete cascade,
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
   name text not null,
   start_date date not null,
   end_date date not null,
@@ -114,7 +118,7 @@ create table items (
   is_stay_span boolean not null default false, -- true only for the multi-day lodging "stay" item itself;
                                                 -- check-in/check-out are separate ordinary items
                                                 -- (parent_item_id -> this item) with their own time/sort_order
-  notes text,                        -- long freeform text / directions
+  notes text,                        -- deprecated: superseded by item_quick_notes; app no longer reads/writes this
   confirmation_code text,
   booking_source text,               -- how it was booked: 'Direct', 'Expedia', 'GetYourGuide', etc.
                                       -- (free text w/ a suggested-values list in the app, not a DB enum,
@@ -146,11 +150,43 @@ create table item_photos (
   item_id uuid not null references items(id) on delete cascade,
   storage_path text not null,        -- path in Supabase Storage
   caption text,
+  file_name text,                    -- original filename; null for older photo-only rows
+  mime_type text,                    -- null mime_type = image (every row before file attachments existed)
   sort_order int not null default 0,
   created_at timestamptz not null default now()
 );
 
 create index idx_item_photos_item on item_photos(item_id);
+
+-- ---------- Item-to-item links (cross-navigation between related items) ----------
+-- One row per link; item_id_a is always the lexically-smaller uuid of the
+-- pair (enforced in application code, not here) so a link only ever exists
+-- in one direction and "is A linked to B" is a single unique check.
+create table item_links (
+  id uuid primary key default gen_random_uuid(),
+  item_id_a uuid not null references items(id) on delete cascade,
+  item_id_b uuid not null references items(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  constraint item_links_no_self check (item_id_a <> item_id_b),
+  constraint item_links_unique unique (item_id_a, item_id_b)
+);
+
+create index idx_item_links_a on item_links(item_id_a);
+create index idx_item_links_b on item_links(item_id_b);
+
+-- ---------- Quick single-line notes on items ----------
+-- Distinct from items.notes (one long free-text field, edited via the full
+-- edit form) — this is a list of short standalone notes addable/removable
+-- in one tap from the item details page, no edit-mode round trip needed.
+create table item_quick_notes (
+  id uuid primary key default gen_random_uuid(),
+  item_id uuid not null references items(id) on delete cascade,
+  text text not null default '',
+  sort_order int not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create index idx_item_quick_notes_item on item_quick_notes(item_id);
 
 -- ---------- Shopping list ----------
 
@@ -178,6 +214,9 @@ create table expenses (
   amount numeric(12,2) not null,
   expense_date date,
   note text,
+  type expense_type not null default 'other',
+  refund_amount numeric(12,2),       -- optional; same currency as this expense; not part of the split
+  refund_company text,               -- e.g. "Global Blue"
   created_at timestamptz not null default now()
 );
 
@@ -192,6 +231,7 @@ create table allocations (
   amount numeric(12,2) not null,     -- in the expense's currency; sum should equal expense.amount
   shopping_list_item_id uuid references shopping_list_items(id) on delete set null,
   party_id uuid references trip_parties(id) on delete set null,  -- null = self / not owed
+  note text,                         -- optional note for this split specifically
   created_at timestamptz not null default now(),
   constraint allocation_amount_positive check (amount > 0)
 );
@@ -199,6 +239,24 @@ create table allocations (
 create index idx_allocations_expense on allocations(expense_id);
 create index idx_allocations_shopping_item on allocations(shopping_list_item_id);
 create index idx_allocations_party on allocations(party_id);
+
+-- ---------- Trip sharing ----------
+-- Lets a trip be collaboratively edited by more than one account. Invites
+-- are by email; if the invited address hasn't signed up yet, the row sits
+-- with shared_with_user_id null until claim_pending_trip_shares() (called
+-- once after login) resolves it.
+
+create table trip_shares (
+  id uuid primary key default gen_random_uuid(),
+  trip_id uuid not null references trips(id) on delete cascade,
+  invited_email text not null,
+  shared_with_user_id uuid references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  constraint trip_shares_unique unique (trip_id, invited_email)
+);
+
+create index idx_trip_shares_trip on trip_shares(trip_id);
+create index idx_trip_shares_user on trip_shares(shared_with_user_id);
 
 -- ============================================================
 -- Notes on app-level logic (not enforced in SQL):
@@ -342,75 +400,202 @@ alter table shopping_list_items enable row level security;
 alter table expenses enable row level security;
 alter table allocations enable row level security;
 alter table item_photos enable row level security;
+alter table item_links enable row level security;
+alter table item_quick_notes enable row level security;
+alter table trip_shares enable row level security;
 
-create policy trips_owner on trips
-  for all using (user_id = auth.uid())
-  with check (user_id = auth.uid());
+-- A share row is visible to the trip owner (to manage who it's shared with)
+-- and to the person it names (to see their own shared trips). No insert/
+-- update/delete policy is defined at all — direct client writes are denied
+-- by default once RLS is on; every write instead goes through the
+-- security-definer functions below, which is what lets share_trip_with_email
+-- resolve an email to a user id (auth.users isn't client-readable) without
+-- granting broader table access to do it.
+create policy trip_shares_visible on trip_shares
+  for select using (
+    shared_with_user_id = auth.uid()
+    or exists (select 1 from trips where trips.id = trip_shares.trip_id and trips.user_id = auth.uid())
+  );
+
+-- True for the trip's owner (identical to the plain ownership check this
+-- replaces) OR for anyone the trip has been shared with. Every other policy
+-- below is built on this, so sharing only ever adds access, never removes it.
+create function user_has_trip_access(p_trip_id uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (
+    select 1 from trips where trips.id = p_trip_id and trips.user_id = auth.uid()
+  ) or exists (
+    select 1 from trip_shares where trip_shares.trip_id = p_trip_id and trip_shares.shared_with_user_id = auth.uid()
+  );
+$$;
+
+-- Storage policies run in a context where a plain (non-security-definer)
+-- subquery into an RLS-protected public-schema table is unreliable — the
+-- JWT claims auth.uid() reads don't always propagate correctly into that
+-- nested lookup, so a subquery-based storage policy can spuriously deny
+-- access even for the trip's own owner. Wrapping the check in its own
+-- security-definer function (same pattern as user_has_trip_access) avoids
+-- the nested-RLS lookup entirely and is the pattern Supabase itself
+-- recommends for storage policies that need to check application data.
+create function storage_path_owner_has_trip_access(p_path text)
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (
+    select 1 from trips
+    where trips.user_id::text = (storage.foldername(p_path))[1]
+      and user_has_trip_access(trips.id)
+  );
+$$;
+
+grant execute on function storage_path_owner_has_trip_access(text) to authenticated;
+
+create function share_trip_with_email(p_trip_id uuid, p_email text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user_id uuid;
+begin
+  if not exists (select 1 from trips where id = p_trip_id and user_id = auth.uid()) then
+    raise exception 'Only the trip owner can share it';
+  end if;
+
+  select id into v_user_id from auth.users where lower(email) = lower(p_email) limit 1;
+
+  insert into trip_shares (trip_id, invited_email, shared_with_user_id)
+  values (p_trip_id, lower(p_email), v_user_id)
+  on conflict (trip_id, invited_email) do update set shared_with_user_id = excluded.shared_with_user_id;
+end;
+$$;
+
+create function unshare_trip(p_trip_id uuid, p_email text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not exists (select 1 from trips where id = p_trip_id and user_id = auth.uid()) then
+    raise exception 'Only the trip owner can remove a share';
+  end if;
+  delete from trip_shares where trip_id = p_trip_id and lower(invited_email) = lower(p_email);
+end;
+$$;
+
+-- Called once after login: attaches any share invited by this account's own
+-- email address that was created before the invitee had signed up.
+create function claim_pending_trip_shares()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update trip_shares
+  set shared_with_user_id = auth.uid()
+  where shared_with_user_id is null
+    and invited_email = lower((select email from auth.users where id = auth.uid()));
+end;
+$$;
+
+grant execute on function user_has_trip_access(uuid) to authenticated;
+grant execute on function share_trip_with_email(uuid, text) to authenticated;
+grant execute on function unshare_trip(uuid, text) to authenticated;
+grant execute on function claim_pending_trip_shares() to authenticated;
+
+create policy trips_select on trips for select using (user_has_trip_access(id));
+create policy trips_update on trips for update using (user_has_trip_access(id)) with check (user_has_trip_access(id));
+create policy trips_insert on trips for insert with check (user_id = auth.uid());
+create policy trips_delete on trips for delete using (user_id = auth.uid());
 
 create policy trip_currencies_owner on trip_currencies
-  for all using (exists (select 1 from trips where trips.id = trip_currencies.trip_id and trips.user_id = auth.uid()))
-  with check (exists (select 1 from trips where trips.id = trip_currencies.trip_id and trips.user_id = auth.uid()));
+  for all using (user_has_trip_access(trip_id))
+  with check (user_has_trip_access(trip_id));
 
 create policy trip_parties_owner on trip_parties
-  for all using (exists (select 1 from trips where trips.id = trip_parties.trip_id and trips.user_id = auth.uid()))
-  with check (exists (select 1 from trips where trips.id = trip_parties.trip_id and trips.user_id = auth.uid()));
+  for all using (user_has_trip_access(trip_id))
+  with check (user_has_trip_access(trip_id));
 
 create policy days_owner on days
-  for all using (exists (select 1 from trips where trips.id = days.trip_id and trips.user_id = auth.uid()))
-  with check (exists (select 1 from trips where trips.id = days.trip_id and trips.user_id = auth.uid()));
+  for all using (user_has_trip_access(trip_id))
+  with check (user_has_trip_access(trip_id));
 
 create policy items_owner on items
-  for all using (exists (select 1 from trips where trips.id = items.trip_id and trips.user_id = auth.uid()))
-  with check (exists (select 1 from trips where trips.id = items.trip_id and trips.user_id = auth.uid()));
+  for all using (user_has_trip_access(trip_id))
+  with check (user_has_trip_access(trip_id));
 
 create policy shopping_list_items_owner on shopping_list_items
-  for all using (exists (select 1 from trips where trips.id = shopping_list_items.trip_id and trips.user_id = auth.uid()))
-  with check (exists (select 1 from trips where trips.id = shopping_list_items.trip_id and trips.user_id = auth.uid()));
+  for all using (user_has_trip_access(trip_id))
+  with check (user_has_trip_access(trip_id));
 
 create policy expenses_owner on expenses
-  for all using (exists (select 1 from trips where trips.id = expenses.trip_id and trips.user_id = auth.uid()))
-  with check (exists (select 1 from trips where trips.id = expenses.trip_id and trips.user_id = auth.uid()));
+  for all using (user_has_trip_access(trip_id))
+  with check (user_has_trip_access(trip_id));
 
 create policy allocations_owner on allocations
   for all using (exists (
       select 1 from expenses
-      join trips on trips.id = expenses.trip_id
-      where expenses.id = allocations.expense_id and trips.user_id = auth.uid()
+      where expenses.id = allocations.expense_id and user_has_trip_access(expenses.trip_id)
     ))
   with check (exists (
       select 1 from expenses
-      join trips on trips.id = expenses.trip_id
-      where expenses.id = allocations.expense_id and trips.user_id = auth.uid()
+      where expenses.id = allocations.expense_id and user_has_trip_access(expenses.trip_id)
     ));
 
 create policy item_photos_owner on item_photos
   for all using (exists (
       select 1 from items
-      join trips on trips.id = items.trip_id
-      where items.id = item_photos.item_id and trips.user_id = auth.uid()
+      where items.id = item_photos.item_id and user_has_trip_access(items.trip_id)
     ))
   with check (exists (
       select 1 from items
-      join trips on trips.id = items.trip_id
-      where items.id = item_photos.item_id and trips.user_id = auth.uid()
+      where items.id = item_photos.item_id and user_has_trip_access(items.trip_id)
+    ));
+
+create policy item_links_owner on item_links
+  for all using (exists (
+      select 1 from items
+      where items.id = item_links.item_id_a and user_has_trip_access(items.trip_id)
+    ))
+  with check (exists (
+      select 1 from items
+      where items.id = item_links.item_id_a and user_has_trip_access(items.trip_id)
+    ));
+
+create policy item_quick_notes_owner on item_quick_notes
+  for all using (exists (
+      select 1 from items
+      where items.id = item_quick_notes.item_id and user_has_trip_access(items.trip_id)
+    ))
+  with check (exists (
+      select 1 from items
+      where items.id = item_quick_notes.item_id and user_has_trip_access(items.trip_id)
     ));
 
 -- ---------- Storage: item photo files ----------
--- Objects are stored at path "{user_id}/{item_id}/{filename}" — the policies
--- below trust that convention to scope access without a join, since storage
--- RLS can't easily join back to the items/trips tables per-request.
+-- Objects are stored at path "{trip_owner_user_id}/{item_id}/{filename}" —
+-- lib/photos.ts resolves and uses the trip OWNER's id for this prefix
+-- regardless of which collaborator uploads, so this check never needs the
+-- item_photos row to exist yet at upload time (it's written to storage
+-- before the row referencing it is inserted) — it only needs the path's
+-- leading segment to belong to a trip this user has access to.
 
 insert into storage.buckets (id, name, public)
 values ('item-photos', 'item-photos', false)
 on conflict (id) do nothing;
 
-create policy item_photos_storage_owner on storage.objects
-  for all using (
-    bucket_id = 'item-photos'
-    and (storage.foldername(name))[1] = auth.uid()::text
-  )
-  with check (
-    bucket_id = 'item-photos'
-    and (storage.foldername(name))[1] = auth.uid()::text
-  );
+create policy item_photos_storage_shared on storage.objects
+  for all using (bucket_id = 'item-photos' and storage_path_owner_has_trip_access(name))
+  with check (bucket_id = 'item-photos' and storage_path_owner_has_trip_access(name));
 -- ============================================================
