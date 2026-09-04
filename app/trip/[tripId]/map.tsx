@@ -4,15 +4,15 @@ import { useLocalSearchParams, useRouter, Stack, useFocusEffect } from "expo-rou
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
-import { Day, Item, ItemType, TripPlace, MapRoute, TripType } from "@/lib/types";
+import { Day, Item, ItemType, MapRoute, TripType } from "@/lib/types";
 import { ITEM_CATEGORIES, categoryByKey } from "@/lib/itemTypeMeta";
 import {
   MapItem, buildDayColorMap, fetchTripDays, fetchTripMapItems,
-  fetchTripRoutes, fetchTripPlaces, NEUTRAL_DAY_COLOR, PLACE_COLOR,
+  fetchTripRoutes, NEUTRAL_DAY_COLOR,
 } from "@/lib/mapData";
 import TripMap from "@/components/TripMap";
 import TripNavBar from "@/components/TripNavBar";
-import AddPlaceModal from "@/components/AddPlaceModal";
+import ItemTypePickerModal from "@/components/ItemTypePickerModal";
 import HomeButton from "@/components/HomeButton";
 import { formatDateDDMM } from "@/lib/dateFormat";
 
@@ -34,39 +34,39 @@ export default function TripMapScreen() {
   const [days, setDays] = useState<Day[]>([]);
   const [items, setItems] = useState<MapItem[]>([]);
   const [routes, setRoutes] = useState<MapRoute[]>([]);
-  const [places, setPlaces] = useState<TripPlace[]>([]);
   const [tripType, setTripType] = useState<TripType | null>(null);
 
   const [visibleDayIds, setVisibleDayIds] = useState<Set<string>>(new Set());
   const [visibleTypes, setVisibleTypes] = useState<Set<ItemType>>(DEFAULT_VISIBLE_TYPES);
-  const [showPlaces, setShowPlaces] = useState(false);
-  const [placeModalOpen, setPlaceModalOpen] = useState(false);
-  const [editingPlace, setEditingPlace] = useState<TripPlace | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const load = useCallback(async () => {
-    const [d, i, r, p, tripRes] = await Promise.all([
-      fetchTripDays(tripId), fetchTripMapItems(tripId), fetchTripRoutes(tripId), fetchTripPlaces(tripId),
+    const [d, i, r, tripRes] = await Promise.all([
+      fetchTripDays(tripId), fetchTripMapItems(tripId), fetchTripRoutes(tripId),
       supabase.from("trips").select("type").eq("id", tripId).single(),
     ]);
     setDays(d);
     setItems(i);
     setRoutes(r);
-    setPlaces(p);
     if (tripRes.data) setTripType(tripRes.data.type as TripType);
-    setVisibleDayIds((prev) => (prev.size === 0 ? new Set(d.map((day) => day.id)) : prev));
+    // The "Proposals" day (date === null) starts off — everything else on.
+    setVisibleDayIds((prev) => (prev.size === 0 ? new Set(d.filter((day) => day.date !== null).map((day) => day.id)) : prev));
 
     // Coming from an item's "View on map" link: make sure the day/type
-    // filters don't hide it (day is all-visible by default already; type
-    // only matters if it's a flight/transfer, hidden by default).
+    // filters don't hide it.
     if (focusItemId) {
       const focused = i.find((it) => it.id === focusItemId);
-      if (focused) setVisibleTypes((prev) => new Set(prev).add(focused.type));
+      if (focused) {
+        setVisibleTypes((prev) => new Set(prev).add(focused.type));
+        if (focused.day_id) setVisibleDayIds((prev) => new Set(prev).add(focused.day_id!));
+      }
     }
   }, [tripId, focusItemId]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const dayColors = buildDayColorMap(days);
+  const proposalsDayId = days.find((d) => d.date === null)?.id;
 
   function toggleDay(id: string) {
     setVisibleDayIds((prev) => {
@@ -84,14 +84,10 @@ export default function TripMapScreen() {
     });
   }
 
-  function openPlace(place: TripPlace) {
-    setEditingPlace(place);
-    setPlaceModalOpen(true);
-  }
-
-  function openNewPlace() {
-    setEditingPlace(null);
-    setPlaceModalOpen(true);
+  function handleSelectCategory(categoryKey: string) {
+    setPickerOpen(false);
+    if (!proposalsDayId) return;
+    router.push(`/item/new?tripId=${tripId}&dayId=${proposalsDayId}&category=${categoryKey}`);
   }
 
   return (
@@ -108,21 +104,17 @@ export default function TripMapScreen() {
       <TripNavBar tripId={tripId} active="map" />
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow} style={styles.filterRowOuter}>
-        {days.map((d, idx) => (
+        {days.map((d) => (
           <Pressable
             key={d.id}
             style={[styles.chip, { borderColor: dayColors.get(d.id) }, visibleDayIds.has(d.id) && { backgroundColor: dayColors.get(d.id) }]}
             onPress={() => toggleDay(d.id)}
           >
-            <Text style={[styles.chipText, visibleDayIds.has(d.id) && styles.chipTextActive]}>{formatDateDDMM(d.date)}</Text>
+            <Text style={[styles.chipText, visibleDayIds.has(d.id) && styles.chipTextActive]}>
+              {d.date === null ? "Proposals" : formatDateDDMM(d.date)}
+            </Text>
           </Pressable>
         ))}
-        <Pressable
-          style={[styles.chip, { borderColor: PLACE_COLOR }, showPlaces && { backgroundColor: PLACE_COLOR }]}
-          onPress={() => setShowPlaces((v) => !v)}
-        >
-          <Text style={[styles.chipText, showPlaces && styles.chipTextActive]}>Places</Text>
-        </Pressable>
       </ScrollView>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow} style={styles.filterRowOuter}>
@@ -148,29 +140,20 @@ export default function TripMapScreen() {
         <TripMap
           items={items}
           routes={routes}
-          places={places}
           dayColors={dayColors}
           neutralColor={NEUTRAL_DAY_COLOR}
           visibleDayIds={visibleDayIds}
           visibleTypes={visibleTypes}
-          showPlaces={showPlaces}
           focusItemId={focusItemId}
           onItemPress={(item: Item) => router.push(`/item/${item.id}`)}
-          onPlacePress={openPlace}
         />
       </View>
 
-      <Pressable style={styles.fab} onPress={openNewPlace}>
-        <Text style={styles.fabText}>+ Add place</Text>
+      <Pressable style={styles.fab} onPress={() => setPickerOpen(true)}>
+        <Text style={styles.fabText}>+ Add proposal</Text>
       </Pressable>
 
-      <AddPlaceModal
-        visible={placeModalOpen}
-        onClose={() => setPlaceModalOpen(false)}
-        onSaved={() => { setPlaceModalOpen(false); load(); }}
-        tripId={tripId}
-        place={editingPlace}
-      />
+      <ItemTypePickerModal visible={pickerOpen} onClose={() => setPickerOpen(false)} onSelect={handleSelectCategory} />
     </View>
   );
 }

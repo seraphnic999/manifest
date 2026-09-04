@@ -182,10 +182,16 @@ export default function TripOverview() {
         renderItem={({ item }) => (
           <Pressable
             style={styles.dayRow}
-            onPress={() => router.push(`/trip/${tripId}/day/${item.date}`)}
+            onPress={() => router.push(`/trip/${tripId}/day/${item.date === null ? "proposals" : item.date}`)}
           >
-            <Text style={styles.date}>{formatDateDDMMYYYY(item.date)}</Text>
-            {item.theme ? <Text style={styles.theme}>{item.theme}</Text> : <Text style={styles.themeEmpty}>No title</Text>}
+            {item.date === null ? (
+              <Text style={styles.date}>Proposals</Text>
+            ) : (
+              <>
+                <Text style={styles.date}>{formatDateDDMMYYYY(item.date)}</Text>
+                {item.theme ? <Text style={styles.theme}>{item.theme}</Text> : <Text style={styles.themeEmpty}>No title</Text>}
+              </>
+            )}
           </Pressable>
         )}
       />

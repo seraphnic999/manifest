@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet } from "react-native";
 import { colors } from "@/lib/theme";
 import { MapItem } from "@/lib/mapData";
-import { MapRoute, TripPlace, ItemType } from "@/lib/types";
+import { MapRoute, ItemType } from "@/lib/types";
 
 // Native MapLibre rendering is Phase B of the map-view work (requires
 // @maplibre/maplibre-react-native + an expo prebuild/rebuild — see
@@ -11,15 +11,12 @@ import { MapRoute, TripPlace, ItemType } from "@/lib/types";
 export interface TripMapProps {
   items: MapItem[];
   routes: MapRoute[];
-  places: TripPlace[];
   dayColors: Map<string, string>;
   neutralColor: string;
   visibleDayIds: Set<string>;
   visibleTypes: Set<ItemType>;
-  showPlaces: boolean;
   focusItemId?: string;
   onItemPress: (item: MapItem) => void;
-  onPlacePress: (place: TripPlace) => void;
 }
 
 export default function TripMap(_props: TripMapProps) {

@@ -90,7 +90,11 @@ create index idx_trip_parties_trip on trip_parties(trip_id);
 create table days (
   id uuid primary key default gen_random_uuid(),
   trip_id uuid not null references trips(id) on delete cascade,
-  date date not null,
+  date date,                         -- null only for the one special "Proposals"
+                                      -- day every trip has (see trigger below) —
+                                      -- a holding pen for undated candidate items;
+                                      -- "promoting" one is just editing its date
+                                      -- to move it onto a real day.
   theme text,                        -- 'At sea', 'Working 1/2 day', etc.
   sort_order int not null,           -- explicit order, independent of date gaps
   created_at timestamptz not null default now(),
@@ -98,6 +102,7 @@ create table days (
 );
 
 create index idx_days_trip on days(trip_id);
+create unique index days_one_proposals_per_trip on days(trip_id) where date is null;
 
 -- ---------- Items ----------
 
@@ -268,12 +273,12 @@ create table trip_shares (
   constraint trip_shares_unique unique (trip_id, invited_email)
 );
 
--- ---------- Map: routes & places ----------
--- map_routes are hand-drawn walking-route polylines that don't correspond
--- to any item. trip_places are non-itinerary "shortlist" pins (runner-up
--- restaurants, unchosen museums) — deliberately NOT items, since they have
--- no day/time and would otherwise pollute every day-by-day/trip-wide
--- items query. Both are a pure map-layer concept.
+-- ---------- Map: routes ----------
+-- Hand-drawn walking-route polylines that don't correspond to any item.
+-- Non-itinerary "shortlist" places (runner-up restaurants, unchosen
+-- museums) used to live in a separate trip_places table, but that's been
+-- superseded by the "Proposals" day (see days.date above) — they're now
+-- just ordinary items with day_id pointing at that day.
 
 create table map_routes (
   id uuid primary key default gen_random_uuid(),
@@ -289,24 +294,6 @@ create table map_routes (
 );
 
 create index idx_map_routes_trip on map_routes(trip_id) where deleted_at is null;
-
-create table trip_places (
-  id uuid primary key default gen_random_uuid(),
-  trip_id uuid not null references trips(id) on delete cascade,
-  name text not null,
-  category text,                     -- free text (not item_type) — only used to pick a marker glyph
-  latitude numeric(9,6) not null,
-  longitude numeric(9,6) not null,
-  address text,
-  link text,
-  notes text,
-  sort_order int not null default 1000,
-  deleted_at timestamptz,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create index idx_trip_places_trip on trip_places(trip_id) where deleted_at is null;
 
 create index idx_trip_shares_trip on trip_shares(trip_id);
 create index idx_trip_shares_user on trip_shares(shared_with_user_id);
@@ -434,6 +421,11 @@ begin
     next_order := next_order + 1;
   end loop;
 
+  -- Every trip also gets one no-date "Proposals" day, sorted last.
+  insert into days (trip_id, date, theme, sort_order)
+  values (new.id, null, 'Proposals', 999999)
+  on conflict (trip_id) where date is null do nothing;
+
   return new;
 end;
 $$ language plpgsql;
@@ -495,7 +487,6 @@ alter table item_links enable row level security;
 alter table item_quick_notes enable row level security;
 alter table trip_shares enable row level security;
 alter table map_routes enable row level security;
-alter table trip_places enable row level security;
 
 -- A share row is visible to the trip owner (to manage who it's shared with)
 -- and to the person it names (to see their own shared trips). No insert/
@@ -696,10 +687,6 @@ create policy item_quick_notes_owner on item_quick_notes
     ));
 
 create policy map_routes_owner on map_routes
-  for all using (user_has_trip_access(trip_id))
-  with check (user_has_trip_access(trip_id));
-
-create policy trip_places_owner on trip_places
   for all using (user_has_trip_access(trip_id))
   with check (user_has_trip_access(trip_id));
 

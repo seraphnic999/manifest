@@ -11,8 +11,8 @@ import type { Map as MLMap, Marker } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Ionicons } from "@expo/vector-icons";
 import { categoryForDbType } from "@/lib/itemTypeMeta";
-import { MapItem, PLACE_COLOR } from "@/lib/mapData";
-import { MapRoute, TripPlace, ItemStatus, ItemType } from "@/lib/types";
+import { MapItem } from "@/lib/mapData";
+import { MapRoute, ItemStatus, ItemType } from "@/lib/types";
 
 // Free, no API key/signup/billing — see MANIFEST-MAP-HANDOFF.md §4.6 for
 // why MapLibre was chosen over the Google Maps JS API (one style across
@@ -22,15 +22,12 @@ const STYLE_URL = "https://tiles.openfreemap.org/styles/positron";
 export interface TripMapProps {
   items: MapItem[];
   routes: MapRoute[];
-  places: TripPlace[];
   dayColors: Map<string, string>;
   neutralColor: string;
   visibleDayIds: Set<string>;
   visibleTypes: Set<ItemType>;
-  showPlaces: boolean;
   focusItemId?: string;
   onItemPress: (item: MapItem) => void;
-  onPlacePress: (place: TripPlace) => void;
 }
 
 function statusOpacity(status: ItemStatus) {
@@ -143,21 +140,6 @@ export default function TripMap(props: TripMapProps) {
         any = true;
       });
 
-      if (p.showPlaces) {
-        p.places.forEach((place) => {
-          const el = document.createElement("div");
-          const root = createRoot(el);
-          root.render(<MarkerGlyph color={PLACE_COLOR} icon="bookmark" opacity={1} />);
-          el.addEventListener("click", () => propsRef.current.onPlacePress(place));
-          const marker = new maplibregl!.Marker({ element: el, anchor: "center" })
-            .setLngLat([place.longitude, place.latitude])
-            .addTo(map);
-          markersRef.current.push({ marker, root });
-          bounds.extend([place.longitude, place.latitude]);
-          any = true;
-        });
-      }
-
       if (focusedItem) {
         map.flyTo({ center: [focusedItem.longitude, focusedItem.latitude], zoom: 16, duration: 600 });
       } else if (any && !bounds.isEmpty()) {
@@ -167,7 +149,7 @@ export default function TripMap(props: TripMapProps) {
 
     if (map.isStyleLoaded()) renderMarkers(map);
     else map.once("load", () => renderMarkers(map));
-  }, [maplibregl, props.items, props.places, props.visibleDayIds, props.visibleTypes, props.showPlaces, props.dayColors, props.neutralColor, props.focusItemId]);
+  }, [maplibregl, props.items, props.visibleDayIds, props.visibleTypes, props.dayColors, props.neutralColor, props.focusItemId]);
 
   useEffect(() => {
     const map = mapRef.current;

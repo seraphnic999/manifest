@@ -23,8 +23,13 @@ function trimTheme(theme: string | null, max = 12) {
   return theme.length > max ? theme.slice(0, max - 1) + "\u2026" : theme;
 }
 
+// "proposals" is a reserved route segment (not a real date) addressing the
+// trip's one special no-date "Proposals" day — see days.date in schema.sql.
+const PROPOSALS_SEGMENT = "proposals";
+
 export default function DayView() {
   const { tripId, date } = useLocalSearchParams<{ tripId: string; date: string }>();
+  const isProposals = date === PROPOSALS_SEGMENT;
   const [stayBanners, setStayBanners] = useState<Item[]>([]);
   const [orderable, setOrderable] = useState<Item[]>([]);
   const [allDays, setAllDays] = useState<Day[]>([]);
@@ -40,7 +45,7 @@ export default function DayView() {
       .from("days").select("*").eq("trip_id", tripId).order("sort_order");
     if (days) setAllDays(days as Day[]);
 
-    const day = days?.find((d) => d.date === date);
+    const day = isProposals ? days?.find((d) => d.date === null) : days?.find((d) => d.date === date);
     if (!day) return;
     setDayId(day.id);
     setTheme(day.theme);
@@ -56,21 +61,28 @@ export default function DayView() {
       // parent_item_id for both relationships.
       .order("sort_order");
 
-    const { data: spanningLodging } = await supabase
-      .from("items").select("*")
-      .eq("trip_id", tripId).eq("is_stay_span", true).is("deleted_at", null)
-      .lte("start_date", date).gte("end_date", date);
+    // A "stay spans this date" banner doesn't make sense for the Proposals
+    // day, which has no date at all.
+    if (!isProposals) {
+      const { data: spanningLodging } = await supabase
+        .from("items").select("*")
+        .eq("trip_id", tripId).eq("is_stay_span", true).is("deleted_at", null)
+        .lte("start_date", date).gte("end_date", date);
+      setStayBanners((spanningLodging ?? []) as Item[]);
+    } else {
+      setStayBanners([]);
+    }
 
-    setStayBanners((spanningLodging ?? []) as Item[]);
     setOrderable((dayItems ?? []) as Item[]);
-  }, [tripId, date]);
+  }, [tripId, date, isProposals]);
 
   useEffect(() => { load(); }, [load]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   function handleSelectCategory(categoryKey: string) {
     setPickerOpen(false);
-    router.push(`/item/new?tripId=${tripId}&dayId=${dayId}&date=${date}&category=${categoryKey}`);
+    const dateParam = isProposals ? "" : date;
+    router.push(`/item/new?tripId=${tripId}&dayId=${dayId}&date=${dateParam}&category=${categoryKey}`);
   }
 
   async function saveTheme() {
@@ -166,7 +178,7 @@ export default function DayView() {
   return (
     <View style={styles.container}>
       <Stack.Screen options={{
-        title: formatDateDDMMYYYY(date),
+        title: isProposals ? "Proposals" : formatDateDDMMYYYY(date),
         headerRight: () => (
           <View style={{ marginRight: 14 }}>
             <HomeButton />
@@ -196,22 +208,26 @@ export default function DayView() {
             },
           } : {})}
         >
-          {allDays.map((d) => (
-            <Pressable
-              key={d.id}
-              style={[styles.dayPill, d.date === date && styles.dayPillActive]}
-              onPress={() => router.replace(`/trip/${tripId}/day/${d.date}`)}
-            >
-              <Text style={[styles.dayPillText, d.date === date && styles.dayPillTextActive]}>
-                {formatDateDDMM(d.date)}
-              </Text>
-              {trimTheme(d.theme) && (
-                <Text style={[styles.dayPillTheme, d.date === date && styles.dayPillTextActive]} numberOfLines={1}>
-                  {trimTheme(d.theme)}
+          {allDays.map((d) => {
+            const active = d.date === null ? isProposals : d.date === date;
+            const href = d.date === null ? `/trip/${tripId}/day/${PROPOSALS_SEGMENT}` : `/trip/${tripId}/day/${d.date}`;
+            return (
+              <Pressable
+                key={d.id}
+                style={[styles.dayPill, active && styles.dayPillActive]}
+                onPress={() => router.replace(href)}
+              >
+                <Text style={[styles.dayPillText, active && styles.dayPillTextActive]}>
+                  {d.date === null ? "Proposals" : formatDateDDMM(d.date)}
                 </Text>
-              )}
-            </Pressable>
-          ))}
+                {trimTheme(d.theme) && d.date !== null && (
+                  <Text style={[styles.dayPillTheme, active && styles.dayPillTextActive]} numberOfLines={1}>
+                    {trimTheme(d.theme)}
+                  </Text>
+                )}
+              </Pressable>
+            );
+          })}
         </ScrollView>
       </View>
 

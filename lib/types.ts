@@ -25,7 +25,7 @@ export interface Trip {
 export interface Day {
   id: string;
   trip_id: string;
-  date: string;
+  date: string | null; // null only for the trip's one special "Proposals" day
   theme: string | null;
   sort_order: number;
 }
@@ -132,20 +132,6 @@ export interface MapRoute {
   color: string | null;
   geometry: { type: "LineString"; coordinates: [number, number][] };
   sort_order: number;
-}
-
-export interface TripPlace {
-  id: string;
-  trip_id: string;
-  name: string;
-  category: string | null;
-  latitude: number;
-  longitude: number;
-  address: string | null;
-  link: string | null;
-  notes: string | null;
-  sort_order: number;
-  deleted_at: string | null;
 }
 
 export function tripStatus(trip: Pick<Trip, "start_date" | "end_date">): TripStatus {

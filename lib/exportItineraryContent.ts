@@ -87,14 +87,18 @@ export async function fetchItineraryData(tripId: string): Promise<ItineraryData>
     itemsByDay.set(item.day_id, bucket);
   }
 
-  const itineraryDays: ItineraryDay[] = ((days ?? []) as Day[]).map((day) => ({
-    day,
-    // Same rule the day view itself uses: a lodging stay "covers" this day
-    // if the day's date falls within [start_date, end_date] — shown pinned
-    // above the day's ordered items, not as its own timeline entry.
-    stays: lodgingSpans.filter((s) => s.start_date && s.end_date && s.start_date <= day.date && day.date <= s.end_date),
-    items: itemsByDay.get(day.id) ?? [],
-  }));
+  // The "Proposals" day (date === null) is an undated holding pen, not a
+  // real part of the trip — never printed on the itinerary.
+  const itineraryDays: ItineraryDay[] = ((days ?? []) as Day[])
+    .filter((day) => day.date !== null)
+    .map((day) => ({
+      day,
+      // Same rule the day view itself uses: a lodging stay "covers" this day
+      // if the day's date falls within [start_date, end_date] — shown pinned
+      // above the day's ordered items, not as its own timeline entry.
+      stays: lodgingSpans.filter((s) => s.start_date && s.end_date && day.date && s.start_date <= day.date && day.date <= s.end_date),
+      items: itemsByDay.get(day.id) ?? [],
+    }));
 
   return { trip: trip as Trip, days: itineraryDays, notesByItem };
 }

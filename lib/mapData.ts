@@ -1,10 +1,10 @@
 import { supabase } from "./supabase";
-import { Item, Day, MapRoute, TripPlace } from "./types";
+import { Item, Day, MapRoute } from "./types";
 
 export type MapItem = Item & { latitude: number; longitude: number };
 
-// Cycles per day (by sort_order position), independent of trip length.
-// Includes the four colours from the original Google My Maps layers
+// Cycles per real (dated) day, by sort_order position, independent of trip
+// length. Includes the four colours from the original Google My Maps layers
 // (dark red, green, amber, purple) so this trip's map looks the same as
 // before, extended with a few more distinct hues for longer trips.
 const DAY_COLOR_PALETTE = [
@@ -16,18 +16,23 @@ const DAY_COLOR_PALETTE = [
 // coordinates) — neutral, not tied to any single day.
 export const NEUTRAL_DAY_COLOR = "#8C8577";
 
-// Fixed colour for trip_places ("spares & fallbacks" — the old map's blue layer).
-export const PLACE_COLOR = "#0288D1";
+// Fixed colour for the "Proposals" day (the old map's blue "spares" layer) —
+// deliberately not part of the cycling palette so it can never collide with
+// a real day's colour on longer trips.
+export const PROPOSALS_COLOR = "#0288D1";
 
 export function dayColorForIndex(index: number): string {
   return DAY_COLOR_PALETTE[index % DAY_COLOR_PALETTE.length];
 }
 
-/** trip_id -> day.id -> hex colour, keyed by each day's position in sort_order. */
+/** trip_id -> day.id -> hex colour, keyed by each real day's position in sort_order. */
 export function buildDayColorMap(days: Day[]): Map<string, string> {
-  const sorted = [...days].sort((a, b) => a.sort_order - b.sort_order);
+  const dated = days.filter((d) => d.date !== null).sort((a, b) => a.sort_order - b.sort_order);
   const map = new Map<string, string>();
-  sorted.forEach((d, i) => map.set(d.id, dayColorForIndex(i)));
+  dated.forEach((d, i) => map.set(d.id, dayColorForIndex(i)));
+  for (const d of days) {
+    if (d.date === null) map.set(d.id, PROPOSALS_COLOR);
+  }
   return map;
 }
 
@@ -53,29 +58,4 @@ export async function fetchTripRoutes(tripId: string): Promise<MapRoute[]> {
     .eq("trip_id", tripId).is("deleted_at", null)
     .order("sort_order");
   return (data ?? []) as MapRoute[];
-}
-
-export async function fetchTripPlaces(tripId: string): Promise<TripPlace[]> {
-  const { data } = await supabase
-    .from("trip_places").select("*")
-    .eq("trip_id", tripId).is("deleted_at", null)
-    .order("sort_order");
-  return (data ?? []) as TripPlace[];
-}
-
-export async function addTripPlace(place: {
-  trip_id: string; name: string; category: string | null;
-  latitude: number; longitude: number;
-  address?: string | null; link?: string | null; notes?: string | null;
-}): Promise<TripPlace | null> {
-  const { data } = await supabase.from("trip_places").insert(place).select().single();
-  return data as TripPlace | null;
-}
-
-export async function updateTripPlace(id: string, patch: Partial<TripPlace>): Promise<void> {
-  await supabase.from("trip_places").update(patch).eq("id", id);
-}
-
-export async function deleteTripPlace(id: string): Promise<void> {
-  await supabase.from("trip_places").update({ deleted_at: new Date().toISOString() }).eq("id", id);
 }
