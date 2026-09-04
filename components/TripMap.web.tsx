@@ -1,7 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createRoot, Root } from "react-dom/client";
-import maplibregl, { Map as MLMap, Marker } from "maplibre-gl";
-import "maplibre-gl/dist/maplibre-gl.css";
+import type { Map as MLMap, Marker } from "maplibre-gl";
 import { Ionicons } from "@expo/vector-icons";
 import { categoryForDbType } from "@/lib/itemTypeMeta";
 import { MapItem, PLACE_COLOR } from "@/lib/mapData";
@@ -51,8 +50,24 @@ export default function TripMap(props: TripMapProps) {
   const propsRef = useRef(props);
   propsRef.current = props;
 
+  // maplibre-gl pulls in WebGL/worker machinery and is only ever needed on
+  // this one screen — Expo Router's default "sync" import mode eagerly
+  // requires every route module (including this one) at app boot, so a
+  // top-level `import "maplibre-gl"` here would load it on every page load,
+  // not just this screen. Loading it lazily, on mount, keeps it off the
+  // startup path entirely.
+  const [maplibregl, setMaplibregl] = useState<typeof import("maplibre-gl") | null>(null);
+
   useEffect(() => {
-    if (!containerRef.current || mapRef.current) return;
+    let cancelled = false;
+    Promise.all([import("maplibre-gl"), import("maplibre-gl/dist/maplibre-gl.css")]).then(([mod]) => {
+      if (!cancelled) setMaplibregl(mod);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!maplibregl || !containerRef.current || mapRef.current) return;
     const map = new maplibregl.Map({
       container: containerRef.current,
       style: STYLE_URL,
@@ -67,18 +82,18 @@ export default function TripMap(props: TripMapProps) {
       map.remove();
       mapRef.current = null;
     };
-  }, []);
+  }, [maplibregl]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
+    if (!maplibregl || !map) return;
 
     function renderMarkers(map: MLMap) {
       markersRef.current.forEach(({ marker, root }) => { marker.remove(); root.unmount(); });
       markersRef.current = [];
 
       const p = propsRef.current;
-      const bounds = new maplibregl.LngLatBounds();
+      const bounds = new maplibregl!.LngLatBounds();
       let any = false;
 
       const visibleItems = p.items.filter((item) => {
@@ -96,7 +111,7 @@ export default function TripMap(props: TripMapProps) {
           <MarkerGlyph color={color} icon={categoryForDbType(item.type).icon} opacity={statusOpacity(item.status)} />
         );
         el.addEventListener("click", () => propsRef.current.onItemPress(item));
-        const marker = new maplibregl.Marker({ element: el, anchor: "center" })
+        const marker = new maplibregl!.Marker({ element: el, anchor: "center" })
           .setLngLat([item.longitude, item.latitude])
           .addTo(map);
         markersRef.current.push({ marker, root });
@@ -110,7 +125,7 @@ export default function TripMap(props: TripMapProps) {
           const root = createRoot(el);
           root.render(<MarkerGlyph color={PLACE_COLOR} icon="bookmark" opacity={1} />);
           el.addEventListener("click", () => propsRef.current.onPlacePress(place));
-          const marker = new maplibregl.Marker({ element: el, anchor: "center" })
+          const marker = new maplibregl!.Marker({ element: el, anchor: "center" })
             .setLngLat([place.longitude, place.latitude])
             .addTo(map);
           markersRef.current.push({ marker, root });
@@ -126,11 +141,11 @@ export default function TripMap(props: TripMapProps) {
 
     if (map.isStyleLoaded()) renderMarkers(map);
     else map.once("load", () => renderMarkers(map));
-  }, [props.items, props.places, props.visibleDayIds, props.visibleTypes, props.showIdeas, props.showPlaces, props.dayColors, props.neutralColor]);
+  }, [maplibregl, props.items, props.places, props.visibleDayIds, props.visibleTypes, props.showIdeas, props.showPlaces, props.dayColors, props.neutralColor]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
+    if (!maplibregl || !map) return;
 
     function drawRoutes(map: MLMap) {
       const p = propsRef.current;
@@ -154,7 +169,7 @@ export default function TripMap(props: TripMapProps) {
 
     if (map.isStyleLoaded()) drawRoutes(map);
     else map.once("load", () => drawRoutes(map));
-  }, [props.routes, props.dayColors, props.neutralColor]);
+  }, [maplibregl, props.routes, props.dayColors, props.neutralColor]);
 
   return <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />;
 }
