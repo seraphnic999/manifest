@@ -2,10 +2,11 @@ import { View, Text, Pressable, StyleSheet, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
 import { colors } from "@/lib/theme";
 
-type TripSection = "overview" | "money" | "shopping" | "day";
+type TripSection = "overview" | "money" | "shopping" | "day" | "map";
 
 const SECTIONS: { key: TripSection; label: string; path: (tripId: string) => string }[] = [
   { key: "overview", label: "Overview", path: (id) => `/trip/${id}` },
+  { key: "map", label: "Map", path: (id) => `/trip/${id}/map` },
   { key: "money", label: "Money", path: (id) => `/trip/${id}/money` },
   { key: "shopping", label: "Shopping", path: (id) => `/trip/${id}/shopping` },
 ];

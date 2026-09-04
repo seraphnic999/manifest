@@ -54,6 +54,8 @@ export interface Item {
   vendor: string | null;
   link: string | null;
   sort_order: number;
+  latitude: number | null;
+  longitude: number | null;
   custom_fields: Record<string, unknown>;
   deleted_at: string | null;
 }
@@ -120,6 +122,30 @@ export interface Allocation {
   shopping_list_item_id: string | null;
   party_id: string | null;
   note: string | null;
+}
+
+export interface MapRoute {
+  id: string;
+  trip_id: string;
+  day_id: string | null;
+  name: string;
+  color: string | null;
+  geometry: { type: "LineString"; coordinates: [number, number][] };
+  sort_order: number;
+}
+
+export interface TripPlace {
+  id: string;
+  trip_id: string;
+  name: string;
+  category: string | null;
+  latitude: number;
+  longitude: number;
+  address: string | null;
+  link: string | null;
+  notes: string | null;
+  sort_order: number;
+  deleted_at: string | null;
 }
 
 export function tripStatus(trip: Pick<Trip, "start_date" | "end_date">): TripStatus {

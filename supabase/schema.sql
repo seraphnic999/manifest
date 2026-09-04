@@ -7,6 +7,10 @@
 --        Trip -> ShoppingListItems (optionally linked to an Item)
 -- ============================================================
 
+-- ---------- Extensions ----------
+
+create extension if not exists postgis; -- powers items.geom (see below) for future "near me" queries
+
 -- ---------- Enums ----------
 
 create type trip_type as enum ('business', 'pleasure', 'mixed');
@@ -128,11 +132,18 @@ create table items (
   vendor text,
   link text,
   sort_order int not null,
+  latitude numeric(9,6),             -- map view: promoted out of custom_fields.lat (still present
+  longitude numeric(9,6),            -- there too until a follow-up migration drops it). Both or neither.
+  geom geography(Point, 4326) generated always as (
+    case when latitude is not null and longitude is not null
+    then st_setsrid(st_makepoint(longitude::float8, latitude::float8), 4326)::geography end
+  ) stored,                          -- derived from lat/lon; app never writes this directly
   deleted_at timestamptz,            -- soft delete / archive; null = active. App filters this by
                                       -- default everywhere; permanent removal is a separate,
                                       -- explicit hard-delete action from the archive view.
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  constraint items_latlon_paired check ((latitude is null) = (longitude is null))
 );
 
 create index idx_items_day on items(day_id);
@@ -142,6 +153,8 @@ create index idx_items_type on items(trip_id, type);   -- powers "all flights" /
 create index idx_items_alt_group on items(alt_group_id);
 create index idx_items_date_range on items(start_date, end_date);
 create index idx_items_active on items(trip_id) where deleted_at is null;  -- fast default "active items" filter
+create index items_latlon_idx on items(latitude, longitude) where deleted_at is null and latitude is not null;
+create index items_geom_idx on items using gist(geom) where deleted_at is null;
 
 -- ---------- Item photos ----------
 
@@ -254,6 +267,46 @@ create table trip_shares (
   created_at timestamptz not null default now(),
   constraint trip_shares_unique unique (trip_id, invited_email)
 );
+
+-- ---------- Map: routes & places ----------
+-- map_routes are hand-drawn walking-route polylines that don't correspond
+-- to any item. trip_places are non-itinerary "shortlist" pins (runner-up
+-- restaurants, unchosen museums) — deliberately NOT items, since they have
+-- no day/time and would otherwise pollute every day-by-day/trip-wide
+-- items query. Both are a pure map-layer concept.
+
+create table map_routes (
+  id uuid primary key default gen_random_uuid(),
+  trip_id uuid not null references trips(id) on delete cascade,
+  day_id uuid references days(id) on delete set null,
+  name text not null,
+  color text,                        -- e.g. '#A52714'; null = inherit day colour
+  geometry jsonb not null,           -- GeoJSON LineString, [lon,lat] vertex order
+  sort_order int not null default 1000,
+  deleted_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index idx_map_routes_trip on map_routes(trip_id) where deleted_at is null;
+
+create table trip_places (
+  id uuid primary key default gen_random_uuid(),
+  trip_id uuid not null references trips(id) on delete cascade,
+  name text not null,
+  category text,                     -- free text (not item_type) — only used to pick a marker glyph
+  latitude numeric(9,6) not null,
+  longitude numeric(9,6) not null,
+  address text,
+  link text,
+  notes text,
+  sort_order int not null default 1000,
+  deleted_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index idx_trip_places_trip on trip_places(trip_id) where deleted_at is null;
 
 create index idx_trip_shares_trip on trip_shares(trip_id);
 create index idx_trip_shares_user on trip_shares(shared_with_user_id);
@@ -441,6 +494,8 @@ alter table item_photos enable row level security;
 alter table item_links enable row level security;
 alter table item_quick_notes enable row level security;
 alter table trip_shares enable row level security;
+alter table map_routes enable row level security;
+alter table trip_places enable row level security;
 
 -- A share row is visible to the trip owner (to manage who it's shared with)
 -- and to the person it names (to see their own shared trips). No insert/
@@ -639,6 +694,14 @@ create policy item_quick_notes_owner on item_quick_notes
       select 1 from items
       where items.id = item_quick_notes.item_id and user_has_trip_access(items.trip_id)
     ));
+
+create policy map_routes_owner on map_routes
+  for all using (user_has_trip_access(trip_id))
+  with check (user_has_trip_access(trip_id));
+
+create policy trip_places_owner on trip_places
+  for all using (user_has_trip_access(trip_id))
+  with check (user_has_trip_access(trip_id));
 
 -- ---------- Storage: item photo files ----------
 -- Objects are stored at path "{trip_owner_user_id}/{item_id}/{filename}" —

@@ -121,6 +121,10 @@ export default function TripOverview() {
               <Text style={styles.shoppingLabel}>Shopping list</Text>
               <Text style={styles.shoppingArrow}>{"\u2192"}</Text>
             </Pressable>
+            <Pressable style={styles.shoppingRow} onPress={() => router.push(`/trip/${tripId}/map`)}>
+              <Text style={styles.shoppingLabel}>Map</Text>
+              <Text style={styles.shoppingArrow}>{"\u2192"}</Text>
+            </Pressable>
 
             {flights.length > 0 && (
               <>
