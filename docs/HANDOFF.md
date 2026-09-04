@@ -137,6 +137,25 @@ true iff an allocation links to this row.
   back-button history
 - A real `Stack` navigator (was missing entirely early on — see below)
 
+## Map view
+
+Built-in map view replacing the owner's Google My Maps KMZ workflow —
+design handed off from a claude.ai planning session as
+`MANIFEST-MAP-HANDOFF.md` (not in the repo; was in the owner's Downloads).
+Phase A (schema + web renderer) is done: `items.latitude/longitude` +
+PostGIS `geom`, `map_routes` (hand-drawn walking routes), `trip_places`
+(non-itinerary "shortlist" pins — a place worth knowing about with no
+day/time, deliberately not an `item`), all in `supabase/migration_009_map_view.sql`
+(applied to the live project) and folded into `schema.sql`. Web renders via
+`maplibre-gl` + OpenFreeMap tiles (`components/TripMap.web.tsx`, free, no
+API key). **Phase B — native MapLibre — is NOT done yet**: `components/TripMap.tsx`
+is a placeholder "coming soon" screen; wiring in `@maplibre/maplibre-react-native`
+needs its Expo config plugin, an `expo prebuild`, and an Android rebuild
+(same local-build flow as the rest of this project, not EAS) — flagged in
+the original plan as a real risk since the current Expo SDK (51) may not
+match what the latest `@maplibre/maplibre-react-native` expects; may need
+an older major pinned.
+
 ## Not built yet
 
 - Alternatives ("pick one of" slash-separated options, e.g. "Dinner —
