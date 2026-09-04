@@ -148,7 +148,29 @@ PostGIS `geom`, `map_routes` (hand-drawn walking routes), `trip_places`
 day/time, deliberately not an `item`), all in `supabase/migration_009_map_view.sql`
 (applied to the live project) and folded into `schema.sql`. Web renders via
 `maplibre-gl` + OpenFreeMap tiles (`components/TripMap.web.tsx`, free, no
-API key). **Phase B — native MapLibre — is NOT done yet**: `components/TripMap.tsx`
+API key), lazily `import()`-ed on mount (not top-level — Expo Router's
+default "sync" import mode eagerly requires every route file at app boot,
+so a top-level import of a heavy WebGL library would load it on every
+page). Getting the web map working also needed two non-obvious fixes,
+worth knowing before adding any other ESM-only library to this project:
+1. `maplibre-gl` (and other modern ESM-only packages) can use static
+   class blocks — needs `@babel/plugin-transform-class-static-block` in
+   `babel.config.js` or Metro's bundle fails outright.
+2. `maplibre-gl` uses `import.meta.url` internally to locate its Web
+   Worker script — meaningless under Metro, which bundles even ESM
+   node_modules into non-module wrappers, causing a hard runtime crash
+   ("Cannot use 'import.meta' outside a module") on *every* page, not
+   just the map screen (any route file eagerly required at boot that
+   transitively imports it). Fixed with a custom
+   `babel-plugin-strip-import-meta.js` (neutralizes the reference) plus
+   an explicit `maplibregl.setWorkerUrl("/maplibre-gl-worker.mjs")` call
+   before constructing any map — the worker file itself is copied
+   verbatim into `public/` (Expo serves/copies this dir as-is, unbundled,
+   on both `expo start` and `expo export`). This is not Metro-specific —
+   every bundler (Vite, webpack) requires the same explicit
+   `setWorkerUrl()` call, since none of them make `import.meta.url`
+   resolve to a real worker-file location automatically.
+**Phase B — native MapLibre — is NOT done yet**: `components/TripMap.tsx`
 is a placeholder "coming soon" screen; wiring in `@maplibre/maplibre-react-native`
 needs its Expo config plugin, an `expo prebuild`, and an Android rebuild
 (same local-build flow as the rest of this project, not EAS) — flagged in
