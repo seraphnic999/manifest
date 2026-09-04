@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { createRoot, Root } from "react-dom/client";
 import type { Map as MLMap, Marker } from "maplibre-gl";
+// A pure CSS side-effect import — no executable JS, so no eager-loading
+// risk (that risk is specific to the "maplibre-gl" JS module below, which
+// pulls in WebGL/worker code and is loaded dynamically instead). Kept
+// static so Expo's build-time CSS extraction (which emits a <link> in the
+// HTML head regardless of import timing) reliably picks it up — a plain
+// runtime `import()` of a .css file isn't a real loadable JS chunk and
+// silently never resolves.
+import "maplibre-gl/dist/maplibre-gl.css";
 import { Ionicons } from "@expo/vector-icons";
 import { categoryForDbType } from "@/lib/itemTypeMeta";
 import { MapItem, PLACE_COLOR } from "@/lib/mapData";
@@ -60,8 +68,10 @@ export default function TripMap(props: TripMapProps) {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([import("maplibre-gl"), import("maplibre-gl/dist/maplibre-gl.css")]).then(([mod]) => {
+    import("maplibre-gl").then((mod) => {
       if (!cancelled) setMaplibregl(mod);
+    }).catch((e) => {
+      console.error("Failed to load maplibre-gl", e);
     });
     return () => { cancelled = true; };
   }, []);
