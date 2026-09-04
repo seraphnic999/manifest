@@ -69,7 +69,14 @@ export default function TripMap(props: TripMapProps) {
   useEffect(() => {
     let cancelled = false;
     import("maplibre-gl").then((mod) => {
-      if (!cancelled) setMaplibregl(mod);
+      if (cancelled) return;
+      // No bundler (Metro included) makes maplibre-gl's own import.meta.url
+      // worker auto-detection resolve to a real, separately-loadable file —
+      // every consumer needs to point this at a real static copy
+      // explicitly. The file is copied verbatim into public/ (served as-is,
+      // unbundled) from node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs.
+      mod.setWorkerUrl("/maplibre-gl-worker.mjs");
+      setMaplibregl(mod);
     }).catch((e) => {
       console.error("Failed to load maplibre-gl", e);
     });
