@@ -2,9 +2,10 @@ import { useCallback, useState } from "react";
 import { View, Text, Pressable, StyleSheet, ScrollView } from "react-native";
 import { useLocalSearchParams, useRouter, Stack, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
-import { Day, Item, ItemType, TripPlace, MapRoute } from "@/lib/types";
-import { ITEM_CATEGORIES, categoryForDbType } from "@/lib/itemTypeMeta";
+import { Day, Item, ItemType, TripPlace, MapRoute, TripType } from "@/lib/types";
+import { ITEM_CATEGORIES, categoryByKey } from "@/lib/itemTypeMeta";
 import {
   MapItem, buildDayColorMap, fetchTripDays, fetchTripMapItems,
   fetchTripRoutes, fetchTripPlaces, NEUTRAL_DAY_COLOR, PLACE_COLOR,
@@ -17,6 +18,11 @@ import { formatDateDDMM } from "@/lib/dateFormat";
 
 const ALL_TYPES = new Set<ItemType>(ITEM_CATEGORIES.flatMap((c) => c.dbTypes));
 
+// Fixed display order for the map's type filter row — independent of
+// ITEM_CATEGORIES's own order (used elsewhere, e.g. the item-type picker
+// grid), which stays as-is.
+const FILTER_ORDER = ["lodging", "work", "dining", "activity", "shopping", "transport", "transfer", "flight", "other"];
+
 export default function TripMapScreen() {
   const { tripId, focusItemId } = useLocalSearchParams<{ tripId: string; focusItemId?: string }>();
   const router = useRouter();
@@ -25,22 +31,25 @@ export default function TripMapScreen() {
   const [items, setItems] = useState<MapItem[]>([]);
   const [routes, setRoutes] = useState<MapRoute[]>([]);
   const [places, setPlaces] = useState<TripPlace[]>([]);
+  const [tripType, setTripType] = useState<TripType | null>(null);
 
   const [visibleDayIds, setVisibleDayIds] = useState<Set<string>>(new Set());
   const [visibleTypes, setVisibleTypes] = useState<Set<ItemType>>(ALL_TYPES);
   const [showIdeas, setShowIdeas] = useState(false);
-  const [showPlaces, setShowPlaces] = useState(true);
+  const [showPlaces, setShowPlaces] = useState(false);
   const [placeModalOpen, setPlaceModalOpen] = useState(false);
   const [editingPlace, setEditingPlace] = useState<TripPlace | null>(null);
 
   const load = useCallback(async () => {
-    const [d, i, r, p] = await Promise.all([
+    const [d, i, r, p, tripRes] = await Promise.all([
       fetchTripDays(tripId), fetchTripMapItems(tripId), fetchTripRoutes(tripId), fetchTripPlaces(tripId),
+      supabase.from("trips").select("type").eq("id", tripId).single(),
     ]);
     setDays(d);
     setItems(i);
     setRoutes(r);
     setPlaces(p);
+    if (tripRes.data) setTripType(tripRes.data.type as TripType);
     setVisibleDayIds((prev) => (prev.size === 0 ? new Set(d.map((day) => day.id)) : prev));
 
     // Coming from an item's "View on map" link: make sure whatever filter
@@ -120,7 +129,10 @@ export default function TripMapScreen() {
       </ScrollView>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow} style={styles.filterRowOuter}>
-        {ITEM_CATEGORIES.map((cat) => {
+        {FILTER_ORDER
+          .filter((key) => key !== "work" || tripType === "business" || tripType === "mixed")
+          .map((key) => categoryByKey(key))
+          .map((cat) => {
           const active = cat.dbTypes.some((t) => visibleTypes.has(t));
           return (
             <Pressable
