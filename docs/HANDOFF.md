@@ -143,10 +143,30 @@ Built-in map view replacing the owner's Google My Maps KMZ workflow —
 design handed off from a claude.ai planning session as
 `MANIFEST-MAP-HANDOFF.md` (not in the repo; was in the owner's Downloads).
 Phase A (schema + web renderer) is done: `items.latitude/longitude` +
-PostGIS `geom`, `map_routes` (hand-drawn walking routes), `trip_places`
-(non-itinerary "shortlist" pins — a place worth knowing about with no
-day/time, deliberately not an `item`), all in `supabase/migration_009_map_view.sql`
-(applied to the live project) and folded into `schema.sql`. Web renders via
+PostGIS `geom`, `map_routes` (hand-drawn walking routes), all in
+`supabase/migration_009_map_view.sql` (applied to the live project) and
+folded into `schema.sql`.
+
+**Non-itinerary "shortlist" places** (a place worth knowing about with no
+day/time — restaurants/bars/museums not chosen) originally got their own
+`trip_places` table, but `migration_011_proposals_day.sql` replaced that
+with a different design: every trip now has one special `days` row with
+`date = null`, `theme = 'Proposals'`, sorted last (`sort_order = 999999`,
+auto-created by the same `generate_trip_days()` trigger that creates real
+days — see `days.date` in `schema.sql`, now nullable, with a partial
+unique index capping it at one no-date day per trip). Shortlist places are
+just ordinary `items` with `day_id` pointing at that day. "Promoting" one
+onto the real itinerary is nothing bespoke — it's just editing the item's
+date, which the existing move-to-day logic in `app/item/[itemId]/edit.tsx`
+already handles by moving `day_id` to match. The day-view screen and Trip
+Overview address this day via the reserved route segment
+`/trip/:id/day/proposals` (not a real date). The map screen shows/hides it
+via the same day-filter chip row every real day already uses (labelled
+"Proposals", off by default, fixed blue colour — see `PROPOSALS_COLOR` in
+`lib/mapData.ts`), not a separate toggle. `components/AddPlaceModal.tsx`
+and the old `trip_places` table are gone.
+
+Web renders via
 `maplibre-gl` + OpenFreeMap tiles (`components/TripMap.web.tsx`, free, no
 API key), lazily `import()`-ed on mount (not top-level — Expo Router's
 default "sync" import mode eagerly requires every route file at app boot,
