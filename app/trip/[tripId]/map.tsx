@@ -17,6 +17,10 @@ import HomeButton from "@/components/HomeButton";
 import { formatDateDDMM } from "@/lib/dateFormat";
 
 const ALL_TYPES = new Set<ItemType>(ITEM_CATEGORIES.flatMap((c) => c.dbTypes));
+// Flight and transfer pins (airports, transfer pickup points) are usually
+// far from the walkable itinerary area, so they start hidden to keep the
+// initial view zoomed to the places actually worth looking at.
+const DEFAULT_VISIBLE_TYPES = new Set<ItemType>([...ALL_TYPES].filter((t) => t !== "flight" && t !== "transfer"));
 
 // Fixed display order for the map's type filter row — independent of
 // ITEM_CATEGORIES's own order (used elsewhere, e.g. the item-type picker
@@ -34,8 +38,7 @@ export default function TripMapScreen() {
   const [tripType, setTripType] = useState<TripType | null>(null);
 
   const [visibleDayIds, setVisibleDayIds] = useState<Set<string>>(new Set());
-  const [visibleTypes, setVisibleTypes] = useState<Set<ItemType>>(ALL_TYPES);
-  const [showIdeas, setShowIdeas] = useState(false);
+  const [visibleTypes, setVisibleTypes] = useState<Set<ItemType>>(DEFAULT_VISIBLE_TYPES);
   const [showPlaces, setShowPlaces] = useState(false);
   const [placeModalOpen, setPlaceModalOpen] = useState(false);
   const [editingPlace, setEditingPlace] = useState<TripPlace | null>(null);
@@ -52,12 +55,12 @@ export default function TripMapScreen() {
     if (tripRes.data) setTripType(tripRes.data.type as TripType);
     setVisibleDayIds((prev) => (prev.size === 0 ? new Set(d.map((day) => day.id)) : prev));
 
-    // Coming from an item's "View on map" link: make sure whatever filter
-    // would otherwise hide it (only "idea" status is filtered by default —
-    // day and type are all-visible by default already) doesn't.
+    // Coming from an item's "View on map" link: make sure the day/type
+    // filters don't hide it (day is all-visible by default already; type
+    // only matters if it's a flight/transfer, hidden by default).
     if (focusItemId) {
       const focused = i.find((it) => it.id === focusItemId);
-      if (focused?.status === "idea") setShowIdeas(true);
+      if (focused) setVisibleTypes((prev) => new Set(prev).add(focused.type));
     }
   }, [tripId, focusItemId]);
 
@@ -120,12 +123,6 @@ export default function TripMapScreen() {
         >
           <Text style={[styles.chipText, showPlaces && styles.chipTextActive]}>Places</Text>
         </Pressable>
-        <Pressable
-          style={[styles.chip, showIdeas && styles.chipActiveNeutral]}
-          onPress={() => setShowIdeas((v) => !v)}
-        >
-          <Text style={[styles.chipText, showIdeas && styles.chipTextActive]}>Ideas</Text>
-        </Pressable>
       </ScrollView>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow} style={styles.filterRowOuter}>
@@ -156,7 +153,6 @@ export default function TripMapScreen() {
           neutralColor={NEUTRAL_DAY_COLOR}
           visibleDayIds={visibleDayIds}
           visibleTypes={visibleTypes}
-          showIdeas={showIdeas}
           showPlaces={showPlaces}
           focusItemId={focusItemId}
           onItemPress={(item: Item) => router.push(`/item/${item.id}`)}
@@ -189,7 +185,6 @@ const styles = StyleSheet.create({
     height: 30, paddingHorizontal: 12, borderRadius: 16, borderWidth: 1.5,
     borderColor: colors.line, alignItems: "center", justifyContent: "center",
   },
-  chipActiveNeutral: { backgroundColor: colors.inkSoft, borderColor: colors.inkSoft },
   chipText: { fontSize: 11, fontWeight: "600", color: colors.inkSoft },
   chipTextActive: { color: "#fff" },
   typeChip: {

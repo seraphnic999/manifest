@@ -13,7 +13,7 @@ import { computeDurationMinutes, formatDuration } from "@/lib/duration";
 import { Item, ItemStatus } from "@/lib/types";
 import HomeButton from "@/components/HomeButton";
 
-const STATUSES: ItemStatus[] = ["planned", "booked", "optional", "idea"];
+const STATUSES: ItemStatus[] = ["planned", "booked", "optional"];
 
 export default function NewItem() {
   const { tripId, dayId, date, category, duplicateFrom } = useLocalSearchParams<{

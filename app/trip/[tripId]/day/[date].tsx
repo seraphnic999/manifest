@@ -15,7 +15,7 @@ import { normalizeTimeHHMM } from "@/lib/timeFormat";
 import HomeButton from "@/components/HomeButton";
 
 const STATUS_LABEL: Record<string, string> = {
-  booked: "Booked", optional: "Optional", idea: "Idea", planned: "Planned",
+  booked: "Booked", optional: "Optional", planned: "Planned",
 };
 
 function trimTheme(theme: string | null, max = 12) {

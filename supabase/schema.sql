@@ -22,7 +22,7 @@ create type item_type as enum (
 -- 'transfer'  = pre-booked private transfer (taxi, Transfeero-style car)
 -- 'transport' = public transport instructions/legs (train, bus, shuttle)
 
-create type item_status as enum ('booked', 'optional', 'idea', 'planned');
+create type item_status as enum ('booked', 'optional', 'planned');
 -- A closed, smaller list than item_type (transfers fold into 'transport',
 -- bar tabs fold into 'meals') since this drives the expense report's
 -- category breakdown, not a general-purpose taxonomy.

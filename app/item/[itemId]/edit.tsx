@@ -19,7 +19,7 @@ import ItemPickerModal from "@/components/ItemPickerModal";
 import QuickNotesList from "@/components/QuickNotesList";
 import HomeButton from "@/components/HomeButton";
 
-const STATUSES: ItemStatus[] = ["planned", "booked", "optional", "idea"];
+const STATUSES: ItemStatus[] = ["planned", "booked", "optional"];
 
 export default function EditItem() {
   const { itemId } = useLocalSearchParams<{ itemId: string }>();

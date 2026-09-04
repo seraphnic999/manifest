@@ -5,7 +5,7 @@ export type ItemType =
   | "flight" | "transfer" | "transport" | "lodging" | "activity"
   | "meal" | "bar" | "sightseeing" | "attraction" | "shopping" | "work" | "other";
 
-export type ItemStatus = "booked" | "optional" | "idea" | "planned";
+export type ItemStatus = "booked" | "optional" | "planned";
 
 export interface Trip {
   id: string;

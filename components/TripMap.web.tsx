@@ -27,7 +27,6 @@ export interface TripMapProps {
   neutralColor: string;
   visibleDayIds: Set<string>;
   visibleTypes: Set<ItemType>;
-  showIdeas: boolean;
   showPlaces: boolean;
   focusItemId?: string;
   onItemPress: (item: MapItem) => void;
@@ -120,7 +119,6 @@ export default function TripMap(props: TripMapProps) {
 
       const visibleItems = p.items.filter((item) => {
         if (!p.visibleTypes.has(item.type)) return false;
-        if (item.status === "idea" && !p.showIdeas) return false;
         if (item.day_id && !p.visibleDayIds.has(item.day_id)) return false;
         return true;
       });
@@ -169,7 +167,7 @@ export default function TripMap(props: TripMapProps) {
 
     if (map.isStyleLoaded()) renderMarkers(map);
     else map.once("load", () => renderMarkers(map));
-  }, [maplibregl, props.items, props.places, props.visibleDayIds, props.visibleTypes, props.showIdeas, props.showPlaces, props.dayColors, props.neutralColor, props.focusItemId]);
+  }, [maplibregl, props.items, props.places, props.visibleDayIds, props.visibleTypes, props.showPlaces, props.dayColors, props.neutralColor, props.focusItemId]);
 
   useEffect(() => {
     const map = mapRef.current;

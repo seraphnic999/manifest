@@ -16,7 +16,6 @@ export interface TripMapProps {
   neutralColor: string;
   visibleDayIds: Set<string>;
   visibleTypes: Set<ItemType>;
-  showIdeas: boolean;
   showPlaces: boolean;
   focusItemId?: string;
   onItemPress: (item: MapItem) => void;
