@@ -190,13 +190,46 @@ worth knowing before adding any other ESM-only library to this project:
    every bundler (Vite, webpack) requires the same explicit
    `setWorkerUrl()` call, since none of them make `import.meta.url`
    resolve to a real worker-file location automatically.
-**Phase B — native MapLibre — is NOT done yet**: `components/TripMap.tsx`
-is a placeholder "coming soon" screen; wiring in `@maplibre/maplibre-react-native`
-needs its Expo config plugin, an `expo prebuild`, and an Android rebuild
-(same local-build flow as the rest of this project, not EAS) — flagged in
-the original plan as a real risk since the current Expo SDK (51) may not
-match what the latest `@maplibre/maplibre-react-native` expects; may need
-an older major pinned.
+**Phase B — native MapLibre — is done.** `components/TripMap.tsx` is a
+real `@maplibre/maplibre-react-native` renderer now (`MapView`/`Camera`/
+`PointAnnotation`/`ShapeSource`+`LineLayer`), matching the web version's
+day-colored markers, Ionicons glyphs, and focus/highlight behavior.
+Pinned to **`@maplibre/maplibre-react-native@10.4.2`, not the current
+11.x** — v11 dropped support for React Native's legacy architecture,
+which this app still uses (`newArchEnabled=false` in
+`android/gradle.properties`); v10 is the last major that works here.
+
+Two real native-build issues came up doing this — both fixed in the
+generated (gitignored) `android/` project, so they'll recur after the
+next `expo prebuild --clean` and need reapplying:
+1. `expo-dev-menu` pulls in `com.google.android.material:material:1.6.1`,
+   too old for `compileSdk 34` + `appcompat 1.7.0` — its own `color-v31`
+   (Android 12+ dynamic color) resources reference `m3_sys_color_dynamic_*`
+   tokens that don't exist yet in 1.6.1, so AAPT fails to link with
+   `resource ... not found`. Fix: a `resolutionStrategy.force
+   'com.google.android.material:material:1.11.0'` in the `allprojects`
+   block of the root `android/build.gradle`.
+2. On Android, `PointAnnotation` renders its children onto a bitmap
+   once — if that snapshot happens before the icon glyph's font has
+   painted, the marker renders as a blank circle (color/size right,
+   icon missing). Fix: call each annotation's `.refresh()` (via its ref)
+   a short delay after render. Also: drive the `Camera` via declarative
+   `CameraStop` props (`{...cameraStop}`), not an imperative ref call —
+   the ref can resolve after first render, so an initial `flyTo`/
+   `fitBounds` call on it silently no-ops.
+
+Verified on a real Android emulator (Pixel_8 AVD) via a temporary
+auth-bypassed test route + adb screenshots, not just a build-success
+check — same principle as verifying the web map in a real browser
+rather than trusting a clean build alone. The signed release APK is at
+the standard Gradle
+location `android/app/build/outputs/apk/release/app-release.apk`,
+verified with `apksigner verify` against the real
+`android-keystore/manifest-release.keystore`
+(also note: `android/gradle.properties`' `MANIFEST_RELEASE_*` keys and
+the matching `signingConfigs.release` block in `android/app/build.gradle`
+are hand-edits that don't survive `expo prebuild --clean` either — see
+`docs/ANDROID_LOCAL_BUILD.md` and `android-keystore/KEYSTORE_INFO.txt`).
 
 ## Not built yet
 
