@@ -44,6 +44,8 @@ export default function EditItem() {
   const [bookingSource, setBookingSource] = useState("");
   const [confirmationCode, setConfirmationCode] = useState("");
   const [link, setLink] = useState("");
+  const [latitude, setLatitude] = useState("");
+  const [longitude, setLongitude] = useState("");
 
   // Lodging span only
   const [checkInDate, setCheckInDate] = useState("");
@@ -66,7 +68,7 @@ export default function EditItem() {
   function currentSnapshot() {
     return JSON.stringify({
       title, status, itemDate, time, address, phone, vendor, flightNumber,
-      bookingSource, confirmationCode, link,
+      bookingSource, confirmationCode, link, latitude, longitude,
       checkInDate, checkInTime, checkOutDate, checkOutTime,
       arrivalDate, arrivalTime,
     });
@@ -106,6 +108,8 @@ export default function EditItem() {
       setBookingSource(item.booking_source ?? "");
       setConfirmationCode(item.confirmation_code ?? "");
       setLink(item.link ?? "");
+      setLatitude(item.latitude != null ? String(item.latitude) : "");
+      setLongitude(item.longitude != null ? String(item.longitude) : "");
       setCheckInDate(item.start_date ?? "");
       setCheckInTime(item.time_start ?? "");
       setCheckOutDate(item.end_date ?? "");
@@ -124,6 +128,8 @@ export default function EditItem() {
         flightNumber: (item.custom_fields as any)?.flight_number ?? "",
         bookingSource: item.booking_source ?? "", confirmationCode: item.confirmation_code ?? "",
         link: item.link ?? "",
+        latitude: item.latitude != null ? String(item.latitude) : "",
+        longitude: item.longitude != null ? String(item.longitude) : "",
         checkInDate: item.start_date ?? "", checkInTime: item.time_start ?? "",
         checkOutDate: item.end_date ?? "", checkOutTime: item.time_end ?? "",
         arrivalDate: item.end_date ?? "", arrivalTime: item.time_end ?? "",
@@ -174,6 +180,16 @@ export default function EditItem() {
       Alert.alert("Check the times", "Arrival must be after departure.");
       return false;
     }
+    if ((latitude && !longitude) || (!latitude && longitude)) {
+      Alert.alert("Missing coordinate", "Enter both latitude and longitude, or leave both blank.");
+      return false;
+    }
+    const lat = latitude ? parseFloat(latitude) : null;
+    const lon = longitude ? parseFloat(longitude) : null;
+    if ((lat !== null && Number.isNaN(lat)) || (lon !== null && Number.isNaN(lon))) {
+      Alert.alert("Invalid coordinate", "Latitude/longitude must be numbers.");
+      return false;
+    }
     setSaving(true);
     const { data: current } = await supabase.from("items").select("trip_id, day_id").eq("id", itemId).single();
 
@@ -189,6 +205,8 @@ export default function EditItem() {
       booking_source: bookingSource || null,
       confirmation_code: confirmationCode || null,
       link: link || null,
+      latitude: lat,
+      longitude: lon,
       custom_fields: flightNumber ? { flight_number: flightNumber } : {},
     }).eq("id", itemId);
     setSaving(false);
@@ -362,6 +380,19 @@ export default function EditItem() {
         <><Text style={styles.label}>Link</Text>
         <TextInput style={styles.input} value={link} onChangeText={setLink} autoCapitalize="none" /></>
       )}
+
+      <Text style={styles.label}>Coordinates (optional)</Text>
+      <View style={styles.row}>
+        <View style={{ flex: 1 }}>
+          <TextInput style={styles.input} value={latitude} onChangeText={setLatitude} placeholder="Latitude" keyboardType="numbers-and-punctuation" />
+        </View>
+        <View style={{ width: 10 }} />
+        <View style={{ flex: 1 }}>
+          <TextInput style={styles.input} value={longitude} onChangeText={setLongitude} placeholder="Longitude" keyboardType="numbers-and-punctuation" />
+        </View>
+      </View>
+      <Text style={styles.hint}>Shown as a pin on the trip map.</Text>
+
       <QuickNotesList itemId={itemId} />
 
       <Text style={styles.label}>Linked items</Text>

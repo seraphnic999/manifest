@@ -18,7 +18,7 @@ import { formatDateDDMM } from "@/lib/dateFormat";
 const ALL_TYPES = new Set<ItemType>(ITEM_CATEGORIES.flatMap((c) => c.dbTypes));
 
 export default function TripMapScreen() {
-  const { tripId } = useLocalSearchParams<{ tripId: string }>();
+  const { tripId, focusItemId } = useLocalSearchParams<{ tripId: string; focusItemId?: string }>();
   const router = useRouter();
 
   const [days, setDays] = useState<Day[]>([]);
@@ -42,7 +42,15 @@ export default function TripMapScreen() {
     setRoutes(r);
     setPlaces(p);
     setVisibleDayIds((prev) => (prev.size === 0 ? new Set(d.map((day) => day.id)) : prev));
-  }, [tripId]);
+
+    // Coming from an item's "View on map" link: make sure whatever filter
+    // would otherwise hide it (only "idea" status is filtered by default —
+    // day and type are all-visible by default already) doesn't.
+    if (focusItemId) {
+      const focused = i.find((it) => it.id === focusItemId);
+      if (focused?.status === "idea") setShowIdeas(true);
+    }
+  }, [tripId, focusItemId]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -138,6 +146,7 @@ export default function TripMapScreen() {
           visibleTypes={visibleTypes}
           showIdeas={showIdeas}
           showPlaces={showPlaces}
+          focusItemId={focusItemId}
           onItemPress={(item: Item) => router.push(`/item/${item.id}`)}
           onPlacePress={openPlace}
         />

@@ -18,6 +18,7 @@ export interface TripMapProps {
   visibleTypes: Set<ItemType>;
   showIdeas: boolean;
   showPlaces: boolean;
+  focusItemId?: string;
   onItemPress: (item: MapItem) => void;
   onPlacePress: (place: TripPlace) => void;
 }

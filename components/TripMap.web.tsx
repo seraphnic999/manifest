@@ -29,6 +29,7 @@ export interface TripMapProps {
   visibleTypes: Set<ItemType>;
   showIdeas: boolean;
   showPlaces: boolean;
+  focusItemId?: string;
   onItemPress: (item: MapItem) => void;
   onPlacePress: (place: TripPlace) => void;
 }
@@ -37,16 +38,20 @@ function statusOpacity(status: ItemStatus) {
   return status === "optional" ? 0.55 : 1;
 }
 
-function MarkerGlyph({ color, icon, opacity }: { color: string; icon: string; opacity: number }) {
+function MarkerGlyph({ color, icon, opacity, focused }: { color: string; icon: string; opacity: number; focused?: boolean }) {
+  const size = focused ? 36 : 28;
   return (
     <div
       style={{
-        width: 28, height: 28, borderRadius: 14, background: color, opacity,
+        width: size, height: size, borderRadius: size / 2, background: color, opacity,
         display: "flex", alignItems: "center", justifyContent: "center",
-        boxShadow: "0 1px 4px rgba(0,0,0,0.4)", border: "2px solid #FFFFFF", cursor: "pointer",
+        boxShadow: focused
+          ? "0 0 0 4px rgba(201,138,46,0.55), 0 1px 6px rgba(0,0,0,0.5)"
+          : "0 1px 4px rgba(0,0,0,0.4)",
+        border: "2px solid #FFFFFF", cursor: "pointer",
       }}
     >
-      <Ionicons name={icon as any} size={14} color="#FFFFFF" />
+      <Ionicons name={icon as any} size={focused ? 17 : 14} color="#FFFFFF" />
     </div>
   );
 }
@@ -120,12 +125,16 @@ export default function TripMap(props: TripMapProps) {
         return true;
       });
 
+      let focusedItem: typeof visibleItems[number] | undefined;
+
       visibleItems.forEach((item) => {
         const color = item.day_id ? p.dayColors.get(item.day_id) ?? p.neutralColor : p.neutralColor;
+        const focused = item.id === p.focusItemId;
+        if (focused) focusedItem = item;
         const el = document.createElement("div");
         const root = createRoot(el);
         root.render(
-          <MarkerGlyph color={color} icon={categoryForDbType(item.type).icon} opacity={statusOpacity(item.status)} />
+          <MarkerGlyph color={color} icon={categoryForDbType(item.type).icon} opacity={statusOpacity(item.status)} focused={focused} />
         );
         el.addEventListener("click", () => propsRef.current.onItemPress(item));
         const marker = new maplibregl!.Marker({ element: el, anchor: "center" })
@@ -151,14 +160,16 @@ export default function TripMap(props: TripMapProps) {
         });
       }
 
-      if (any && !bounds.isEmpty()) {
+      if (focusedItem) {
+        map.flyTo({ center: [focusedItem.longitude, focusedItem.latitude], zoom: 16, duration: 600 });
+      } else if (any && !bounds.isEmpty()) {
         map.fitBounds(bounds, { padding: 60, maxZoom: 16, duration: 0 });
       }
     }
 
     if (map.isStyleLoaded()) renderMarkers(map);
     else map.once("load", () => renderMarkers(map));
-  }, [maplibregl, props.items, props.places, props.visibleDayIds, props.visibleTypes, props.showIdeas, props.showPlaces, props.dayColors, props.neutralColor]);
+  }, [maplibregl, props.items, props.places, props.visibleDayIds, props.visibleTypes, props.showIdeas, props.showPlaces, props.dayColors, props.neutralColor, props.focusItemId]);
 
   useEffect(() => {
     const map = mapRef.current;

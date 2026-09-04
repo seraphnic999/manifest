@@ -253,6 +253,16 @@ export default function ItemDetails() {
         </Pressable>
       ) : null}
 
+      {item.latitude != null && item.longitude != null ? (
+        <Pressable
+          onPress={() => router.push(`/trip/${item.trip_id}/map?focusItemId=${item.id}`)}
+          style={styles.mapLinkButton}
+        >
+          <Ionicons name="map-outline" size={15} color={colors.teal} />
+          <Text style={styles.mapLinkButtonText}>View on map</Text>
+        </Pressable>
+      ) : null}
+
       <Text style={styles.sectionLabel}>Expenses</Text>
       {expenses.map((e) => (
         <Pressable key={e.id} style={styles.expenseRow} onPress={() => setEditExpenseId(e.id)}>
@@ -387,6 +397,11 @@ const styles = StyleSheet.create({
   fieldValue: { color: colors.ink, fontSize: 15, marginTop: 2 },
   linkButton: { backgroundColor: colors.ink, borderRadius: radius.md, padding: 12, alignItems: "center", marginTop: 16 },
   linkButtonText: { color: colors.paper, fontWeight: "700" },
+  mapLinkButton: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+    borderWidth: 1, borderColor: colors.teal, borderRadius: radius.md, padding: 12, marginTop: 10,
+  },
+  mapLinkButtonText: { color: colors.teal, fontWeight: "700" },
   sectionLabel: {
     color: colors.inkSoft, fontWeight: "700", fontSize: 12,
     textTransform: "uppercase", letterSpacing: 1, marginTop: 20, marginBottom: 4,

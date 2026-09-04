@@ -35,6 +35,8 @@ export default function NewItem() {
   const [bookingSource, setBookingSource] = useState("");
   const [confirmationCode, setConfirmationCode] = useState("");
   const [link, setLink] = useState("");
+  const [latitude, setLatitude] = useState("");
+  const [longitude, setLongitude] = useState("");
   const [saving, setSaving] = useState(false);
 
   // Lodging-specific
@@ -68,6 +70,8 @@ export default function NewItem() {
       setBookingSource(src.booking_source ?? "");
       setConfirmationCode(src.confirmation_code ?? "");
       setLink(src.link ?? "");
+      setLatitude(src.latitude != null ? String(src.latitude) : "");
+      setLongitude(src.longitude != null ? String(src.longitude) : "");
       if (src.is_stay_span) {
         setCheckInDate(src.start_date ?? "");
         setCheckInTime(src.time_start ?? "");
@@ -100,6 +104,16 @@ export default function NewItem() {
       Alert.alert("Check the times", "Arrival must be after departure.");
       return;
     }
+    if ((latitude && !longitude) || (!latitude && longitude)) {
+      Alert.alert("Missing coordinate", "Enter both latitude and longitude, or leave both blank.");
+      return;
+    }
+    const lat = latitude ? parseFloat(latitude) : null;
+    const lon = longitude ? parseFloat(longitude) : null;
+    if ((lat !== null && Number.isNaN(lat)) || (lon !== null && Number.isNaN(lon))) {
+      Alert.alert("Invalid coordinate", "Latitude/longitude must be numbers.");
+      return;
+    }
     setSaving(true);
 
     const base = {
@@ -113,6 +127,8 @@ export default function NewItem() {
       booking_source: bookingSource || null,
       confirmation_code: confirmationCode || null,
       link: link || null,
+      latitude: lat,
+      longitude: lon,
       custom_fields: flightNumber ? { flight_number: flightNumber } : {},
     };
 
@@ -305,6 +321,19 @@ export default function NewItem() {
         <><Text style={styles.label}>Link</Text>
         <TextInput style={styles.input} value={link} onChangeText={setLink} autoCapitalize="none" placeholder="https://…" /></>
       )}
+
+      <Text style={styles.label}>Coordinates (optional)</Text>
+      <View style={styles.row}>
+        <View style={{ flex: 1 }}>
+          <TextInput style={styles.input} value={latitude} onChangeText={setLatitude} placeholder="Latitude" keyboardType="numbers-and-punctuation" />
+        </View>
+        <View style={{ width: 10 }} />
+        <View style={{ flex: 1 }}>
+          <TextInput style={styles.input} value={longitude} onChangeText={setLongitude} placeholder="Longitude" keyboardType="numbers-and-punctuation" />
+        </View>
+      </View>
+      <Text style={styles.hint}>Shown as a pin on the trip map.</Text>
+
       <Pressable style={styles.button} onPress={save} disabled={saving}>
         <Text style={styles.buttonText}>{saving ? "Saving…" : duplicateFrom ? "Save duplicate" : "Add item"}</Text>
       </Pressable>
