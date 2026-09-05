@@ -1,6 +1,7 @@
-import { useEffect, useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
 import { useLocalSearchParams, useRouter, Stack, useFocusEffect } from "expo-router";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
 import { TripCurrency, TripParty, Expense, Allocation, ExpenseType } from "@/lib/types";
@@ -11,38 +12,60 @@ import TripNavBar from "@/components/TripNavBar";
 import { DateField } from "@/components/DateTimeFields";
 import { formatDateDDMMYYYY } from "@/lib/dateFormat";
 import HomeButton from "@/components/HomeButton";
+import { useNetworkStatus } from "@/lib/useNetworkStatus";
+import OfflineBanner from "@/components/OfflineBanner";
+import { Alert } from "@/lib/alert";
 
 type ExpenseWithAllocations = Expense & { allocations: Allocation[] };
+
+interface MoneyData {
+  tripStartDate: string | null;
+  currencies: TripCurrency[];
+  parties: TripParty[];
+  expenses: ExpenseWithAllocations[];
+}
+
+async function fetchMoneyData(tripId: string): Promise<MoneyData> {
+  const { data: trip, error: tripError } = await supabase.from("trips").select("start_date").eq("id", tripId).single();
+  if (tripError) throw tripError;
+  const { data: c, error: currenciesError } = await supabase.from("trip_currencies").select("*").eq("trip_id", tripId);
+  if (currenciesError) throw currenciesError;
+  const { data: p, error: partiesError } = await supabase.from("trip_parties").select("*").eq("trip_id", tripId);
+  if (partiesError) throw partiesError;
+  const { data: e, error: expensesError } = await supabase
+    .from("expenses").select("*, allocations(*)").eq("trip_id", tripId)
+    .order("expense_date", { ascending: false })
+    .order("created_at", { ascending: false });
+  if (expensesError) throw expensesError;
+
+  return {
+    tripStartDate: trip?.start_date ?? null,
+    currencies: (c ?? []) as TripCurrency[],
+    parties: (p ?? []) as TripParty[],
+    expenses: (e ?? []) as ExpenseWithAllocations[],
+  };
+}
 
 export default function MoneyScreen() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
   const router = useRouter();
-  const [currencies, setCurrencies] = useState<TripCurrency[]>([]);
-  const [parties, setParties] = useState<TripParty[]>([]);
-  const [expenses, setExpenses] = useState<ExpenseWithAllocations[]>([]);
-  const [tripStartDate, setTripStartDate] = useState<string | null>(null);
+  const isOnline = useNetworkStatus();
   const [formOpen, setFormOpen] = useState(false);
   const [editExpenseId, setEditExpenseId] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<ExpenseType[]>([]);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
-  const load = useCallback(async () => {
-    const { data: trip } = await supabase.from("trips").select("start_date").eq("id", tripId).single();
-    if (trip) setTripStartDate(trip.start_date);
-    const { data: c } = await supabase.from("trip_currencies").select("*").eq("trip_id", tripId);
-    if (c) setCurrencies(c as TripCurrency[]);
-    const { data: p } = await supabase.from("trip_parties").select("*").eq("trip_id", tripId);
-    if (p) setParties(p as TripParty[]);
-    const { data: e } = await supabase
-      .from("expenses").select("*, allocations(*)").eq("trip_id", tripId)
-      .order("expense_date", { ascending: false })
-      .order("created_at", { ascending: false });
-    if (e) setExpenses(e as ExpenseWithAllocations[]);
-  }, [tripId]);
+  const { data, dataUpdatedAt, refetch } = useQuery({
+    queryKey: ["money", tripId],
+    queryFn: () => fetchMoneyData(tripId),
+  });
+  const tripStartDate = data?.tripStartDate ?? null;
+  const currencies = data?.currencies ?? [];
+  const parties = data?.parties ?? [];
+  const expenses = data?.expenses ?? [];
 
-  useEffect(() => { load(); }, [load]);
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
 
   function rateFor(code: string) {
     return currencies.find((c) => c.code === code)?.rate_to_nis ?? 1;
@@ -97,6 +120,7 @@ export default function MoneyScreen() {
         ),
       }} />
       <TripNavBar tripId={tripId} active="money" />
+      <OfflineBanner dataUpdatedAt={!isOnline ? dataUpdatedAt : undefined} />
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 90 }}>
         <View style={styles.summaryCard}>
           <Text style={styles.totalLabel}>Total spent (NIS)</Text>
@@ -177,14 +201,20 @@ export default function MoneyScreen() {
         )}
       </ScrollView>
 
-      <Pressable style={styles.fab} onPress={() => setFormOpen(true)}>
+      <Pressable
+        style={styles.fab}
+        onPress={() => {
+          if (!isOnline) { Alert.alert("You're offline", "Connect to the internet to add an expense."); return; }
+          setFormOpen(true);
+        }}
+      >
         <Text style={styles.fabText}>+ Add expense</Text>
       </Pressable>
 
       <AddExpenseModal
         visible={formOpen}
         onClose={() => setFormOpen(false)}
-        onSaved={() => { setFormOpen(false); load(); }}
+        onSaved={() => { setFormOpen(false); refetch(); }}
         tripId={tripId}
         currencies={currencies}
         parties={parties}
@@ -193,7 +223,7 @@ export default function MoneyScreen() {
       <AddExpenseModal
         visible={!!editExpenseId}
         onClose={() => setEditExpenseId(null)}
-        onSaved={() => { setEditExpenseId(null); load(); }}
+        onSaved={() => { setEditExpenseId(null); refetch(); }}
         tripId={tripId}
         currencies={currencies}
         parties={parties}

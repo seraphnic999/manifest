@@ -1,6 +1,7 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { View, Text, Pressable, StyleSheet, ScrollView } from "react-native";
 import { useLocalSearchParams, useRouter, Stack, useFocusEffect } from "expo-router";
+import { useQuery } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
@@ -15,6 +16,11 @@ import TripNavBar from "@/components/TripNavBar";
 import ItemTypePickerModal from "@/components/ItemTypePickerModal";
 import HomeButton from "@/components/HomeButton";
 import { formatDateDDMM } from "@/lib/dateFormat";
+import { useNetworkStatus } from "@/lib/useNetworkStatus";
+import OfflineBanner from "@/components/OfflineBanner";
+import { Alert } from "@/lib/alert";
+import { categoryForDbType } from "@/lib/itemTypeMeta";
+import { fetchCurrentPosition, fetchNearbyItems, formatDistance, NearbyItem } from "@/lib/nearMe";
 
 const ALL_TYPES = new Set<ItemType>(ITEM_CATEGORIES.flatMap((c) => c.dbTypes));
 // Flight and transfer pins (airports, transfer pickup points) are usually
@@ -27,43 +33,60 @@ const DEFAULT_VISIBLE_TYPES = new Set<ItemType>([...ALL_TYPES].filter((t) => t !
 // grid), which stays as-is.
 const FILTER_ORDER = ["lodging", "work", "dining", "activity", "shopping", "transport", "transfer", "flight", "other"];
 
+interface TripMapData {
+  days: Day[];
+  items: MapItem[];
+  routes: MapRoute[];
+  tripType: TripType | null;
+}
+
+async function fetchTripMapData(tripId: string): Promise<TripMapData> {
+  const [days, items, routes, tripRes] = await Promise.all([
+    fetchTripDays(tripId), fetchTripMapItems(tripId), fetchTripRoutes(tripId),
+    supabase.from("trips").select("type").eq("id", tripId).single(),
+  ]);
+  if (tripRes.error) throw tripRes.error;
+  return { days, items, routes, tripType: (tripRes.data?.type as TripType) ?? null };
+}
+
 export default function TripMapScreen() {
   const { tripId, focusItemId } = useLocalSearchParams<{ tripId: string; focusItemId?: string }>();
   const router = useRouter();
-
-  const [days, setDays] = useState<Day[]>([]);
-  const [items, setItems] = useState<MapItem[]>([]);
-  const [routes, setRoutes] = useState<MapRoute[]>([]);
-  const [tripType, setTripType] = useState<TripType | null>(null);
+  const isOnline = useNetworkStatus();
 
   const [visibleDayIds, setVisibleDayIds] = useState<Set<string>>(new Set());
   const [visibleTypes, setVisibleTypes] = useState<Set<ItemType>>(DEFAULT_VISIBLE_TYPES);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [nearMeOn, setNearMeOn] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [nearbyItems, setNearbyItems] = useState<NearbyItem[]>([]);
 
-  const load = useCallback(async () => {
-    const [d, i, r, tripRes] = await Promise.all([
-      fetchTripDays(tripId), fetchTripMapItems(tripId), fetchTripRoutes(tripId),
-      supabase.from("trips").select("type").eq("id", tripId).single(),
-    ]);
-    setDays(d);
-    setItems(i);
-    setRoutes(r);
-    if (tripRes.data) setTripType(tripRes.data.type as TripType);
+  const { data, dataUpdatedAt, refetch } = useQuery({
+    queryKey: ["tripMap", tripId],
+    queryFn: () => fetchTripMapData(tripId),
+  });
+  const days = data?.days ?? [];
+  const items = data?.items ?? [];
+  const routes = data?.routes ?? [];
+  const tripType = data?.tripType ?? null;
+
+  useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
+
+  useEffect(() => {
+    if (!data) return;
     // The "Proposals" day (date === null) starts off — everything else on.
-    setVisibleDayIds((prev) => (prev.size === 0 ? new Set(d.filter((day) => day.date !== null).map((day) => day.id)) : prev));
+    setVisibleDayIds((prev) => (prev.size === 0 ? new Set(data.days.filter((day) => day.date !== null).map((day) => day.id)) : prev));
 
     // Coming from an item's "View on map" link: make sure the day/type
     // filters don't hide it.
     if (focusItemId) {
-      const focused = i.find((it) => it.id === focusItemId);
+      const focused = data.items.find((it) => it.id === focusItemId);
       if (focused) {
         setVisibleTypes((prev) => new Set(prev).add(focused.type));
         if (focused.day_id) setVisibleDayIds((prev) => new Set(prev).add(focused.day_id!));
       }
     }
-  }, [tripId, focusItemId]);
-
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  }, [data, focusItemId]);
 
   const dayColors = buildDayColorMap(days);
   const proposalsDayId = days.find((d) => d.date === null)?.id;
@@ -90,6 +113,33 @@ export default function TripMapScreen() {
     router.push(`/item/new?tripId=${tripId}&dayId=${proposalsDayId}&category=${categoryKey}`);
   }
 
+  async function toggleNearMe() {
+    if (nearMeOn) {
+      setNearMeOn(false);
+      setNearbyItems([]);
+      return;
+    }
+    if (!isOnline) {
+      Alert.alert("You're offline", "Connect to the internet to use Near me.");
+      return;
+    }
+    setLocating(true);
+    try {
+      const pos = await fetchCurrentPosition();
+      if (!pos) {
+        Alert.alert("Location needed", "Allow location access to see what's nearby.");
+        return;
+      }
+      const nearby = await fetchNearbyItems(tripId, pos.lat, pos.lon);
+      setNearbyItems(nearby);
+      setNearMeOn(true);
+    } catch (e: any) {
+      Alert.alert("Couldn't get nearby places", e.message ?? "Unknown error");
+    } finally {
+      setLocating(false);
+    }
+  }
+
   return (
     <View style={styles.container}>
       <Stack.Screen options={{
@@ -102,6 +152,7 @@ export default function TripMapScreen() {
       }} />
 
       <TripNavBar tripId={tripId} active="map" />
+      <OfflineBanner dataUpdatedAt={!isOnline ? dataUpdatedAt : undefined} />
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow} style={styles.filterRowOuter}>
         {days.map((d) => (
@@ -134,6 +185,16 @@ export default function TripMapScreen() {
             </Pressable>
           );
         })}
+        <Pressable
+          style={[styles.nearMeChip, nearMeOn && styles.nearMeChipActive]}
+          onPress={toggleNearMe}
+          disabled={locating}
+        >
+          <Ionicons name="locate" size={13} color={nearMeOn ? "#fff" : colors.teal} />
+          <Text style={[styles.chipText, { color: colors.teal }, nearMeOn && styles.chipTextActive]}>
+            {locating ? "Locating…" : "Near me"}
+          </Text>
+        </Pressable>
       </ScrollView>
 
       <View style={styles.mapWrap}>
@@ -147,9 +208,31 @@ export default function TripMapScreen() {
           focusItemId={focusItemId}
           onItemPress={(item: Item) => router.push(`/item/${item.id}`)}
         />
+
+        {nearMeOn && (
+          <View style={styles.nearMePanel}>
+            <Text style={styles.nearMePanelTitle}>Nearby, closest first</Text>
+            <ScrollView style={{ maxHeight: 220 }}>
+              {nearbyItems.map(({ item, distance_m }) => (
+                <Pressable key={item.id} style={styles.nearMeRow} onPress={() => router.push(`/item/${item.id}`)}>
+                  <Ionicons name={categoryForDbType(item.type).icon as any} size={14} color={colors.teal} />
+                  <Text style={styles.nearMeRowTitle} numberOfLines={1}>{item.title}</Text>
+                  <Text style={styles.nearMeRowDistance}>{formatDistance(distance_m)}</Text>
+                </Pressable>
+              ))}
+              {nearbyItems.length === 0 && <Text style={styles.empty}>No items with coordinates on this trip.</Text>}
+            </ScrollView>
+          </View>
+        )}
       </View>
 
-      <Pressable style={styles.fab} onPress={() => setPickerOpen(true)}>
+      <Pressable
+        style={styles.fab}
+        onPress={() => {
+          if (!isOnline) { Alert.alert("You're offline", "Connect to the internet to add a proposal."); return; }
+          setPickerOpen(true);
+        }}
+      >
         <Text style={styles.fabText}>+ Add proposal</Text>
       </Pressable>
 
@@ -175,6 +258,27 @@ const styles = StyleSheet.create({
     flexDirection: "row", alignItems: "center", gap: 5, justifyContent: "center",
   },
   mapWrap: { flex: 1 },
+  nearMeChip: {
+    height: 30, paddingHorizontal: 10, borderRadius: 16, borderWidth: 1.5, borderColor: colors.teal,
+    flexDirection: "row", alignItems: "center", gap: 5, justifyContent: "center",
+  },
+  nearMeChipActive: { backgroundColor: colors.teal },
+  nearMePanel: {
+    position: "absolute", left: 12, right: 12, bottom: 90,
+    backgroundColor: colors.paperRaised, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line,
+    padding: 12, shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4,
+  },
+  nearMePanelTitle: {
+    color: colors.inkSoft, fontWeight: "700", fontSize: 11,
+    textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8,
+  },
+  nearMeRow: {
+    flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 8,
+    borderBottomWidth: 1, borderBottomColor: colors.line,
+  },
+  nearMeRowTitle: { flex: 1, color: colors.ink, fontWeight: "600", fontSize: 13 },
+  nearMeRowDistance: { fontFamily: "IBMPlexMono_500Medium", color: colors.teal, fontSize: 11, fontWeight: "600" },
+  empty: { color: colors.inkSoft, fontSize: 12, fontStyle: "italic", paddingVertical: 8 },
   fab: {
     position: "absolute", bottom: 20, alignSelf: "center",
     backgroundColor: colors.ink, borderRadius: 24, paddingVertical: 14, paddingHorizontal: 24,

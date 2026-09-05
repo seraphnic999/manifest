@@ -16,7 +16,7 @@
     "ios": { "supportsTablet": false },
     "android": {
       "package": "com.seraphnic999.manifest",
-      "versionCode": 7,
+      "versionCode": 8,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#212F3D"
@@ -32,7 +32,9 @@
           "cameraPermission": "Manifest uses your camera to attach photos to trip items."
         }
       ],
-      "@maplibre/maplibre-react-native"
+      "@maplibre/maplibre-react-native",
+      "expo-location",
+      "expo-notifications"
     ]
   }
 }

@@ -59,6 +59,8 @@ export interface Item {
   sort_order: number;
   latitude: number | null;
   longitude: number | null;
+  reminder_minutes_before: number | null;
+  reminder_sent_at: string | null;
   custom_fields: Record<string, unknown>;
   deleted_at: string | null;
 }

@@ -8,6 +8,7 @@ import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persi
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { supabase } from "@/lib/supabase";
 import { claimPendingTripShares } from "@/lib/tripSharing";
+import { registerPushToken } from "@/lib/reminders";
 import { colors } from "@/lib/theme";
 import { queryClient } from "@/lib/queryClient";
 
@@ -37,11 +38,17 @@ export default function RootLayout() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
-      if (data.session) claimPendingTripShares().catch(() => {});
+      if (data.session) {
+        claimPendingTripShares().catch(() => {});
+        if (Platform.OS !== "web") registerPushToken();
+      }
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
-      if (s) claimPendingTripShares().catch(() => {});
+      if (s) {
+        claimPendingTripShares().catch(() => {});
+        if (Platform.OS !== "web") registerPushToken();
+      }
     });
     return () => sub.subscription.unsubscribe();
   }, []);

@@ -1,8 +1,9 @@
-import { useEffect, useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { View, Text, ScrollView, StyleSheet, Linking, Pressable, Image, ActivityIndicator } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Alert } from "@/lib/alert";
 import { useLocalSearchParams, useRouter, Stack, useFocusEffect } from "expo-router";
+import { useQuery } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import { Ionicons } from "@expo/vector-icons";
@@ -21,8 +22,52 @@ import AddShoppingItemModal from "@/components/AddShoppingItemModal";
 import QuickNotesList from "@/components/QuickNotesList";
 import HeaderIconButton from "@/components/HeaderIconButton";
 import HomeButton from "@/components/HomeButton";
+import { useNetworkStatus } from "@/lib/useNetworkStatus";
+import OfflineBanner from "@/components/OfflineBanner";
 
 type PhotoWithUrl = ItemPhoto & { url: string };
+type LinkedShoppingItem = { id: string; name: string; quantity: number; allocations: { id: string }[] };
+
+interface ItemDetailData {
+  item: Item;
+  photos: PhotoWithUrl[];
+  expenses: Expense[];
+  linkedShoppingItems: LinkedShoppingItem[];
+  linkedItems: LinkedItemSummary[];
+}
+
+async function fetchItemDetail(itemId: string): Promise<ItemDetailData | null> {
+  const { data: item, error } = await supabase.from("items").select("*").eq("id", itemId).single();
+  if (error) throw error;
+  if (!item) return null;
+
+  const [photos, expensesRes, shoppingRes, linkedItems] = await Promise.all([
+    fetchItemPhotosWithUrls(itemId),
+    supabase.from("expenses").select("*").eq("item_id", itemId).order("expense_date", { ascending: false }),
+    supabase.from("shopping_list_items").select("id, name, quantity, allocations(id)").eq("item_id", itemId),
+    fetchLinkedItems(itemId),
+  ]);
+  if (expensesRes.error) throw expensesRes.error;
+  if (shoppingRes.error) throw shoppingRes.error;
+
+  return {
+    item: item as Item,
+    photos,
+    expenses: (expensesRes.data ?? []) as Expense[],
+    linkedShoppingItems: (shoppingRes.data ?? []) as unknown as LinkedShoppingItem[],
+    linkedItems,
+  };
+}
+
+async function fetchTripExtras(tripId: string): Promise<{ currencies: TripCurrency[]; parties: TripParty[] }> {
+  const [{ data: currencies, error: currenciesError }, { data: parties, error: partiesError }] = await Promise.all([
+    supabase.from("trip_currencies").select("*").eq("trip_id", tripId),
+    supabase.from("trip_parties").select("*").eq("trip_id", tripId),
+  ]);
+  if (currenciesError) throw currenciesError;
+  if (partiesError) throw partiesError;
+  return { currencies: (currencies ?? []) as TripCurrency[], parties: (parties ?? []) as TripParty[] };
+}
 
 // Everything that's deliberately hidden from the day view lives here:
 // booking_source, vendor, link, confirmation_code, address, phone,
@@ -32,56 +77,41 @@ export default function ItemDetails() {
   const { itemId } = useLocalSearchParams<{ itemId: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [item, setItem] = useState<Item | null>(null);
-  const [photos, setPhotos] = useState<PhotoWithUrl[]>([]);
+  const isOnline = useNetworkStatus();
   const [uploading, setUploading] = useState(false);
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [currencies, setCurrencies] = useState<TripCurrency[]>([]);
-  const [parties, setParties] = useState<TripParty[]>([]);
   const [expenseFormOpen, setExpenseFormOpen] = useState(false);
   const [editExpenseId, setEditExpenseId] = useState<string | null>(null);
   const [shoppingFormOpen, setShoppingFormOpen] = useState(false);
   const [editShoppingId, setEditShoppingId] = useState<string | null>(null);
-  const [linkedShoppingItems, setLinkedShoppingItems] = useState<
-    { id: string; name: string; quantity: number; allocations: { id: string }[] }[]
-  >([]);
-  const [linkedItems, setLinkedItems] = useState<LinkedItemSummary[]>([]);
 
-  const loadShopping = useCallback(() => {
-    supabase.from("shopping_list_items").select("id, name, quantity, allocations(id)").eq("item_id", itemId)
-      .then(({ data }) => data && setLinkedShoppingItems(data as any));
-  }, [itemId]);
+  const { data, dataUpdatedAt, refetch } = useQuery({
+    queryKey: ["itemDetail", itemId],
+    queryFn: () => fetchItemDetail(itemId),
+  });
+  const item = data?.item ?? null;
+  const photos = data?.photos ?? [];
+  const expenses = data?.expenses ?? [];
+  const linkedShoppingItems = data?.linkedShoppingItems ?? [];
+  const linkedItems = data?.linkedItems ?? [];
 
-  const loadItem = useCallback(() => {
-    supabase.from("items").select("*").eq("id", itemId).single()
-      .then(({ data }) => data && setItem(data as Item));
-  }, [itemId]);
+  const { data: tripExtras } = useQuery({
+    queryKey: ["itemTripExtras", item?.trip_id],
+    queryFn: () => fetchTripExtras(item!.trip_id),
+    enabled: !!item?.trip_id,
+  });
+  const currencies = tripExtras?.currencies ?? [];
+  const parties = tripExtras?.parties ?? [];
 
-  const loadPhotos = useCallback(() => {
-    fetchItemPhotosWithUrls(itemId).then(setPhotos);
-  }, [itemId]);
+  useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
 
-  const loadExpenses = useCallback(() => {
-    supabase.from("expenses").select("*").eq("item_id", itemId).order("expense_date", { ascending: false })
-      .then(({ data }) => data && setExpenses(data as Expense[]));
-  }, [itemId]);
-
-  const loadLinkedItems = useCallback(() => {
-    fetchLinkedItems(itemId).then(setLinkedItems);
-  }, [itemId]);
-
-  useEffect(() => { loadItem(); loadPhotos(); loadExpenses(); loadShopping(); loadLinkedItems(); }, [loadItem, loadPhotos, loadExpenses, loadShopping, loadLinkedItems]);
-  useFocusEffect(useCallback(() => { loadItem(); loadPhotos(); loadExpenses(); loadShopping(); loadLinkedItems(); }, [loadItem, loadPhotos, loadExpenses, loadShopping, loadLinkedItems]));
-
-  useEffect(() => {
-    if (!item) return;
-    supabase.from("trip_currencies").select("*").eq("trip_id", item.trip_id)
-      .then(({ data }) => data && setCurrencies(data as TripCurrency[]));
-    supabase.from("trip_parties").select("*").eq("trip_id", item.trip_id)
-      .then(({ data }) => data && setParties(data as TripParty[]));
-  }, [item?.trip_id]);
+  function requireOnline(): boolean {
+    if (isOnline) return true;
+    Alert.alert("You're offline", "Connect to the internet to make changes.");
+    return false;
+  }
 
   async function addPhoto() {
+    if (!requireOnline()) return;
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
       Alert.alert("Permission needed", "Allow photo library access to attach photos.");
@@ -96,7 +126,7 @@ export default function ItemDetails() {
     setUploading(true);
     try {
       await uploadItemPhoto(itemId, result.assets[0]);
-      loadPhotos();
+      refetch();
     } catch (e: any) {
       Alert.alert("Upload failed", e.message ?? "Unknown error");
     }
@@ -104,6 +134,7 @@ export default function ItemDetails() {
   }
 
   async function takePhoto() {
+    if (!requireOnline()) return;
     const perm = await ImagePicker.requestCameraPermissionsAsync();
     if (!perm.granted) {
       Alert.alert("Permission needed", "Allow camera access to take photos.");
@@ -118,7 +149,7 @@ export default function ItemDetails() {
     setUploading(true);
     try {
       await uploadItemPhoto(itemId, result.assets[0]);
-      loadPhotos();
+      refetch();
     } catch (e: any) {
       Alert.alert("Upload failed", e.message ?? "Unknown error");
     }
@@ -126,13 +157,14 @@ export default function ItemDetails() {
   }
 
   async function addDocument() {
+    if (!requireOnline()) return;
     const result = await DocumentPicker.getDocumentAsync({ multiple: false, copyToCacheDirectory: true });
     if (result.canceled || !result.assets?.[0]) return;
 
     setUploading(true);
     try {
       await uploadItemDocument(itemId, result.assets[0]);
-      loadPhotos();
+      refetch();
     } catch (e: any) {
       Alert.alert("Upload failed", e.message ?? "Unknown error");
     }
@@ -150,9 +182,10 @@ export default function ItemDetails() {
   }
 
   async function removePhoto(photo: PhotoWithUrl) {
+    if (!requireOnline()) return;
     Alert.alert("Remove attachment", "Delete this attachment?", [
       { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: async () => { await deleteItemPhoto(photo); loadPhotos(); } },
+      { text: "Delete", style: "destructive", onPress: async () => { await deleteItemPhoto(photo); refetch(); } },
     ]);
   }
 
@@ -170,6 +203,7 @@ export default function ItemDetails() {
   }
 
   function deleteItem() {
+    if (!requireOnline()) return;
     Alert.alert("Delete item", "Move this item to the archive?", [
       { text: "Cancel", style: "cancel" },
       {
@@ -256,6 +290,7 @@ export default function ItemDetails() {
         </View>
       </View>
 
+      <OfflineBanner dataUpdatedAt={!isOnline ? dataUpdatedAt : undefined} />
       <ScrollView style={styles.container}>
       <Text style={styles.typeTag}>{item.type.toUpperCase()}</Text>
       <Text style={styles.title}>{item.title}</Text>
@@ -306,7 +341,7 @@ export default function ItemDetails() {
         </Pressable>
       ))}
       {expenses.length === 0 && <Text style={styles.empty}>No expenses linked yet.</Text>}
-      <Pressable style={styles.addExpenseButton} onPress={() => setExpenseFormOpen(true)}>
+      <Pressable style={styles.addExpenseButton} onPress={() => { if (requireOnline()) setExpenseFormOpen(true); }}>
         <Text style={styles.addExpenseButtonText}>+ Add expense</Text>
       </Pressable>
 
@@ -323,7 +358,7 @@ export default function ItemDetails() {
         );
       })}
       {linkedShoppingItems.length === 0 && <Text style={styles.empty}>Nothing on the shopping list for this yet.</Text>}
-      <Pressable style={styles.addExpenseButton} onPress={() => setShoppingFormOpen(true)}>
+      <Pressable style={styles.addExpenseButton} onPress={() => { if (requireOnline()) setShoppingFormOpen(true); }}>
         <Text style={styles.addExpenseButtonText}>+ Add to shopping list</Text>
       </Pressable>
 
@@ -379,7 +414,7 @@ export default function ItemDetails() {
           <AddExpenseModal
             visible={expenseFormOpen}
             onClose={() => setExpenseFormOpen(false)}
-            onSaved={() => { setExpenseFormOpen(false); loadExpenses(); }}
+            onSaved={() => { setExpenseFormOpen(false); refetch(); }}
             tripId={item.trip_id}
             currencies={currencies}
             parties={parties}
@@ -388,7 +423,7 @@ export default function ItemDetails() {
           <AddExpenseModal
             visible={!!editExpenseId}
             onClose={() => setEditExpenseId(null)}
-            onSaved={() => { setEditExpenseId(null); loadExpenses(); }}
+            onSaved={() => { setEditExpenseId(null); refetch(); }}
             tripId={item.trip_id}
             currencies={currencies}
             parties={parties}
@@ -397,14 +432,14 @@ export default function ItemDetails() {
           <AddShoppingItemModal
             visible={shoppingFormOpen}
             onClose={() => setShoppingFormOpen(false)}
-            onSaved={() => { setShoppingFormOpen(false); loadShopping(); }}
+            onSaved={() => { setShoppingFormOpen(false); refetch(); }}
             tripId={item.trip_id}
             presetItemId={item.id}
           />
           <AddShoppingItemModal
             visible={!!editShoppingId}
             onClose={() => setEditShoppingId(null)}
-            onSaved={() => { setEditShoppingId(null); loadShopping(); }}
+            onSaved={() => { setEditShoppingId(null); refetch(); }}
             tripId={item.trip_id}
             editId={editShoppingId ?? undefined}
           />

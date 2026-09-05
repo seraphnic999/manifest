@@ -146,6 +146,8 @@ create table items (
     case when latitude is not null and longitude is not null
     then st_setsrid(st_makepoint(longitude::float8, latitude::float8), 4326)::geography end
   ) stored,                          -- derived from lat/lon; app never writes this directly
+  reminder_minutes_before integer,   -- null = no reminder; sent by the send-reminders Edge Function
+  reminder_sent_at timestamptz,      -- reset to null on any edit that moves the trigger time
   deleted_at timestamptz,            -- soft delete / archive; null = active. App filters this by
                                       -- default everywhere; permanent removal is a separate,
                                       -- explicit hard-delete action from the archive view.
@@ -300,6 +302,19 @@ create index idx_map_routes_trip on map_routes(trip_id) where deleted_at is null
 
 create index idx_trip_shares_trip on trip_shares(trip_id);
 create index idx_trip_shares_user on trip_shares(shared_with_user_id);
+
+-- ---------- Reminders: push token registry ----------
+-- One row per device registered for push (see lib/reminders.ts). Not a
+-- column on auth.users since a user could eventually have more than one
+-- device; unique per (user, token) so re-registering the same device is a
+-- no-op rather than a duplicate row.
+create table push_tokens (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  expo_push_token text not null,
+  updated_at timestamptz not null default now(),
+  constraint push_tokens_unique unique (user_id, expo_push_token)
+);
 
 -- ============================================================
 -- Notes on app-level logic (not enforced in SQL):
@@ -490,6 +505,11 @@ alter table item_links enable row level security;
 alter table item_quick_notes enable row level security;
 alter table trip_shares enable row level security;
 alter table map_routes enable row level security;
+alter table push_tokens enable row level security;
+
+create policy push_tokens_owner on push_tokens
+  for all using (user_id = auth.uid())
+  with check (user_id = auth.uid());
 
 -- A share row is visible to the trip owner (to manage who it's shared with)
 -- and to the person it names (to see their own shared trips). No insert/
@@ -640,6 +660,26 @@ create policy days_owner on days
 create policy items_owner on items
   for all using (user_has_trip_access(trip_id))
   with check (user_has_trip_access(trip_id));
+
+-- Near-me mode (see lib/nearMe.ts): every item on the trip with coordinates,
+-- nearest first. Plain SECURITY INVOKER (the default) — the underlying
+-- select still goes through items_owner RLS exactly like any other client
+-- query, so this adds no access of its own.
+create or replace function nearby_items(
+  p_trip_id uuid, p_lat float8, p_lon float8, p_limit int default 20
+)
+returns table (item items, distance_m double precision)
+language sql
+stable
+as $$
+  select i, st_distance(i.geom, st_setsrid(st_makepoint(p_lon, p_lat), 4326)::geography) as distance_m
+  from items i
+  where i.trip_id = p_trip_id
+    and i.deleted_at is null
+    and i.geom is not null
+  order by i.geom <-> st_setsrid(st_makepoint(p_lon, p_lat), 4326)::geography
+  limit p_limit;
+$$;
 
 create policy shopping_list_items_owner on shopping_list_items
   for all using (user_has_trip_access(trip_id))

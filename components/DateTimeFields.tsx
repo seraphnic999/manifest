@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { View, Text, Pressable, Platform, TextInput } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { colors, radius } from "@/lib/theme";
-import { formatDateDDMMYYYY } from "@/lib/dateFormat";
+import { formatDateDDMMYYYY, localIsoDate } from "@/lib/dateFormat";
 import { normalizeTimeHHMM } from "@/lib/timeFormat";
 
 function webStyle(extra = {}) {
@@ -69,7 +69,11 @@ export function DateField({ label, value, onChange }: { label: string; value: st
         <DateTimePicker
           value={value ? new Date(value) : new Date()}
           mode="date"
-          onChange={(_, d) => { setShow(false); if (d) onChange(d.toISOString().slice(0, 10)); }}
+          // localIsoDate, not d.toISOString() — the picker gives a Date at
+          // local midnight for the tapped day; toISOString() is UTC and
+          // rolls that back to the previous day for hours east of UTC
+          // (e.g. Israel), silently saving the wrong date.
+          onChange={(_, d) => { setShow(false); if (d) onChange(localIsoDate(d)); }}
         />
       )}
     </View>

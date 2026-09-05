@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView, Modal } from "react-native";
 import { useLocalSearchParams, Stack, useFocusEffect } from "expo-router";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
 import { TripCurrency, TripParty, Expense, Allocation, ExpenseType } from "@/lib/types";
@@ -9,6 +10,8 @@ import { classifyExpenseTiming, ExpenseTiming } from "@/lib/expenseTiming";
 import { formatDateDDMMYYYY } from "@/lib/dateFormat";
 import TripNavBar from "@/components/TripNavBar";
 import HomeButton from "@/components/HomeButton";
+import { useNetworkStatus } from "@/lib/useNetworkStatus";
+import OfflineBanner from "@/components/OfflineBanner";
 
 type ExpenseWithAllocations = Expense & { allocations: Allocation[] };
 
@@ -48,26 +51,46 @@ const TYPE_COLORS: Record<ExpenseType, string> = {
   meals: "#E07A3C", attractions: "#4C9A6A", shopping: "#9A6FC9", other: "#8C8577",
 };
 
+interface ReportData {
+  tripStartDate: string | null;
+  currencies: TripCurrency[];
+  parties: TripParty[];
+  expenses: ExpenseWithAllocations[];
+}
+
+async function fetchReportData(tripId: string): Promise<ReportData> {
+  const { data: trip, error: tripError } = await supabase.from("trips").select("start_date").eq("id", tripId).single();
+  if (tripError) throw tripError;
+  const { data: c, error: currenciesError } = await supabase.from("trip_currencies").select("*").eq("trip_id", tripId);
+  if (currenciesError) throw currenciesError;
+  const { data: p, error: partiesError } = await supabase.from("trip_parties").select("*").eq("trip_id", tripId);
+  if (partiesError) throw partiesError;
+  const { data: e, error: expensesError } = await supabase.from("expenses").select("*, allocations(*)").eq("trip_id", tripId);
+  if (expensesError) throw expensesError;
+
+  return {
+    tripStartDate: trip?.start_date ?? null,
+    currencies: (c ?? []) as TripCurrency[],
+    parties: (p ?? []) as TripParty[],
+    expenses: (e ?? []) as ExpenseWithAllocations[],
+  };
+}
+
 export default function ExpenseReport() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
-  const [currencies, setCurrencies] = useState<TripCurrency[]>([]);
-  const [parties, setParties] = useState<TripParty[]>([]);
-  const [expenses, setExpenses] = useState<ExpenseWithAllocations[]>([]);
-  const [tripStartDate, setTripStartDate] = useState<string | null>(null);
+  const isOnline = useNetworkStatus();
   const [openPartyId, setOpenPartyId] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    const { data: trip } = await supabase.from("trips").select("start_date").eq("id", tripId).single();
-    if (trip) setTripStartDate(trip.start_date);
-    const { data: c } = await supabase.from("trip_currencies").select("*").eq("trip_id", tripId);
-    if (c) setCurrencies(c as TripCurrency[]);
-    const { data: p } = await supabase.from("trip_parties").select("*").eq("trip_id", tripId);
-    if (p) setParties(p as TripParty[]);
-    const { data: e } = await supabase.from("expenses").select("*, allocations(*)").eq("trip_id", tripId);
-    if (e) setExpenses(e as ExpenseWithAllocations[]);
-  }, [tripId]);
+  const { data, dataUpdatedAt, refetch } = useQuery({
+    queryKey: ["report", tripId],
+    queryFn: () => fetchReportData(tripId),
+  });
+  const tripStartDate = data?.tripStartDate ?? null;
+  const currencies = data?.currencies ?? [];
+  const parties = data?.parties ?? [];
+  const expenses = data?.expenses ?? [];
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
 
   function rateFor(code: string) {
     return currencies.find((c) => c.code === code)?.rate_to_nis ?? 1;
@@ -132,6 +155,7 @@ export default function ExpenseReport() {
         ),
       }} />
       <TripNavBar tripId={tripId} active="money" />
+      <OfflineBanner dataUpdatedAt={!isOnline ? dataUpdatedAt : undefined} />
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
         <View style={styles.summaryCard}>
           <Text style={styles.totalLabel}>Total spent (NIS)</Text>

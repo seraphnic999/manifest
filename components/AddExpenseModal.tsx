@@ -6,6 +6,7 @@ import { Alert } from "@/lib/alert";
 import { useRouter } from "expo-router";
 import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
+import { localIsoDate } from "@/lib/dateFormat";
 import { TripCurrency, TripParty, ShoppingListItem, ExpenseType } from "@/lib/types";
 import { EXPENSE_TYPES, EXPENSE_TYPE_LABELS, deriveExpenseTypeFromItemType } from "@/lib/expenseType";
 import { DateField } from "@/components/DateTimeFields";
@@ -35,7 +36,7 @@ export default function AddExpenseModal({
   const router = useRouter();
   const [amount, setAmount] = useState("");
   const [currencyCode, setCurrencyCode] = useState("NIS");
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(localIsoDate());
   const [note, setNote] = useState("");
   const [expenseType, setExpenseType] = useState<ExpenseType>("other");
   const [refundAmount, setRefundAmount] = useState("");
@@ -117,7 +118,7 @@ export default function AddExpenseModal({
         if (cancelled || !exp) return;
         setAmount(String(exp.amount));
         setCurrencyCode(exp.currency_code);
-        setDate(exp.expense_date ?? new Date().toISOString().slice(0, 10));
+        setDate(exp.expense_date ?? localIsoDate());
         setNote(exp.note ?? "");
         setExpenseType((exp.type as ExpenseType) ?? "other");
         setRefundAmount(exp.refund_amount != null ? String(exp.refund_amount) : "");
@@ -136,7 +137,7 @@ export default function AddExpenseModal({
         setLoaded(true);
       });
     } else {
-      setAmount(""); setCurrencyCode("NIS"); setDate(new Date().toISOString().slice(0, 10)); setNote("");
+      setAmount(""); setCurrencyCode("NIS"); setDate(localIsoDate()); setNote("");
       setRefundAmount(""); setRefundCompany("");
       setSplitting(false); setSingleParty(null);
       setRows([{ amount: "", partyId: null, shoppingItemId: null, note: "" }]);

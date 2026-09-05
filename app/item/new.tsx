@@ -11,6 +11,7 @@ import { computeInsertSortOrder } from "@/lib/reorder";
 import { DateField, TimeField } from "@/components/DateTimeFields";
 import { computeDurationMinutes, formatDuration } from "@/lib/duration";
 import { Item, ItemStatus } from "@/lib/types";
+import { DEFAULT_REMINDER_MINUTES } from "@/lib/reminders";
 import HomeButton from "@/components/HomeButton";
 
 const STATUSES: ItemStatus[] = ["planned", "booked", "optional"];
@@ -38,6 +39,7 @@ export default function NewItem() {
   const [googleMapsLink, setGoogleMapsLink] = useState("");
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
+  const [reminderMinutes, setReminderMinutes] = useState("");
   const [saving, setSaving] = useState(false);
 
   // Lodging-specific
@@ -74,6 +76,7 @@ export default function NewItem() {
       setGoogleMapsLink(src.google_maps_link ?? "");
       setLatitude(src.latitude != null ? String(src.latitude) : "");
       setLongitude(src.longitude != null ? String(src.longitude) : "");
+      setReminderMinutes(src.reminder_minutes_before != null ? String(src.reminder_minutes_before) : "");
       if (src.is_stay_span) {
         setCheckInDate(src.start_date ?? "");
         setCheckInTime(src.time_start ?? "");
@@ -132,6 +135,7 @@ export default function NewItem() {
       google_maps_link: googleMapsLink || null,
       latitude: lat,
       longitude: lon,
+      reminder_minutes_before: reminderMinutes ? parseInt(reminderMinutes, 10) || null : null,
       custom_fields: flightNumber ? { flight_number: flightNumber } : {},
     };
 
@@ -339,6 +343,16 @@ export default function NewItem() {
         </View>
       </View>
       <Text style={styles.hint}>Shown as a pin on the trip map.</Text>
+
+      <Text style={styles.label}>Remind me (minutes before, optional)</Text>
+      <TextInput
+        style={styles.input}
+        value={reminderMinutes}
+        onChangeText={setReminderMinutes}
+        keyboardType="number-pad"
+        placeholder={`e.g. ${DEFAULT_REMINDER_MINUTES[subtype] ?? 30}`}
+      />
+      <Text style={styles.hint}>Sent as a push notification — needs a signed-in device registered for push.</Text>
 
       <Pressable style={styles.button} onPress={save} disabled={saving}>
         <Text style={styles.buttonText}>{saving ? "Saving…" : duplicateFrom ? "Save duplicate" : "Add item"}</Text>

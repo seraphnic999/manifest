@@ -203,7 +203,7 @@ export default function DayView() {
           // pattern for a dedicated handle, and keeping it a separate
           // Pressable (not overlapping the row's own tap-to-open area)
           // avoids the two touch handlers fighting over the same gesture.
-          <Pressable style={styles.dragHandle} onPressIn={drag} disabled={isActive}>
+          <Pressable style={styles.dragHandle} onPressIn={() => { if (requireOnline()) drag(); }} disabled={isActive}>
             <Text style={styles.dragHandleText}>{"\u2630"}</Text>
           </Pressable>
         )}

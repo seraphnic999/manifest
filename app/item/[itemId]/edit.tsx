@@ -12,6 +12,7 @@ import { computeInsertSortOrder } from "@/lib/reorder";
 import { computeDurationMinutes, formatDuration } from "@/lib/duration";
 import { useUnsavedChangesGuard } from "@/lib/useUnsavedChangesGuard";
 import { Item, ItemStatus } from "@/lib/types";
+import { DEFAULT_REMINDER_MINUTES } from "@/lib/reminders";
 import { linkItems, unlinkItems, fetchLinkedItems, LinkedItemSummary } from "@/lib/itemLinks";
 import { formatDateDDMM } from "@/lib/dateFormat";
 import { normalizeTimeHHMM } from "@/lib/timeFormat";
@@ -36,6 +37,11 @@ export default function EditItem() {
   const [status, setStatus] = useState<ItemStatus>("booked");
   const [itemDate, setItemDate] = useState("");
   const [origItemDate, setOrigItemDate] = useState("");
+  // Whether the reminder needs re-arming (reminder_sent_at reset to null) on
+  // save — only when the trigger time actually moved (start date/time or the
+  // offset itself), not on every unrelated edit, or an already-sent
+  // reminder would fire a second time for no reason.
+  const origReminderKeyRef = useRef("");
   const [time, setTime] = useState("");
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
@@ -45,6 +51,8 @@ export default function EditItem() {
   const [confirmationCode, setConfirmationCode] = useState("");
   const [link, setLink] = useState("");
   const [googleMapsLink, setGoogleMapsLink] = useState("");
+  const [reminderMinutes, setReminderMinutes] = useState("");
+  const [itemType, setItemType] = useState("other");
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
 
@@ -70,6 +78,7 @@ export default function EditItem() {
     return JSON.stringify({
       title, status, itemDate, time, address, phone, vendor, flightNumber,
       bookingSource, confirmationCode, link, googleMapsLink, latitude, longitude,
+      reminderMinutes,
       checkInDate, checkInTime, checkOutDate, checkOutTime,
       arrivalDate, arrivalTime,
     });
@@ -92,6 +101,7 @@ export default function EditItem() {
       if (!data) return;
       const item = data as Item;
       setIsStaySpan(item.is_stay_span);
+      setItemType(item.type);
       const cat = categoryForDbType(item.type);
       // A lodging check-in/check-out event isn't the span itself, so drop
       // the date-range fields even though its DB type is also 'lodging'.
@@ -112,6 +122,8 @@ export default function EditItem() {
       setGoogleMapsLink(item.google_maps_link ?? "");
       setLatitude(item.latitude != null ? String(item.latitude) : "");
       setLongitude(item.longitude != null ? String(item.longitude) : "");
+      setReminderMinutes(item.reminder_minutes_before != null ? String(item.reminder_minutes_before) : "");
+      origReminderKeyRef.current = [item.start_date, item.time_start, item.reminder_minutes_before].join("|");
       setCheckInDate(item.start_date ?? "");
       setCheckInTime(item.time_start ?? "");
       setCheckOutDate(item.end_date ?? "");
@@ -133,6 +145,7 @@ export default function EditItem() {
         googleMapsLink: item.google_maps_link ?? "",
         latitude: item.latitude != null ? String(item.latitude) : "",
         longitude: item.longitude != null ? String(item.longitude) : "",
+        reminderMinutes: item.reminder_minutes_before != null ? String(item.reminder_minutes_before) : "",
         checkInDate: item.start_date ?? "", checkInTime: item.time_start ?? "",
         checkOutDate: item.end_date ?? "", checkOutTime: item.time_end ?? "",
         arrivalDate: item.end_date ?? "", arrivalTime: item.time_end ?? "",
@@ -196,11 +209,16 @@ export default function EditItem() {
     setSaving(true);
     const { data: current } = await supabase.from("items").select("trip_id, day_id").eq("id", itemId).single();
 
+    const newStartDate = isStaySpan ? checkInDate : (itemDate || null);
+    const newTimeStart = isStaySpan ? (checkInTime || null) : (time || null);
+    const newReminderMinutes = reminderMinutes ? parseInt(reminderMinutes, 10) || null : null;
+    const reminderKeyChanged = [newStartDate, newTimeStart, newReminderMinutes].join("|") !== origReminderKeyRef.current;
+
     const { error } = await supabase.from("items").update({
       title, status,
-      time_start: isStaySpan ? (checkInTime || null) : (time || null),
+      time_start: newTimeStart,
       time_end: isStaySpan ? (checkOutTime || null) : (has("flightTimes") ? (arrivalTime || null) : undefined),
-      start_date: isStaySpan ? checkInDate : (itemDate || null),
+      start_date: newStartDate,
       end_date: isStaySpan ? checkOutDate : (has("flightTimes") ? (arrivalDate || null) : undefined),
       address: address || null,
       phone: phone || null,
@@ -211,6 +229,8 @@ export default function EditItem() {
       google_maps_link: googleMapsLink || null,
       latitude: lat,
       longitude: lon,
+      reminder_minutes_before: newReminderMinutes,
+      ...(reminderKeyChanged ? { reminder_sent_at: null } : {}),
       custom_fields: flightNumber ? { flight_number: flightNumber } : {},
     }).eq("id", itemId);
     setSaving(false);
@@ -399,6 +419,16 @@ export default function EditItem() {
         </View>
       </View>
       <Text style={styles.hint}>Shown as a pin on the trip map.</Text>
+
+      <Text style={styles.label}>Remind me (minutes before, optional)</Text>
+      <TextInput
+        style={styles.input}
+        value={reminderMinutes}
+        onChangeText={setReminderMinutes}
+        keyboardType="number-pad"
+        placeholder={`e.g. ${DEFAULT_REMINDER_MINUTES[itemType] ?? 30}`}
+      />
+      <Text style={styles.hint}>Sent as a push notification — needs a signed-in device registered for push.</Text>
 
       <QuickNotesList itemId={itemId} />
 

@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView, Modal } from "react-native";
 import { useLocalSearchParams, Stack, useFocusEffect } from "expo-router";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
 import { TripCurrency, TripParty } from "@/lib/types";
@@ -9,6 +10,9 @@ import AddExpenseModal from "@/components/AddExpenseModal";
 import AddShoppingItemModal from "@/components/AddShoppingItemModal";
 import TripNavBar from "@/components/TripNavBar";
 import HomeButton from "@/components/HomeButton";
+import { useNetworkStatus } from "@/lib/useNetworkStatus";
+import OfflineBanner from "@/components/OfflineBanner";
+import { Alert } from "@/lib/alert";
 
 interface AllocationInfo {
   id: string;
@@ -28,32 +32,56 @@ interface ShoppingRow {
   allocations: AllocationInfo[];
 }
 
+interface ShoppingData {
+  rows: ShoppingRow[];
+  currencies: TripCurrency[];
+  parties: TripParty[];
+}
+
+async function fetchShoppingData(tripId: string): Promise<ShoppingData> {
+  const { data, error } = await supabase
+    .from("shopping_list_items")
+    .select("*, items(title), allocations(id, amount, party_id, expense_id, expenses(currency_code, note, expense_date))")
+    .eq("trip_id", tripId)
+    .order("name");
+  if (error) throw error;
+
+  const { data: c, error: currenciesError } = await supabase.from("trip_currencies").select("*").eq("trip_id", tripId);
+  if (currenciesError) throw currenciesError;
+  const { data: p, error: partiesError } = await supabase.from("trip_parties").select("*").eq("trip_id", tripId);
+  if (partiesError) throw partiesError;
+
+  return {
+    rows: (data ?? []) as unknown as ShoppingRow[],
+    currencies: (c ?? []) as TripCurrency[],
+    parties: (p ?? []) as TripParty[],
+  };
+}
+
 export default function ShoppingScreen() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
-  const [rows, setRows] = useState<ShoppingRow[]>([]);
-  const [currencies, setCurrencies] = useState<TripCurrency[]>([]);
-  const [parties, setParties] = useState<TripParty[]>([]);
+  const isOnline = useNetworkStatus();
   const [addFormOpen, setAddFormOpen] = useState(false);
   const [editRowId, setEditRowId] = useState<string | null>(null);
   const [expenseTarget, setExpenseTarget] = useState<ShoppingRow | null>(null);
   const [editExpenseId, setEditExpenseId] = useState<string | null>(null);
   const [relatedExpensesTarget, setRelatedExpensesTarget] = useState<ShoppingRow | null>(null);
 
-  const load = useCallback(async () => {
-    const { data } = await supabase
-      .from("shopping_list_items")
-      .select("*, items(title), allocations(id, amount, party_id, expense_id, expenses(currency_code, note, expense_date))")
-      .eq("trip_id", tripId)
-      .order("name");
-    if (data) setRows(data as unknown as ShoppingRow[]);
+  const { data, dataUpdatedAt, refetch } = useQuery({
+    queryKey: ["shopping", tripId],
+    queryFn: () => fetchShoppingData(tripId),
+  });
+  const rows = data?.rows ?? [];
+  const currencies = data?.currencies ?? [];
+  const parties = data?.parties ?? [];
 
-    const { data: c } = await supabase.from("trip_currencies").select("*").eq("trip_id", tripId);
-    if (c) setCurrencies(c as TripCurrency[]);
-    const { data: p } = await supabase.from("trip_parties").select("*").eq("trip_id", tripId);
-    if (p) setParties(p as TripParty[]);
-  }, [tripId]);
+  useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  function requireOnline(): boolean {
+    if (isOnline) return true;
+    Alert.alert("You're offline", "Connect to the internet to make changes.");
+    return false;
+  }
 
   function partyName(id: string | null) {
     if (!id) return null;
@@ -119,6 +147,7 @@ export default function ShoppingScreen() {
         ),
       }} />
       <TripNavBar tripId={tripId} active="shopping" />
+      <OfflineBanner dataUpdatedAt={!isOnline ? dataUpdatedAt : undefined} />
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 90 }}>
         {general.length > 0 && (
           <>
@@ -136,21 +165,21 @@ export default function ShoppingScreen() {
         <Text style={styles.hint}>Tap an unbought item to record what you paid for it, or a bought item to view its expense.</Text>
       </ScrollView>
 
-      <Pressable style={styles.fab} onPress={() => setAddFormOpen(true)}>
+      <Pressable style={styles.fab} onPress={() => { if (requireOnline()) setAddFormOpen(true); }}>
         <Text style={styles.fabText}>+ Add item</Text>
       </Pressable>
 
       <AddShoppingItemModal
         visible={addFormOpen}
         onClose={() => setAddFormOpen(false)}
-        onSaved={() => { setAddFormOpen(false); load(); }}
+        onSaved={() => { setAddFormOpen(false); refetch(); }}
         tripId={tripId}
       />
 
       <AddShoppingItemModal
         visible={!!editRowId}
         onClose={() => setEditRowId(null)}
-        onSaved={() => { setEditRowId(null); load(); }}
+        onSaved={() => { setEditRowId(null); refetch(); }}
         tripId={tripId}
         editId={editRowId ?? undefined}
       />
@@ -159,7 +188,7 @@ export default function ShoppingScreen() {
         <AddExpenseModal
           visible={!!expenseTarget}
           onClose={() => setExpenseTarget(null)}
-          onSaved={() => { setExpenseTarget(null); load(); }}
+          onSaved={() => { setExpenseTarget(null); refetch(); }}
           tripId={tripId}
           currencies={currencies}
           parties={parties}
@@ -171,7 +200,7 @@ export default function ShoppingScreen() {
         <AddExpenseModal
           visible={!!editExpenseId}
           onClose={() => setEditExpenseId(null)}
-          onSaved={() => { setEditExpenseId(null); load(); }}
+          onSaved={() => { setEditExpenseId(null); refetch(); }}
           tripId={tripId}
           currencies={currencies}
           parties={parties}
