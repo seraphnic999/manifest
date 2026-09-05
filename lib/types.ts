@@ -53,6 +53,7 @@ export interface Item {
   phone: string | null;
   vendor: string | null;
   link: string | null;
+  google_maps_link: string | null;
   sort_order: number;
   latitude: number | null;
   longitude: number | null;

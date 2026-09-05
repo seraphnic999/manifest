@@ -35,6 +35,7 @@ export default function NewItem() {
   const [bookingSource, setBookingSource] = useState("");
   const [confirmationCode, setConfirmationCode] = useState("");
   const [link, setLink] = useState("");
+  const [googleMapsLink, setGoogleMapsLink] = useState("");
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
   const [saving, setSaving] = useState(false);
@@ -70,6 +71,7 @@ export default function NewItem() {
       setBookingSource(src.booking_source ?? "");
       setConfirmationCode(src.confirmation_code ?? "");
       setLink(src.link ?? "");
+      setGoogleMapsLink(src.google_maps_link ?? "");
       setLatitude(src.latitude != null ? String(src.latitude) : "");
       setLongitude(src.longitude != null ? String(src.longitude) : "");
       if (src.is_stay_span) {
@@ -127,6 +129,7 @@ export default function NewItem() {
       booking_source: bookingSource || null,
       confirmation_code: confirmationCode || null,
       link: link || null,
+      google_maps_link: googleMapsLink || null,
       latitude: lat,
       longitude: lon,
       custom_fields: flightNumber ? { flight_number: flightNumber } : {},
@@ -321,6 +324,9 @@ export default function NewItem() {
         <><Text style={styles.label}>Link</Text>
         <TextInput style={styles.input} value={link} onChangeText={setLink} autoCapitalize="none" placeholder="https://…" /></>
       )}
+
+      <Text style={styles.label}>Google Maps link (optional)</Text>
+      <TextInput style={styles.input} value={googleMapsLink} onChangeText={setGoogleMapsLink} autoCapitalize="none" placeholder="https://maps.app.goo.gl/…" />
 
       <Text style={styles.label}>Coordinates (optional)</Text>
       <View style={styles.row}>

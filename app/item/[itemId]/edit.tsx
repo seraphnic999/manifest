@@ -44,6 +44,7 @@ export default function EditItem() {
   const [bookingSource, setBookingSource] = useState("");
   const [confirmationCode, setConfirmationCode] = useState("");
   const [link, setLink] = useState("");
+  const [googleMapsLink, setGoogleMapsLink] = useState("");
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
 
@@ -68,7 +69,7 @@ export default function EditItem() {
   function currentSnapshot() {
     return JSON.stringify({
       title, status, itemDate, time, address, phone, vendor, flightNumber,
-      bookingSource, confirmationCode, link, latitude, longitude,
+      bookingSource, confirmationCode, link, googleMapsLink, latitude, longitude,
       checkInDate, checkInTime, checkOutDate, checkOutTime,
       arrivalDate, arrivalTime,
     });
@@ -108,6 +109,7 @@ export default function EditItem() {
       setBookingSource(item.booking_source ?? "");
       setConfirmationCode(item.confirmation_code ?? "");
       setLink(item.link ?? "");
+      setGoogleMapsLink(item.google_maps_link ?? "");
       setLatitude(item.latitude != null ? String(item.latitude) : "");
       setLongitude(item.longitude != null ? String(item.longitude) : "");
       setCheckInDate(item.start_date ?? "");
@@ -128,6 +130,7 @@ export default function EditItem() {
         flightNumber: (item.custom_fields as any)?.flight_number ?? "",
         bookingSource: item.booking_source ?? "", confirmationCode: item.confirmation_code ?? "",
         link: item.link ?? "",
+        googleMapsLink: item.google_maps_link ?? "",
         latitude: item.latitude != null ? String(item.latitude) : "",
         longitude: item.longitude != null ? String(item.longitude) : "",
         checkInDate: item.start_date ?? "", checkInTime: item.time_start ?? "",
@@ -205,6 +208,7 @@ export default function EditItem() {
       booking_source: bookingSource || null,
       confirmation_code: confirmationCode || null,
       link: link || null,
+      google_maps_link: googleMapsLink || null,
       latitude: lat,
       longitude: lon,
       custom_fields: flightNumber ? { flight_number: flightNumber } : {},
@@ -380,6 +384,9 @@ export default function EditItem() {
         <><Text style={styles.label}>Link</Text>
         <TextInput style={styles.input} value={link} onChangeText={setLink} autoCapitalize="none" /></>
       )}
+
+      <Text style={styles.label}>Google Maps link (optional)</Text>
+      <TextInput style={styles.input} value={googleMapsLink} onChangeText={setGoogleMapsLink} autoCapitalize="none" placeholder="https://maps.app.goo.gl/…" />
 
       <Text style={styles.label}>Coordinates (optional)</Text>
       <View style={styles.row}>

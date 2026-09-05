@@ -136,6 +136,9 @@ create table items (
   phone text,
   vendor text,
   link text,
+  google_maps_link text,             -- optional; opens in a new tab on web, deep-links to the
+                                      -- Google Maps app on native — separate from `link` (the
+                                      -- item's own booking/info URL)
   sort_order int not null,
   latitude numeric(9,6),             -- map view: promoted out of custom_fields.lat (still present
   longitude numeric(9,6),            -- there too until a follow-up migration drops it). Both or neither.

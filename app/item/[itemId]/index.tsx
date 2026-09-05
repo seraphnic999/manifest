@@ -253,6 +253,16 @@ export default function ItemDetails() {
         </Pressable>
       ) : null}
 
+      {item.google_maps_link ? (
+        <Pressable
+          onPress={() => Linking.openURL(item.google_maps_link!)}
+          style={styles.mapLinkButton}
+        >
+          <Ionicons name="logo-google" size={15} color={colors.teal} />
+          <Text style={styles.mapLinkButtonText}>Open in Google Maps</Text>
+        </Pressable>
+      ) : null}
+
       {item.latitude != null && item.longitude != null ? (
         <Pressable
           onPress={() => router.push(`/trip/${item.trip_id}/map?focusItemId=${item.id}`)}
