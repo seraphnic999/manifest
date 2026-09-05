@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, Modal, Platform } from "react-native";
 import { useLocalSearchParams, useRouter, Stack, useFocusEffect } from "expo-router";
+import { useQuery } from "@tanstack/react-query";
 import { RenderItemParams, NestableScrollContainer, NestableDraggableFlatList } from "react-native-draggable-flatlist";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/lib/supabase";
@@ -13,6 +14,9 @@ import TripNavBar from "@/components/TripNavBar";
 import { formatDateDDMMYYYY, formatDateDDMM } from "@/lib/dateFormat";
 import { normalizeTimeHHMM } from "@/lib/timeFormat";
 import HomeButton from "@/components/HomeButton";
+import { useNetworkStatus } from "@/lib/useNetworkStatus";
+import OfflineBanner from "@/components/OfflineBanner";
+import { Alert } from "@/lib/alert";
 
 const STATUS_LABEL: Record<string, string> = {
   booked: "Booked", optional: "Optional", planned: "Planned",
@@ -27,9 +31,54 @@ function trimTheme(theme: string | null, max = 12) {
 // trip's one special no-date "Proposals" day — see days.date in schema.sql.
 const PROPOSALS_SEGMENT = "proposals";
 
+interface DayData {
+  allDays: Day[];
+  dayId: string | null;
+  theme: string | null;
+  orderable: Item[];
+  stayBanners: Item[];
+}
+
+async function fetchDayData(tripId: string, date: string, isProposals: boolean): Promise<DayData> {
+  const { data: days, error: daysError } = await supabase
+    .from("days").select("*").eq("trip_id", tripId).order("sort_order");
+  if (daysError) throw daysError;
+  const allDays = (days ?? []) as Day[];
+
+  const day = isProposals ? allDays.find((d) => d.date === null) : allDays.find((d) => d.date === date);
+  if (!day) return { allDays, dayId: null, theme: null, orderable: [], stayBanners: [] };
+
+  const { data: dayItems, error: itemsError } = await supabase
+    .from("items").select("*")
+    .eq("day_id", day.id).is("deleted_at", null)
+    // Note: not filtering out items with a parent_item_id — that field is
+    // also used to link check-in/check-out events back to their lodging
+    // span, and those DO belong in the ordered day timeline. Once true
+    // multi-leg sub-steps are added, they'll need their own way to be
+    // excluded here (e.g. a separate is_substep flag) rather than reusing
+    // parent_item_id for both relationships.
+    .order("sort_order");
+  if (itemsError) throw itemsError;
+
+  // A "stay spans this date" banner doesn't make sense for the Proposals
+  // day, which has no date at all.
+  let stayBanners: Item[] = [];
+  if (!isProposals) {
+    const { data: spanningLodging, error } = await supabase
+      .from("items").select("*")
+      .eq("trip_id", tripId).eq("is_stay_span", true).is("deleted_at", null)
+      .lte("start_date", date).gte("end_date", date);
+    if (error) throw error;
+    stayBanners = (spanningLodging ?? []) as Item[];
+  }
+
+  return { allDays, dayId: day.id, theme: day.theme, orderable: (dayItems ?? []) as Item[], stayBanners };
+}
+
 export default function DayView() {
   const { tripId, date } = useLocalSearchParams<{ tripId: string; date: string }>();
   const isProposals = date === PROPOSALS_SEGMENT;
+  const isOnline = useNetworkStatus();
   const [stayBanners, setStayBanners] = useState<Item[]>([]);
   const [orderable, setOrderable] = useState<Item[]>([]);
   const [allDays, setAllDays] = useState<Day[]>([]);
@@ -40,44 +89,30 @@ export default function DayView() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const router = useRouter();
 
-  const load = useCallback(async () => {
-    const { data: days } = await supabase
-      .from("days").select("*").eq("trip_id", tripId).order("sort_order");
-    if (days) setAllDays(days as Day[]);
+  const { data, dataUpdatedAt, refetch } = useQuery({
+    queryKey: ["day", tripId, date],
+    queryFn: () => fetchDayData(tripId, date, isProposals),
+  });
 
-    const day = isProposals ? days?.find((d) => d.date === null) : days?.find((d) => d.date === date);
-    if (!day) return;
-    setDayId(day.id);
-    setTheme(day.theme);
+  // Query data feeds these as the source of truth on every fetch; mutations
+  // below (reorder, theme edit) still update them directly for instant
+  // feedback, same as before this screen read through TanStack Query.
+  useEffect(() => {
+    if (!data) return;
+    setAllDays(data.allDays);
+    setDayId(data.dayId);
+    setTheme(data.theme);
+    setOrderable(data.orderable);
+    setStayBanners(data.stayBanners);
+  }, [data]);
 
-    const { data: dayItems } = await supabase
-      .from("items").select("*")
-      .eq("day_id", day.id).is("deleted_at", null)
-      // Note: not filtering out items with a parent_item_id — that field is
-      // also used to link check-in/check-out events back to their lodging
-      // span, and those DO belong in the ordered day timeline. Once true
-      // multi-leg sub-steps are added, they'll need their own way to be
-      // excluded here (e.g. a separate is_substep flag) rather than reusing
-      // parent_item_id for both relationships.
-      .order("sort_order");
+  useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
 
-    // A "stay spans this date" banner doesn't make sense for the Proposals
-    // day, which has no date at all.
-    if (!isProposals) {
-      const { data: spanningLodging } = await supabase
-        .from("items").select("*")
-        .eq("trip_id", tripId).eq("is_stay_span", true).is("deleted_at", null)
-        .lte("start_date", date).gte("end_date", date);
-      setStayBanners((spanningLodging ?? []) as Item[]);
-    } else {
-      setStayBanners([]);
-    }
-
-    setOrderable((dayItems ?? []) as Item[]);
-  }, [tripId, date, isProposals]);
-
-  useEffect(() => { load(); }, [load]);
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  function requireOnline(): boolean {
+    if (isOnline) return true;
+    Alert.alert("You're offline", "Connect to the internet to make changes.");
+    return false;
+  }
 
   function handleSelectCategory(categoryKey: string) {
     setPickerOpen(false);
@@ -107,6 +142,7 @@ export default function DayView() {
   // adjacent items instead of fighting that library further. Native keeps
   // the real drag handle, where it works.
   function moveItem(item: Item, direction: -1 | 1) {
+    if (!requireOnline()) return;
     const idx = orderable.findIndex((i) => i.id === item.id);
     const swapIdx = idx + direction;
     if (idx === -1 || swapIdx < 0 || swapIdx >= orderable.length) return;
@@ -187,6 +223,7 @@ export default function DayView() {
       }} />
 
       <TripNavBar tripId={tripId} active="day" />
+      <OfflineBanner dataUpdatedAt={!isOnline ? dataUpdatedAt : undefined} />
 
       <View style={styles.dayStripOuter}>
         <ScrollView
@@ -238,7 +275,10 @@ export default function DayView() {
           page without the outer scroll and the inner drag gesture fighting
           each other, which a plain DraggableFlatList here would do. */}
       <NestableScrollContainer contentContainerStyle={{ paddingBottom: 90 }}>
-        <Pressable style={styles.themeRow} onPress={() => { setThemeDraft(theme ?? ""); setThemeModalOpen(true); }}>
+        <Pressable
+          style={styles.themeRow}
+          onPress={() => { if (requireOnline()) { setThemeDraft(theme ?? ""); setThemeModalOpen(true); } }}
+        >
           <Text style={theme ? styles.themeText : styles.themePlaceholder}>
             {theme || "Add a day title\u2026"}
           </Text>
@@ -262,7 +302,7 @@ export default function DayView() {
         />
       </NestableScrollContainer>
 
-      <Pressable style={styles.fab} onPress={() => setPickerOpen(true)}>
+      <Pressable style={styles.fab} onPress={() => { if (requireOnline()) setPickerOpen(true); }}>
         <Text style={styles.fabText}>+ Add item</Text>
       </Pressable>
 

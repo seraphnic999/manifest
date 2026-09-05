@@ -103,6 +103,28 @@ export default function ItemDetails() {
     setUploading(false);
   }
 
+  async function takePhoto() {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert("Permission needed", "Allow camera access to take photos.");
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.7,
+    });
+    if (result.canceled || !result.assets?.[0]) return;
+
+    setUploading(true);
+    try {
+      await uploadItemPhoto(itemId, result.assets[0]);
+      loadPhotos();
+    } catch (e: any) {
+      Alert.alert("Upload failed", e.message ?? "Unknown error");
+    }
+    setUploading(false);
+  }
+
   async function addDocument() {
     const result = await DocumentPicker.getDocumentAsync({ multiple: false, copyToCacheDirectory: true });
     if (result.canceled || !result.assets?.[0]) return;
@@ -340,6 +362,9 @@ export default function ItemDetails() {
             </Pressable>
           )
         )}
+        <Pressable style={styles.addPhotoTile} onPress={takePhoto} disabled={uploading}>
+          {uploading ? <ActivityIndicator color={colors.inkSoft} /> : <Text style={styles.addPhotoText}>+ Camera</Text>}
+        </Pressable>
         <Pressable style={styles.addPhotoTile} onPress={addPhoto} disabled={uploading}>
           {uploading ? <ActivityIndicator color={colors.inkSoft} /> : <Text style={styles.addPhotoText}>+ Photo</Text>}
         </Pressable>

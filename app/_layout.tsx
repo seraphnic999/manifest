@@ -3,9 +3,18 @@ import { Stack, useRouter, useSegments } from "expo-router";
 import { Session } from "@supabase/supabase-js";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { View, Platform, StyleSheet, I18nManager } from "react-native";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { supabase } from "@/lib/supabase";
 import { claimPendingTripShares } from "@/lib/tripSharing";
 import { colors } from "@/lib/theme";
+import { queryClient } from "@/lib/queryClient";
+
+const asyncStoragePersister = createAsyncStoragePersister({
+  storage: AsyncStorage,
+  key: "MANIFEST_QUERY_CACHE",
+});
 
 // This app has no RTL-specific design (no Hebrew/Arabic UI text — the ₪
 // symbol is just a currency glyph). But React Native auto-mirrors every
@@ -48,22 +57,27 @@ export default function RootLayout() {
   }, [session, segments]);
 
   return (
-    <GestureHandlerRootView style={styles.outer}>
-      <View style={styles.inner}>
-        <Stack
-          screenOptions={{
-            headerStyle: { backgroundColor: colors.paperRaised },
-            headerTintColor: colors.ink,
-            headerTitleStyle: { fontWeight: "700" },
-            headerBackTitle: "Back",
-            contentStyle: { backgroundColor: colors.paper },
-          }}
-        >
-          <Stack.Screen name="index" options={{ title: "Trips" }} />
-          <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
-        </Stack>
-      </View>
-    </GestureHandlerRootView>
+    <PersistQueryClientProvider
+      client={queryClient}
+      persistOptions={{ persister: asyncStoragePersister, maxAge: 7 * 24 * 60 * 60 * 1000 }}
+    >
+      <GestureHandlerRootView style={styles.outer}>
+        <View style={styles.inner}>
+          <Stack
+            screenOptions={{
+              headerStyle: { backgroundColor: colors.paperRaised },
+              headerTintColor: colors.ink,
+              headerTitleStyle: { fontWeight: "700" },
+              headerBackTitle: "Back",
+              contentStyle: { backgroundColor: colors.paper },
+            }}
+          >
+            <Stack.Screen name="index" options={{ title: "Trips" }} />
+            <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
+          </Stack>
+        </View>
+      </GestureHandlerRootView>
+    </PersistQueryClientProvider>
   );
 }
 

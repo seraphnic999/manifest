@@ -1,32 +1,55 @@
-import { useState, useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { View, Text, FlatList, StyleSheet, Pressable, RefreshControl } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
 import { Trip, tripStatus } from "@/lib/types";
 import { formatDateDDMMYYYY } from "@/lib/dateFormat";
+import { useNetworkStatus } from "@/lib/useNetworkStatus";
+import OfflineBanner from "@/components/OfflineBanner";
+import { Alert } from "@/lib/alert";
+
+// Set once a current-trip redirect has been attempted this app session, so
+// it only ever fires on the first load after launch — the Home button (the
+// only other way back to this screen) must keep working as a real trip list
+// even while a trip is current, not bounce straight back to Today.
+let hasCheckedLaunchRedirect = false;
+
+async function fetchTrips(): Promise<Trip[]> {
+  const { data, error } = await supabase
+    .from("trips")
+    .select("*")
+    .is("deleted_at", null)
+    .order("start_date", { ascending: false });
+  if (error) throw error;
+  return data as Trip[];
+}
 
 export default function TripList() {
-  const [trips, setTrips] = useState<Trip[]>([]);
-  const [refreshing, setRefreshing] = useState(false);
   const router = useRouter();
+  const isOnline = useNetworkStatus();
+  const { data, dataUpdatedAt, refetch, isRefetching } = useQuery({
+    queryKey: ["trips"],
+    queryFn: fetchTrips,
+  });
+  const trips = data ?? [];
 
-  const load = useCallback(async () => {
-    const { data, error } = await supabase
-      .from("trips")
-      .select("*")
-      .is("deleted_at", null)
-      .order("start_date", { ascending: false });
-    if (!error && data) setTrips(data as Trip[]);
-  }, []);
+  // Runs once per app session, the first time trip data actually loads —
+  // see hasCheckedLaunchRedirect above for why this can't just be "every
+  // time this screen loads".
+  const redirectChecked = useRef(false);
+  useEffect(() => {
+    if (!data || redirectChecked.current || hasCheckedLaunchRedirect) return;
+    redirectChecked.current = true;
+    hasCheckedLaunchRedirect = true;
+    const current = data.find((t) => tripStatus(t) === "current");
+    if (current) router.replace(`/trip/${current.id}/today`);
+  }, [data]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await load();
-    setRefreshing(false);
-  };
+  const onRefresh = async () => { await refetch(); };
 
   // Upcoming = not finished yet (already in progress or still to come), soonest
   // first. Previous = already over, most recently ended first (going further
@@ -46,14 +69,24 @@ export default function TripList() {
             <Text style={styles.eyebrow}>YOUR TRIPS</Text>
             <Text style={styles.title}>Where next?</Text>
           </View>
-          <Pressable style={styles.newButton} onPress={() => router.push("/trip/new")}>
+          <Pressable
+            style={styles.newButton}
+            onPress={() => {
+              if (!isOnline) {
+                Alert.alert("You're offline", "Connect to the internet to create a new trip.");
+                return;
+              }
+              router.push("/trip/new");
+            }}
+          >
             <Text style={styles.newButtonText}>+ New trip</Text>
           </Pressable>
         </View>
       </View>
+      <OfflineBanner dataUpdatedAt={!isOnline ? dataUpdatedAt : undefined} />
       <FlatList
         contentContainerStyle={{ padding: 16 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={onRefresh} />}
         data={[
           { label: "Upcoming Trips", items: upcoming },
           { label: "Previous Trips", items: previous },

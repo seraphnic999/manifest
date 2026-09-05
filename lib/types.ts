@@ -1,3 +1,5 @@
+import { localIsoDate } from "./dateFormat";
+
 export type TripType = "business" | "pleasure" | "mixed";
 export type TripStatus = "future" | "current" | "past"; // derived, not stored
 
@@ -136,7 +138,7 @@ export interface MapRoute {
 }
 
 export function tripStatus(trip: Pick<Trip, "start_date" | "end_date">): TripStatus {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localIsoDate();
   if (today < trip.start_date) return "future";
   if (today > trip.end_date) return "past";
   return "current";

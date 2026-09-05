@@ -18,3 +18,16 @@ export function formatDateDDMM(iso: string | null | undefined): string {
   if (!m || !d) return iso;
   return `${d}/${m}`;
 }
+
+// "Today" as the device's own local calendar date — NOT
+// `new Date().toISOString().slice(0, 10)`, which is UTC and rolls back to
+// the previous day for several hours after local midnight anywhere east of
+// UTC (e.g. until ~03:00 in Israel). A traveler's phone tracks local time
+// for wherever they actually are, so local components are what "today"
+// should mean here.
+export function localIsoDate(d: Date = new Date()): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}

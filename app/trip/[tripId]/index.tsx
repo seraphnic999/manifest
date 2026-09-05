@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { View, Text, FlatList, StyleSheet, Pressable, ActivityIndicator } from "react-native";
 import { useLocalSearchParams, useRouter, Stack, useFocusEffect } from "expo-router";
+import { useQuery } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { Alert } from "@/lib/alert";
 import { supabase } from "@/lib/supabase";
@@ -14,18 +15,68 @@ import { exportTripItineraryPdf } from "@/lib/exportItinerary";
 import ShareTripModal from "@/components/ShareTripModal";
 import HeaderIconButton from "@/components/HeaderIconButton";
 import HomeButton from "@/components/HomeButton";
+import { useNetworkStatus } from "@/lib/useNetworkStatus";
+import OfflineBanner from "@/components/OfflineBanner";
+
+interface OverviewData {
+  trip: Trip;
+  days: Day[];
+  flights: Item[];
+  lodgings: Item[];
+  totalNis: number | null;
+}
+
+async function fetchOverviewData(tripId: string): Promise<OverviewData | null> {
+  const { data: trip, error: tripError } = await supabase.from("trips").select("*").eq("id", tripId).single();
+  if (tripError) throw tripError;
+  if (!trip) return null;
+
+  const { data: days, error: daysError } = await supabase.from("days").select("*").eq("trip_id", tripId).order("sort_order");
+  if (daysError) throw daysError;
+  const { data: flights, error: flightsError } = await supabase
+    .from("items").select("*").eq("trip_id", tripId).eq("type", "flight").is("deleted_at", null).order("start_date");
+  if (flightsError) throw flightsError;
+  const { data: lodgings, error: lodgingsError } = await supabase
+    .from("items").select("*").eq("trip_id", tripId).eq("is_stay_span", true).is("deleted_at", null).order("start_date");
+  if (lodgingsError) throw lodgingsError;
+
+  const { data: currencies, error: currenciesError } = await supabase.from("trip_currencies").select("*").eq("trip_id", tripId);
+  if (currenciesError) throw currenciesError;
+  const { data: expenses, error: expensesError } = await supabase.from("expenses").select("amount, currency_code").eq("trip_id", tripId);
+  if (expensesError) throw expensesError;
+  const totalNis = currencies && expenses
+    ? expenses.reduce((sum, e) => {
+        const rate = currencies.find((c) => c.code === e.currency_code)?.rate_to_nis ?? 1;
+        return sum + e.amount * rate;
+      }, 0)
+    : null;
+
+  return {
+    trip: trip as Trip,
+    days: (days ?? []) as Day[],
+    flights: (flights ?? []) as Item[],
+    lodgings: (lodgings ?? []) as Item[],
+    totalNis,
+  };
+}
 
 export default function TripOverview() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
-  const [trip, setTrip] = useState<Trip | null>(null);
-  const [days, setDays] = useState<Day[]>([]);
-  const [flights, setFlights] = useState<Item[]>([]);
-  const [lodgings, setLodgings] = useState<Item[]>([]);
-  const [totalNis, setTotalNis] = useState<number | null>(null);
+  const isOnline = useNetworkStatus();
   const [exporting, setExporting] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const router = useRouter();
+
+  const { data, dataUpdatedAt, refetch } = useQuery({
+    queryKey: ["tripOverview", tripId],
+    queryFn: () => fetchOverviewData(tripId),
+  });
+  const trip = data?.trip ?? null;
+  const days = data?.days ?? [];
+  const flights = data?.flights ?? [];
+  const lodgings = data?.lodgings ?? [];
+  const totalNis = data?.totalNis ?? null;
 
   useEffect(() => {
     if (!trip) return;
@@ -44,33 +95,11 @@ export default function TripOverview() {
     setExporting(false);
   }
 
-  const load = useCallback(() => {
-    supabase.from("trips").select("*").eq("id", tripId).single()
-      .then(({ data }) => data && setTrip(data as Trip));
-    supabase.from("days").select("*").eq("trip_id", tripId).order("sort_order")
-      .then(({ data }) => data && setDays(data as Day[]));
-    supabase.from("items").select("*").eq("trip_id", tripId).eq("type", "flight").is("deleted_at", null).order("start_date")
-      .then(({ data }) => data && setFlights(data as Item[]));
-    supabase.from("items").select("*").eq("trip_id", tripId).eq("is_stay_span", true).is("deleted_at", null).order("start_date")
-      .then(({ data }) => data && setLodgings(data as Item[]));
-
-    (async () => {
-      const { data: currencies } = await supabase.from("trip_currencies").select("*").eq("trip_id", tripId);
-      const { data: expenses } = await supabase.from("expenses").select("amount, currency_code").eq("trip_id", tripId);
-      if (!currencies || !expenses) return;
-      const total = expenses.reduce((sum, e) => {
-        const rate = currencies.find((c) => c.code === e.currency_code)?.rate_to_nis ?? 1;
-        return sum + e.amount * rate;
-      }, 0);
-      setTotalNis(total);
-    })();
-  }, [tripId]);
-
   // Re-fetch every time this screen regains focus (e.g. navigating back
   // after adding an expense on an item page) — a plain useEffect only runs
   // once on mount/param-change, so the Money total would otherwise go stale
   // until the next full reload.
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
 
   if (!trip) return null;
 
@@ -98,6 +127,7 @@ export default function TripOverview() {
         ),
       }} />
       <TripNavBar tripId={tripId} active="overview" />
+      <OfflineBanner dataUpdatedAt={!isOnline ? dataUpdatedAt : undefined} />
       <ShareTripModal visible={shareOpen} onClose={() => setShareOpen(false)} tripId={tripId} />
       <FlatList
         contentContainerStyle={{ padding: 16 }}

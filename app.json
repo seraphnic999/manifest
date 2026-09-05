@@ -16,7 +16,7 @@
     "ios": { "supportsTablet": false },
     "android": {
       "package": "com.seraphnic999.manifest",
-      "versionCode": 6,
+      "versionCode": 7,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#212F3D"
@@ -28,7 +28,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Manifest uses your photos to attach pictures to trip items."
+          "photosPermission": "Manifest uses your photos to attach pictures to trip items.",
+          "cameraPermission": "Manifest uses your camera to attach photos to trip items."
         }
       ],
       "@maplibre/maplibre-react-native"
