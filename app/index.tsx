@@ -100,7 +100,9 @@ export default function TripList() {
                 <Pressable
                   key={trip.id}
                   style={styles.card}
-                  onPress={() => router.push(`/trip/${trip.id}`)}
+                  onPress={() => router.push(
+                    tripStatus(trip) === "current" ? `/trip/${trip.id}/today` : `/trip/${trip.id}`
+                  )}
                 >
                   <Text style={styles.tag}>{trip.type.toUpperCase()}</Text>
                   <Text style={styles.cardTitle}>{trip.name}</Text>

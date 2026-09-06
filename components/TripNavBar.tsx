@@ -1,6 +1,9 @@
 import { View, Text, Pressable, StyleSheet, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
+import { useQuery } from "@tanstack/react-query";
 import { colors } from "@/lib/theme";
+import { supabase } from "@/lib/supabase";
+import { tripStatus } from "@/lib/types";
 
 type TripSection = "today" | "overview" | "money" | "shopping" | "day" | "map";
 
@@ -12,8 +15,26 @@ const SECTIONS: { key: TripSection; label: string; path: (tripId: string) => str
   { key: "shopping", label: "Shopping", path: (id) => `/trip/${id}/shopping` },
 ];
 
+async function fetchTripDates(tripId: string) {
+  const { data, error } = await supabase.from("trips").select("start_date, end_date").eq("id", tripId).single();
+  if (error) throw error;
+  return data;
+}
+
 export default function TripNavBar({ tripId, active }: { tripId: string; active: TripSection }) {
   const router = useRouter();
+
+  // Today only ever makes sense for a trip that's actually under way — a
+  // dedicated, minimal query (not reusing e.g. the Overview screen's own
+  // ["tripOverview", tripId] key/shape) so this component stays correct
+  // regardless of which screen it's rendered from.
+  const { data: tripDates } = useQuery({
+    queryKey: ["tripDates", tripId],
+    queryFn: () => fetchTripDates(tripId),
+  });
+  const isCurrent = tripDates ? tripStatus(tripDates) === "current" : false;
+  const sections = SECTIONS.filter((s) => s.key !== "today" || isCurrent);
+
   return (
     <View style={styles.barOuter}>
       <ScrollView
@@ -21,7 +42,7 @@ export default function TripNavBar({ tripId, active }: { tripId: string; active:
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.barContent}
       >
-        {SECTIONS.map((s) => (
+        {sections.map((s) => (
           <Pressable
             key={s.key}
             style={[styles.pill, active === s.key && styles.pillActive]}

@@ -7,3 +7,4 @@ web-build/
 /android
 /ios
 /android-keystore
+/google-services.json
