@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { View, Text, ScrollView, StyleSheet, Linking, Pressable, Image, ActivityIndicator } from "react-native";
+import { View, Text, ScrollView, StyleSheet, Linking, Pressable, Image, ActivityIndicator, Modal } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Alert } from "@/lib/alert";
 import { useLocalSearchParams, useRouter, Stack, useFocusEffect } from "expo-router";
@@ -24,6 +24,7 @@ import HeaderIconButton from "@/components/HeaderIconButton";
 import HomeButton from "@/components/HomeButton";
 import { useNetworkStatus } from "@/lib/useNetworkStatus";
 import OfflineBanner from "@/components/OfflineBanner";
+import { fetchFlightStatus, isFlightStatusConfigured, FlightStatus } from "@/lib/flightStatus";
 
 type PhotoWithUrl = ItemPhoto & { url: string };
 type LinkedShoppingItem = { id: string; name: string; quantity: number; allocations: { id: string }[] };
@@ -83,6 +84,11 @@ export default function ItemDetails() {
   const [editExpenseId, setEditExpenseId] = useState<string | null>(null);
   const [shoppingFormOpen, setShoppingFormOpen] = useState(false);
   const [editShoppingId, setEditShoppingId] = useState<string | null>(null);
+  const [photoSourceOpen, setPhotoSourceOpen] = useState(false);
+  const [flightStatus, setFlightStatus] = useState<FlightStatus | null>(null);
+  const [flightStatusError, setFlightStatusError] = useState<string | null>(null);
+  const [flightStatusLoading, setFlightStatusLoading] = useState(false);
+  const [flightStatusCheckedAt, setFlightStatusCheckedAt] = useState<Date | null>(null);
 
   const { data, dataUpdatedAt, refetch } = useQuery({
     queryKey: ["itemDetail", itemId],
@@ -200,6 +206,20 @@ export default function ItemDetails() {
       duplicateFrom: item.id,
     });
     router.push(`/item/new?${params.toString()}`);
+  }
+
+  async function refreshFlightStatus(flightNum: string, dateIso: string) {
+    setFlightStatusLoading(true);
+    setFlightStatusError(null);
+    try {
+      const status = await fetchFlightStatus(flightNum, dateIso);
+      setFlightStatus(status);
+      setFlightStatusCheckedAt(new Date());
+    } catch (e: any) {
+      setFlightStatusError(e.message ?? "Couldn't fetch flight status.");
+    } finally {
+      setFlightStatusLoading(false);
+    }
   }
 
   function deleteItem() {
@@ -330,6 +350,52 @@ export default function ItemDetails() {
         </Pressable>
       ) : null}
 
+      {isFlight && flightNumber && isFlightStatusConfigured() ? (
+        <View style={styles.flightStatusCard}>
+          <View style={styles.flightStatusHeader}>
+            <Text style={styles.sectionLabel}>Flight status</Text>
+            <Pressable
+              onPress={() => { if (item.start_date && requireOnline()) refreshFlightStatus(flightNumber, item.start_date); }}
+              disabled={flightStatusLoading}
+            >
+              {flightStatusLoading ? (
+                <ActivityIndicator size="small" color={colors.teal} />
+              ) : (
+                <Ionicons name="refresh" size={18} color={colors.teal} />
+              )}
+            </Pressable>
+          </View>
+          {flightStatusError ? (
+            <Text style={styles.flightStatusError}>{flightStatusError}</Text>
+          ) : flightStatus ? (
+            <>
+              <Text style={styles.flightStatusValue}>{flightStatus.status ?? "Unknown"}</Text>
+              <View style={styles.fieldRow}>
+                <Text style={styles.fieldLabel}>Departure</Text>
+                <Text style={styles.fieldValue}>
+                  {(flightStatus.departure.revised?.local ?? flightStatus.departure.scheduled.local) ?? "—"}
+                  {flightStatus.departure.gate ? ` · Gate ${flightStatus.departure.gate}` : ""}
+                  {flightStatus.departure.terminal ? ` · T${flightStatus.departure.terminal}` : ""}
+                </Text>
+              </View>
+              <View style={styles.fieldRow}>
+                <Text style={styles.fieldLabel}>Arrival</Text>
+                <Text style={styles.fieldValue}>
+                  {(flightStatus.arrival.revised?.local ?? flightStatus.arrival.scheduled.local) ?? "—"}
+                  {flightStatus.arrival.gate ? ` · Gate ${flightStatus.arrival.gate}` : ""}
+                  {flightStatus.arrival.terminal ? ` · T${flightStatus.arrival.terminal}` : ""}
+                </Text>
+              </View>
+              {flightStatusCheckedAt && (
+                <Text style={styles.flightStatusChecked}>Last checked {flightStatusCheckedAt.toLocaleTimeString()}</Text>
+              )}
+            </>
+          ) : (
+            <Text style={styles.empty}>Tap refresh to check live status.</Text>
+          )}
+        </View>
+      ) : null}
+
       <Text style={styles.sectionLabel}>Expenses</Text>
       {expenses.map((e) => (
         <Pressable key={e.id} style={styles.expenseRow} onPress={() => setEditExpenseId(e.id)}>
@@ -397,10 +463,7 @@ export default function ItemDetails() {
             </Pressable>
           )
         )}
-        <Pressable style={styles.addPhotoTile} onPress={takePhoto} disabled={uploading}>
-          {uploading ? <ActivityIndicator color={colors.inkSoft} /> : <Text style={styles.addPhotoText}>+ Camera</Text>}
-        </Pressable>
-        <Pressable style={styles.addPhotoTile} onPress={addPhoto} disabled={uploading}>
+        <Pressable style={styles.addPhotoTile} onPress={() => setPhotoSourceOpen(true)} disabled={uploading}>
           {uploading ? <ActivityIndicator color={colors.inkSoft} /> : <Text style={styles.addPhotoText}>+ Photo</Text>}
         </Pressable>
         <Pressable style={styles.addPhotoTile} onPress={addDocument} disabled={uploading}>
@@ -445,6 +508,28 @@ export default function ItemDetails() {
           />
         </>
       )}
+
+      <Modal visible={photoSourceOpen} transparent animationType="fade" onRequestClose={() => setPhotoSourceOpen(false)}>
+        <Pressable style={styles.photoSourceBackdrop} onPress={() => setPhotoSourceOpen(false)}>
+          <Pressable style={styles.photoSourceSheet} onPress={(e) => e.stopPropagation()}>
+            <Pressable
+              style={styles.photoSourceOption}
+              onPress={() => { setPhotoSourceOpen(false); takePhoto(); }}
+            >
+              <Ionicons name="camera-outline" size={20} color={colors.ink} />
+              <Text style={styles.photoSourceOptionText}>Take Photo</Text>
+            </Pressable>
+            <View style={styles.photoSourceDivider} />
+            <Pressable
+              style={styles.photoSourceOption}
+              onPress={() => { setPhotoSourceOpen(false); addPhoto(); }}
+            >
+              <Ionicons name="images-outline" size={20} color={colors.ink} />
+              <Text style={styles.photoSourceOptionText}>Choose from Library</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
       </ScrollView>
     </View>
   );
@@ -472,6 +557,14 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.teal, borderRadius: radius.md, padding: 12, marginTop: 10,
   },
   mapLinkButtonText: { color: colors.teal, fontWeight: "700" },
+  flightStatusCard: {
+    backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,
+    borderRadius: radius.md, padding: 12, marginTop: 16,
+  },
+  flightStatusHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  flightStatusValue: { color: colors.teal, fontWeight: "700", fontSize: 14, marginBottom: 4 },
+  flightStatusError: { color: colors.coral, fontSize: 12, marginTop: 4 },
+  flightStatusChecked: { color: colors.inkSoft, fontSize: 11, fontStyle: "italic", marginTop: 6 },
   sectionLabel: {
     color: colors.inkSoft, fontWeight: "700", fontSize: 12,
     textTransform: "uppercase", letterSpacing: 1, marginTop: 20, marginBottom: 4,
@@ -490,6 +583,14 @@ const styles = StyleSheet.create({
   },
   addPhotoText: { color: colors.inkSoft, fontWeight: "600", fontSize: 12 },
   hint: { color: colors.inkSoft, fontSize: 11, marginTop: 6, fontStyle: "italic", marginBottom: 30 },
+  photoSourceBackdrop: { flex: 1, backgroundColor: "rgba(33,47,61,0.5)", justifyContent: "flex-end" },
+  photoSourceSheet: {
+    backgroundColor: colors.paperRaised, borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingTop: 8, paddingBottom: 24, width: "100%", maxWidth: 480, alignSelf: "center",
+  },
+  photoSourceOption: { flexDirection: "row", alignItems: "center", gap: 12, padding: 18 },
+  photoSourceOptionText: { color: colors.ink, fontWeight: "600", fontSize: 15 },
+  photoSourceDivider: { height: 1, backgroundColor: colors.line, marginHorizontal: 18 },
   expenseRow: {
     flexDirection: "row", alignItems: "center", backgroundColor: colors.paperRaised,
     borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, padding: 12, marginBottom: 6,

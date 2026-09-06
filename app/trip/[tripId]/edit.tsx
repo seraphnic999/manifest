@@ -342,6 +342,10 @@ export default function EditTrip() {
         <Text style={styles.buttonText}>{saving ? "Saving…" : "Save changes"}</Text>
       </Pressable>
 
+      <Pressable style={styles.duplicateButton} onPress={() => router.push(`/trip/${tripId}/duplicate`)}>
+        <Text style={styles.duplicateButtonText}>Duplicate trip</Text>
+      </Pressable>
+
       <Pressable style={styles.deleteButton} onPress={deleteTrip}>
         <Text style={styles.deleteButtonText}>Delete trip</Text>
       </Pressable>
@@ -369,6 +373,11 @@ const styles = StyleSheet.create({
   linkText: { color: colors.teal, fontSize: 12, fontWeight: "600", marginTop: 8 },
   button: { backgroundColor: colors.ink, borderRadius: radius.md, padding: 14, alignItems: "center", marginTop: 28 },
   buttonText: { color: colors.paper, fontWeight: "700" },
+  duplicateButton: {
+    borderWidth: 1, borderColor: colors.teal, borderRadius: radius.md,
+    padding: 14, alignItems: "center", marginTop: 12,
+  },
+  duplicateButtonText: { color: colors.teal, fontWeight: "700" },
   deleteButton: {
     borderWidth: 1, borderColor: colors.coral, borderRadius: radius.md,
     padding: 14, alignItems: "center", marginTop: 12, marginBottom: 20,

@@ -9,7 +9,7 @@ import { colors, radius } from "@/lib/theme";
 import { Day, Item, Trip } from "@/lib/types";
 import TripNavBar from "@/components/TripNavBar";
 import { computeDurationMinutes, formatDuration } from "@/lib/duration";
-import { formatDateDDMMYYYY } from "@/lib/dateFormat";
+import { formatDateDDMMYYYY, localIsoDate } from "@/lib/dateFormat";
 import { normalizeTimeHHMM } from "@/lib/timeFormat";
 import { exportTripItineraryPdf } from "@/lib/exportItinerary";
 import ShareTripModal from "@/components/ShareTripModal";
@@ -218,7 +218,12 @@ export default function TripOverview() {
               <Text style={styles.date}>Proposals</Text>
             ) : (
               <>
-                <Text style={styles.date}>{formatDateDDMMYYYY(item.date)}</Text>
+                <View style={styles.dateRow}>
+                  <Text style={styles.date}>{formatDateDDMMYYYY(item.date)}</Text>
+                  {item.date === localIsoDate() && (
+                    <Ionicons name="today" size={14} color={colors.amber} style={{ marginLeft: 6 }} />
+                  )}
+                </View>
                 {item.theme ? <Text style={styles.theme}>{item.theme}</Text> : <Text style={styles.themeEmpty}>No title</Text>}
               </>
             )}
@@ -277,6 +282,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.line,
     borderRadius: radius.md, padding: 14, marginBottom: 8,
   },
+  dateRow: { flexDirection: "row", alignItems: "center" },
   date: { fontFamily: "IBMPlexMono_500Medium", color: colors.ink, fontWeight: "600" },
   theme: { color: colors.teal, fontSize: 12, marginTop: 2, fontWeight: "600" },
   themeEmpty: { color: colors.inkSoft, fontSize: 11, marginTop: 2, fontStyle: "italic" },
