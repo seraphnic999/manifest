@@ -1,6 +1,13 @@
 import * as Notifications from "expo-notifications";
+import Constants from "expo-constants";
 import { Platform } from "react-native";
 import { supabase } from "./supabase";
+
+// Constants.easConfig only auto-populates for an EAS Update/Build manifest;
+// this project's local (non-EAS) builds need the projectId passed in
+// explicitly — see the "bare workflow" note in getExpoPushTokenAsync's own
+// error message.
+const EAS_PROJECT_ID = Constants.expoConfig?.extra?.eas?.projectId as string | undefined;
 
 // Sensible per-type defaults (minutes before the item's start time) — the
 // item form lets these be overridden per item. Reminders are sent by a
@@ -25,9 +32,8 @@ export const DEFAULT_REMINDER_MINUTES: Record<string, number> = {
  * Requests notification permission and registers this device's Expo push
  * token against the signed-in user. Fails silently (returns false) rather
  * than throwing — this runs opportunistically on login/foreground, and a
- * device that can't get a push token (permission denied, or no Firebase
- * project wired up yet on Android — see docs/HANDOFF.md) shouldn't block
- * anything else in the app.
+ * device that can't get a push token (permission denied, no EAS projectId,
+ * etc.) shouldn't block anything else in the app.
  */
 export async function registerPushToken(): Promise<boolean> {
   try {
@@ -43,17 +49,17 @@ export async function registerPushToken(): Promise<boolean> {
 
     const { data: userData } = await supabase.auth.getUser();
     const userId = userData.user?.id;
-    if (!userId) return false;
+    if (!userId || !EAS_PROJECT_ID) return false;
 
-    const { data: tokenData } = await Notifications.getExpoPushTokenAsync();
-    const expoPushToken = tokenData;
+    const tokenResult = await Notifications.getExpoPushTokenAsync({ projectId: EAS_PROJECT_ID });
+    const expoPushToken = tokenResult.data;
     if (!expoPushToken) return false;
 
-    await supabase.from("push_tokens").upsert(
+    const { error } = await supabase.from("push_tokens").upsert(
       { user_id: userId, expo_push_token: expoPushToken, updated_at: new Date().toISOString() },
       { onConflict: "user_id,expo_push_token" }
     );
-    return true;
+    return !error;
   } catch {
     return false;
   }

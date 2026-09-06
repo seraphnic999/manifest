@@ -69,11 +69,19 @@ Deno.serve(async () => {
       sound: "default",
     }));
 
-    await fetch("https://exp.host/--/api/v2/push/send", {
+    const pushRes = await fetch("https://exp.host/--/api/v2/push/send", {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify(messages),
     });
+    const pushJson = await pushRes.json().catch(() => null);
+    // Expo's response is a per-message ticket array — "ok" only means Expo
+    // accepted it for delivery to FCM, not that it was actually delivered.
+    // Logged (not surfaced anywhere) so a real delivery problem is at least
+    // visible in this function's logs, not just silently swallowed.
+    if (!pushRes.ok || pushJson?.data?.some?.((t: any) => t.status !== "ok")) {
+      console.error("push send returned an error ticket", item.id, JSON.stringify(pushJson));
+    }
 
     await supabase.from("items").update({ reminder_sent_at: new Date().toISOString() }).eq("id", item.id);
     sent++;

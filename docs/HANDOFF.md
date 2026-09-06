@@ -231,6 +231,39 @@ the matching `signingConfigs.release` block in `android/app/build.gradle`
 are hand-edits that don't survive `expo prebuild --clean` either — see
 `docs/ANDROID_LOCAL_BUILD.md` and `android-keystore/KEYSTORE_INFO.txt`).
 
+## More hand-maintained native/android/ edits (post-map-view, won't survive `expo prebuild --clean`)
+
+Beyond the two map-view fixes above, later phases added these directly to
+the generated `android/` project rather than via `app.json` + a real
+prebuild — reapply after any `--clean` prebuild:
+
+1. **Permissions** in `android/app/src/main/AndroidManifest.xml`:
+   `CAMERA` (camera capture), `ACCESS_COARSE_LOCATION`/`ACCESS_FINE_LOCATION`
+   (near-me mode). `POST_NOTIFICATIONS`/`RECEIVE_BOOT_COMPLETED` come
+   bundled in `expo-notifications`' own AAR manifest, no hand-edit needed.
+2. **Firebase/FCM wiring**, needed for reminders' push notifications:
+   `android/app/google-services.json` (gitignored — a copy also lives at
+   the project root for `googleServicesFile` in `app.json`, same gitignore
+   reason), the `com.google.gms:google-services` classpath in the root
+   `android/build.gradle`, and `apply plugin: 'com.google.gms.google-services'`
+   as the last line of `android/app/build.gradle`.
+3. **expo-constants' app.config generation** — `Constants.expoConfig`/
+   `easConfig` (needed by `lib/reminders.ts` for the EAS `projectId`
+   `getExpoPushTokenAsync` requires) silently return `null` on this bare/
+   local build without this; a real `expo prebuild` wires it in
+   automatically but this hand-maintained project never had it. Fix: `apply
+   from: new File(["node", "--print", "require.resolve('expo-constants/package.json')"].execute(null, rootDir).text.trim(), "../scripts/get-app-config-android.gradle")`
+   near the top of `android/app/build.gradle`, right after the `apply
+   plugin` lines.
+4. Also outside `android/`: `eas.json` (minimal, just enough for
+   `eas credentials` to run) and `app.json`'s `owner`/`extra.eas.projectId`
+   — `eas init` writes these but they're plain tracked files, not
+   `android/`-gitignored, so they DO survive normally; noted here only
+   because they're easy to mistake for EAS-Build opt-in (they're not —
+   this project still builds locally, these just register the project
+   with Expo's servers, which push notifications need regardless of build
+   method).
+
 ## Not built yet
 
 - Alternatives ("pick one of" slash-separated options, e.g. "Dinner —
