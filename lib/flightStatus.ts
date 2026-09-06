@@ -39,6 +39,18 @@ function parseTime(t: any): FlightStatusTime {
   return { utc: t?.utc ?? null, local: t?.local ?? null };
 }
 
+// AeroDataBox names the "revised" time differently depending on how
+// confirmed it is — actualTime once landed/departed, revisedTime once a
+// gate-level update exists, predictedTime as an earlier estimate — and
+// which of these is present varies per flight. Falls back through all
+// three rather than assuming one name, since a real response can use
+// either "revisedTime" (seen on departure) or "predictedTime" (seen on
+// arrival) for what's conceptually the same "updated time" concept.
+function parseBestTime(leg: any): FlightStatusTime | null {
+  const t = leg?.actualTime ?? leg?.revisedTime ?? leg?.predictedTime;
+  return t ? parseTime(t) : null;
+}
+
 /**
  * Looks up a flight by IATA/ICAO number and local departure date
  * (YYYY-MM-DD). Throws if no API key is configured, the flight isn't
@@ -59,6 +71,9 @@ export async function fetchFlightStatus(flightNumber: string, dateIso: string): 
     },
   });
 
+  if (res.status === 204) {
+    throw new Error(`No flight found for ${cleaned} on ${dateIso}.`);
+  }
   if (!res.ok) {
     throw new Error(`Flight status lookup failed (${res.status}).`);
   }
@@ -79,14 +94,14 @@ export async function fetchFlightStatus(flightNumber: string, dateIso: string): 
     departure: {
       airport: f.departure?.airport?.iata ?? f.departure?.airport?.name ?? null,
       scheduled: parseTime(f.departure?.scheduledTime),
-      revised: f.departure?.revisedTime ? parseTime(f.departure.revisedTime) : null,
+      revised: parseBestTime(f.departure),
       terminal: f.departure?.terminal ?? null,
       gate: f.departure?.gate ?? null,
     },
     arrival: {
       airport: f.arrival?.airport?.iata ?? f.arrival?.airport?.name ?? null,
       scheduled: parseTime(f.arrival?.scheduledTime),
-      revised: f.arrival?.revisedTime ? parseTime(f.arrival.revisedTime) : null,
+      revised: parseBestTime(f.arrival),
       terminal: f.arrival?.terminal ?? null,
       gate: f.arrival?.gate ?? null,
     },
