@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useRef } from "react";
 import { View, Text, FlatList, StyleSheet, Pressable, RefreshControl } from "react-native";
-import { useRouter, useFocusEffect } from "expo-router";
+import { useRouter, useFocusEffect, Stack } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
+import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
 import { Trip, tripStatus } from "@/lib/types";
 import { formatDateDDMMYYYY } from "@/lib/dateFormat";
 import { useNetworkStatus } from "@/lib/useNetworkStatus";
 import OfflineBanner from "@/components/OfflineBanner";
+import HeaderIconButton from "@/components/HeaderIconButton";
 import { Alert } from "@/lib/alert";
 
 // Set once a current-trip redirect has been attempted this app session, so
@@ -51,6 +53,22 @@ export default function TripList() {
 
   const onRefresh = async () => { await refetch(); };
 
+  function signOut() {
+    Alert.alert("Sign out", "Sign out of Manifest?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Sign out", style: "destructive",
+        onPress: () => {
+          // So a later sign-in this same app session gets the same
+          // straight-to-Today jump a cold launch would, instead of landing
+          // on the plain trip list just because launch already happened once.
+          hasCheckedLaunchRedirect = false;
+          supabase.auth.signOut();
+        },
+      },
+    ]);
+  }
+
   // Upcoming = not finished yet (already in progress or still to come), soonest
   // first. Previous = already over, most recently ended first (going further
   // back in time below that).
@@ -63,6 +81,14 @@ export default function TripList() {
 
   return (
     <View style={styles.container}>
+      <Stack.Screen options={{
+        title: "Trips",
+        headerRight: () => (
+          <HeaderIconButton onPress={signOut} accessibilityLabel="Sign out">
+            <Ionicons name="log-out-outline" size={16} color={colors.coral} />
+          </HeaderIconButton>
+        ),
+      }} />
       <View style={styles.topbar}>
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end" }}>
           <View>
