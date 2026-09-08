@@ -70,8 +70,14 @@ function sourceDayLabel(day: Day, tripStart: string): string {
 }
 
 interface Mapped {
-  date: string | null;     // resolved target date (start date, for spans), null = Proposals / unresolved
+  date: string | null;     // resolved target date, null = Proposals / unresolved
   outOfWindow: boolean;    // true = the computed default fell past the new trip's last day
+}
+
+interface SpanMapped {
+  checkIn: string | null;
+  checkOut: string | null;
+  outOfWindow: boolean;    // true = needs attention: default doesn't fit, or a manual override is invalid
 }
 
 export default function DuplicateTrip() {
@@ -85,7 +91,11 @@ export default function DuplicateTrip() {
   // longer flagged, even if it happens to fall outside the window.
   const [touched, setTouched] = useState<Set<string>>(new Set());
   const [overrides, setOverrides] = useState<Map<string, string | null>>(new Map());
+  const [staySpanOverrides, setStaySpanOverrides] = useState<Map<string, { checkIn: string; checkOut: string }>>(new Map());
   const [pickerItemId, setPickerItemId] = useState<string | null>(null);
+  const [spanEditorItemId, setSpanEditorItemId] = useState<string | null>(null);
+  const [spanDraftCheckIn, setSpanDraftCheckIn] = useState("");
+  const [spanDraftCheckOut, setSpanDraftCheckOut] = useState("");
   const [saving, setSaving] = useState(false);
   const [initialized, setInitialized] = useState(false);
 
@@ -143,17 +153,46 @@ export default function DuplicateTrip() {
     return { date: mapped, outOfWindow: false };
   }
 
-  function computeStaySpanDefault(item: Item): Mapped {
-    if (!datesReady || !item.start_date) return { date: null, outOfWindow: false };
+  function computeStaySpanDefault(item: Item): SpanMapped {
+    if (!datesReady || !item.start_date) return { checkIn: null, checkOut: null, outOfWindow: false };
     const mappedStart = addDaysIso(item.start_date, offsetDays);
     const mappedEnd = item.end_date ? addDaysIso(item.end_date, offsetDays) : mappedStart;
-    if (mappedEnd > newEndDate) return { date: null, outOfWindow: true };
-    return { date: mappedStart, outOfWindow: false };
+    if (mappedEnd > newEndDate) return { checkIn: null, checkOut: null, outOfWindow: true };
+    return { checkIn: mappedStart, checkOut: mappedEnd, outOfWindow: false };
   }
 
   function resolvedTarget(itemId: string, fallback: Mapped): Mapped {
     if (touched.has(itemId)) return { date: overrides.get(itemId) ?? null, outOfWindow: false };
     return fallback;
+  }
+
+  // Unlike a regular item's single target date, a span's manual override
+  // can itself be invalid (check-out before check-in, or either date
+  // outside the new trip) — so touching it doesn't unconditionally clear
+  // the "needs attention" flag the way it does for a plain date/Proposals
+  // choice.
+  function resolvedStaySpan(itemId: string, fallback: SpanMapped): SpanMapped {
+    if (touched.has(itemId)) {
+      const ov = staySpanOverrides.get(itemId);
+      if (!ov) return { checkIn: null, checkOut: null, outOfWindow: true };
+      const valid = datesReady && ov.checkOut >= ov.checkIn && ov.checkIn >= newStartDate && ov.checkOut <= newEndDate;
+      return { checkIn: ov.checkIn, checkOut: ov.checkOut, outOfWindow: !valid };
+    }
+    return fallback;
+  }
+
+  function openSpanEditor(item: Item) {
+    const resolved = resolvedStaySpan(item.id, computeStaySpanDefault(item));
+    setSpanDraftCheckIn(resolved.checkIn ?? newStartDate ?? "");
+    setSpanDraftCheckOut(resolved.checkOut ?? newEndDate ?? "");
+    setSpanEditorItemId(item.id);
+  }
+
+  function saveSpanEditor() {
+    if (!spanEditorItemId || !spanDraftCheckIn || !spanDraftCheckOut) return;
+    setStaySpanOverrides((prev) => new Map(prev).set(spanEditorItemId, { checkIn: spanDraftCheckIn, checkOut: spanDraftCheckOut }));
+    setTouched((prev) => new Set(prev).add(spanEditorItemId));
+    setSpanEditorItemId(null);
   }
 
   const unresolvedCount = useMemo(() => {
@@ -167,12 +206,12 @@ export default function DuplicateTrip() {
       }
     }
     for (const item of data.staySpans) {
-      if (!checked.has(item.id) || touched.has(item.id)) continue;
-      if (computeStaySpanDefault(item).outOfWindow) count++;
+      if (!checked.has(item.id)) continue;
+      if (resolvedStaySpan(item.id, computeStaySpanDefault(item)).outOfWindow) count++;
     }
     return count;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, checked, touched, newStartDate, newEndDate]);
+  }, [data, checked, touched, staySpanOverrides, newStartDate, newEndDate]);
 
   function toggleItem(itemId: string) {
     setChecked((prev) => {
@@ -209,13 +248,13 @@ export default function DuplicateTrip() {
     }
     if (unresolvedCount > 0) {
       Alert.alert(
-        "Some items need a day",
-        `${unresolvedCount} item${unresolvedCount === 1 ? "" : "s"} fall outside the new trip's dates. Tap each one's date to assign a day, or send it to Proposals, before duplicating.`
+        "Some items need attention",
+        `${unresolvedCount} item${unresolvedCount === 1 ? "" : "s"} fall outside the new trip's dates, or have an invalid date range. Tap each one to fix its dates before duplicating.`
       );
       return;
     }
 
-    const itemSelections: { item_id: string; target_date: string | null }[] = [];
+    const itemSelections: { item_id: string; target_date: string | null; target_end_date?: string | null }[] = [];
     for (const [dayId, items] of data.itemsByDay) {
       const day = daysById.get(dayId);
       for (const item of items) {
@@ -226,8 +265,8 @@ export default function DuplicateTrip() {
     }
     for (const item of data.staySpans) {
       if (!checked.has(item.id)) continue;
-      const target = resolvedTarget(item.id, computeStaySpanDefault(item)).date;
-      itemSelections.push({ item_id: item.id, target_date: target });
+      const resolved = resolvedStaySpan(item.id, computeStaySpanDefault(item));
+      itemSelections.push({ item_id: item.id, target_date: resolved.checkIn, target_end_date: resolved.checkOut });
     }
 
     setSaving(true);
@@ -249,28 +288,10 @@ export default function DuplicateTrip() {
 
   if (isLoading || !data) return null;
 
-  const pickerItem = pickerItemId
-    ? (data.staySpans.find((i) => i.id === pickerItemId) ??
-        Array.from(data.itemsByDay.values()).flat().find((i) => i.id === pickerItemId))
-    : null;
-  const pickerIsStaySpan = !!pickerItem && pickerItem.day_id === null;
-  const pickerDuration = pickerIsStaySpan && pickerItem?.start_date && pickerItem?.end_date
-    ? daysBetween(pickerItem.start_date, pickerItem.end_date) : 0;
-  const pickerDates = pickerIsStaySpan
-    ? windowDates.filter((d) => addDaysIso(d, pickerDuration) <= newEndDate)
-    : windowDates;
-
-  function renderChip(itemId: string, isChecked: boolean, mapped: Mapped, staySpanItem?: Item) {
+  function renderChip(itemId: string, isChecked: boolean, mapped: Mapped) {
     const resolved = resolvedTarget(itemId, mapped);
     const needsAttention = isChecked && !touched.has(itemId) && mapped.outOfWindow;
-    let label: string;
-    if (needsAttention) label = "Needs a day";
-    else if (staySpanItem) {
-      const duration = staySpanItem.start_date && staySpanItem.end_date ? daysBetween(staySpanItem.start_date, staySpanItem.end_date) : 0;
-      label = resolved.date ? `${formatDateDDMMYYYY(resolved.date)} → ${formatDateDDMMYYYY(addDaysIso(resolved.date, duration))}` : "Needs a day";
-    } else {
-      label = resolved.date === null ? "Proposals" : formatDateDDMMYYYY(resolved.date);
-    }
+    const label = needsAttention ? "Needs a day" : (resolved.date === null ? "Proposals" : formatDateDDMMYYYY(resolved.date));
     return (
       <Pressable
         style={[styles.dayChip, needsAttention && styles.dayChipWarning]}
@@ -333,7 +354,11 @@ export default function DuplicateTrip() {
             {data.staySpans.map((item) => {
               const category = categoryForDbType(item.type);
               const isChecked = checked.has(item.id);
-              const mapped = computeStaySpanDefault(item);
+              const resolved = resolvedStaySpan(item.id, computeStaySpanDefault(item));
+              const needsAttention = isChecked && resolved.outOfWindow;
+              const label = !needsAttention && resolved.checkIn && resolved.checkOut
+                ? `${formatDateDDMMYYYY(resolved.checkIn)} → ${formatDateDDMMYYYY(resolved.checkOut)}`
+                : "Needs dates";
               return (
                 <View key={item.id} style={styles.itemRow}>
                   <Pressable style={styles.checkbox} onPress={() => toggleItem(item.id)}>
@@ -341,7 +366,15 @@ export default function DuplicateTrip() {
                   </Pressable>
                   <Ionicons name={category.icon as any} size={18} color={category.tileColor} style={{ marginHorizontal: 8 }} />
                   <Text style={[styles.itemTitle, !isChecked && styles.itemTitleDim]} numberOfLines={1}>{item.title}</Text>
-                  {renderChip(item.id, isChecked, mapped, item)}
+                  <Pressable
+                    style={[styles.dayChip, needsAttention && styles.dayChipWarning]}
+                    onPress={() => openSpanEditor(item)}
+                    disabled={!isChecked}
+                  >
+                    <Text style={[styles.dayChipText, !isChecked && styles.itemTitleDim, needsAttention && styles.dayChipWarningText]}>
+                      {label}
+                    </Text>
+                  </Pressable>
                 </View>
               );
             })}
@@ -396,24 +429,42 @@ export default function DuplicateTrip() {
         <Pressable style={styles.modalBackdrop} onPress={() => setPickerItemId(null)}>
           <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
             <ScrollView style={{ maxHeight: 420 }}>
-              {pickerDates.map((d) => (
+              {windowDates.map((d) => (
                 <Pressable key={d} style={styles.modalRow} onPress={() => pickerItemId && chooseTarget(pickerItemId, d)}>
-                  <Text style={styles.modalRowText}>
-                    {pickerIsStaySpan ? `${formatDateDDMMYYYY(d)} → ${formatDateDDMMYYYY(addDaysIso(d, pickerDuration))}` : formatDateDDMMYYYY(d)}
-                  </Text>
+                  <Text style={styles.modalRowText}>{formatDateDDMMYYYY(d)}</Text>
                 </Pressable>
               ))}
-              {!pickerIsStaySpan && (
-                <Pressable style={styles.modalRow} onPress={() => pickerItemId && chooseTarget(pickerItemId, null)}>
-                  <Text style={styles.modalRowText}>Proposals (no date)</Text>
-                </Pressable>
-              )}
-              {pickerDates.length === 0 && (
-                <Text style={styles.hint}>
-                  {pickerIsStaySpan ? "No date in the new trip fits this stay's length." : "Set the new trip's dates first."}
-                </Text>
+              <Pressable style={styles.modalRow} onPress={() => pickerItemId && chooseTarget(pickerItemId, null)}>
+                <Text style={styles.modalRowText}>Proposals (no date)</Text>
+              </Pressable>
+              {windowDates.length === 0 && (
+                <Text style={styles.hint}>Set the new trip's dates first.</Text>
               )}
             </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal visible={spanEditorItemId !== null} transparent animationType="fade" onRequestClose={() => setSpanEditorItemId(null)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setSpanEditorItemId(null)}>
+          <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
+            <Text style={styles.dayTitle}>Check-in / check-out</Text>
+            <View style={{ height: 12 }} />
+            <DateField label="Check-in" value={spanDraftCheckIn} onChange={setSpanDraftCheckIn} />
+            <View style={{ height: 10 }} />
+            <DateField label="Check-out" value={spanDraftCheckOut} onChange={setSpanDraftCheckOut} />
+            {spanDraftCheckIn && spanDraftCheckOut && spanDraftCheckOut < spanDraftCheckIn ? (
+              <Text style={styles.warningText}>Check-out must be on or after check-in.</Text>
+            ) : null}
+            {datesReady && spanDraftCheckIn && (spanDraftCheckIn < newStartDate || spanDraftCheckIn > newEndDate) ? (
+              <Text style={styles.warningText}>Check-in must fall within the new trip's dates.</Text>
+            ) : null}
+            {datesReady && spanDraftCheckOut && (spanDraftCheckOut < newStartDate || spanDraftCheckOut > newEndDate) ? (
+              <Text style={styles.warningText}>Check-out must fall within the new trip's dates.</Text>
+            ) : null}
+            <Pressable style={styles.spanSaveButton} onPress={saveSpanEditor}>
+              <Text style={styles.buttonText}>Save dates</Text>
+            </Pressable>
           </Pressable>
         </Pressable>
       </Modal>
@@ -455,6 +506,7 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: { opacity: 0.5 },
   buttonText: { color: colors.paper, fontWeight: "700" },
+  spanSaveButton: { backgroundColor: colors.ink, borderRadius: radius.md, padding: 14, alignItems: "center", marginTop: 16 },
   modalBackdrop: { flex: 1, backgroundColor: "rgba(33,47,61,0.4)", justifyContent: "center", padding: 30 },
   modalCard: { backgroundColor: colors.paperRaised, borderRadius: radius.lg, padding: 8, width: "100%", maxWidth: 420, alignSelf: "center" },
   modalRow: { padding: 12, borderBottomWidth: 1, borderBottomColor: colors.line },

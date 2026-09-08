@@ -17,6 +17,7 @@ import HeaderIconButton from "@/components/HeaderIconButton";
 import HomeButton from "@/components/HomeButton";
 import { useNetworkStatus } from "@/lib/useNetworkStatus";
 import OfflineBanner from "@/components/OfflineBanner";
+import WeatherCarousel from "@/components/WeatherCarousel";
 
 interface OverviewData {
   trip: Trip;
@@ -140,6 +141,8 @@ export default function TripOverview() {
                 <Text style={styles.destinations}>{trip.destinations.join(" \u00b7 ")}</Text>
               )}
             </View>
+
+            <WeatherCarousel tripId={tripId} destinations={trip.destinations} />
 
             <Pressable style={styles.moneyRow} onPress={() => router.push(`/trip/${tripId}/money`)}>
               <Text style={styles.moneyLabel}>Money</Text>

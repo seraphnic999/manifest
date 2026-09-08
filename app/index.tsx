@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef } from "react";
-import { View, Text, FlatList, StyleSheet, Pressable, RefreshControl } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { View, Text, FlatList, StyleSheet, Pressable, RefreshControl, TextInput } from "react-native";
 import { useRouter, useFocusEffect, Stack } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
@@ -10,6 +10,7 @@ import { formatDateDDMMYYYY } from "@/lib/dateFormat";
 import { useNetworkStatus } from "@/lib/useNetworkStatus";
 import OfflineBanner from "@/components/OfflineBanner";
 import HeaderIconButton from "@/components/HeaderIconButton";
+import { searchEverything, SearchResult, SEARCH_KIND_LABEL } from "@/lib/search";
 import { Alert } from "@/lib/alert";
 
 // Set once a current-trip redirect has been attempted this app session, so
@@ -36,6 +37,28 @@ export default function TripList() {
     queryFn: fetchTrips,
   });
   const trips = data ?? [];
+
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  useEffect(() => {
+    const handle = setTimeout(() => setSearchQuery(searchInput.trim()), 300);
+    return () => clearTimeout(handle);
+  }, [searchInput]);
+  const searching = searchQuery.length >= 2;
+  const { data: searchResults, isFetching: searchLoading } = useQuery({
+    queryKey: ["search", searchQuery],
+    queryFn: () => searchEverything(searchQuery),
+    enabled: searching,
+  });
+  const resultsByKind = { trip: [], item: [], shopping: [], expense: [] } as Record<SearchResult["kind"], SearchResult[]>;
+  for (const r of searchResults ?? []) resultsByKind[r.kind].push(r);
+
+  function openResult(r: SearchResult) {
+    if (r.kind === "trip") router.push(`/trip/${r.id}`);
+    else if (r.kind === "item") router.push(`/item/${r.id}`);
+    else if (r.kind === "shopping") router.push(`/trip/${r.trip_id}/shopping`);
+    else router.push(`/trip/${r.trip_id}/money`);
+  }
 
   // Runs once per app session, the first time trip data actually loads —
   // see hasCheckedLaunchRedirect above for why this can't just be "every
@@ -84,9 +107,14 @@ export default function TripList() {
       <Stack.Screen options={{
         title: "Trips",
         headerRight: () => (
-          <HeaderIconButton onPress={signOut} accessibilityLabel="Sign out">
-            <Ionicons name="log-out-outline" size={16} color={colors.coral} />
-          </HeaderIconButton>
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <HeaderIconButton onPress={() => router.push("/archived")} accessibilityLabel="Archived trips">
+              <Ionicons name="archive-outline" size={16} color={colors.inkSoft} />
+            </HeaderIconButton>
+            <HeaderIconButton onPress={signOut} accessibilityLabel="Sign out">
+              <Ionicons name="log-out-outline" size={16} color={colors.coral} />
+            </HeaderIconButton>
+          </View>
         ),
       }} />
       <View style={styles.topbar}>
@@ -108,42 +136,83 @@ export default function TripList() {
             <Text style={styles.newButtonText}>+ New trip</Text>
           </Pressable>
         </View>
+        <View style={styles.searchRow}>
+          <Ionicons name="search" size={16} color={colors.inkSoft} />
+          <TextInput
+            style={styles.searchInput}
+            value={searchInput}
+            onChangeText={setSearchInput}
+            placeholder="Search trips, items, shopping, expenses…"
+            placeholderTextColor={colors.inkSoft}
+          />
+          {searchInput.length > 0 && (
+            <Pressable onPress={() => setSearchInput("")} hitSlop={8}>
+              <Ionicons name="close-circle" size={16} color={colors.inkSoft} />
+            </Pressable>
+          )}
+        </View>
       </View>
       <OfflineBanner dataUpdatedAt={!isOnline ? dataUpdatedAt : undefined} />
-      <FlatList
-        contentContainerStyle={{ padding: 16 }}
-        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={onRefresh} />}
-        data={[
-          { label: "Upcoming Trips", items: upcoming },
-          { label: "Previous Trips", items: previous },
-        ]}
-        keyExtractor={(s) => s.label}
-        renderItem={({ item: section }) =>
-          section.items.length === 0 ? null : (
-            <View>
-              <Text style={styles.sectionLabel}>{section.label}</Text>
-              {section.items.map((trip) => (
-                <Pressable
-                  key={trip.id}
-                  style={styles.card}
-                  onPress={() => router.push(
-                    tripStatus(trip) === "current" ? `/trip/${trip.id}/today` : `/trip/${trip.id}`
-                  )}
-                >
-                  <Text style={styles.tag}>{trip.type.toUpperCase()}</Text>
-                  <Text style={styles.cardTitle}>{trip.name}</Text>
-                  <Text style={styles.dates}>
-                    {formatDateDDMMYYYY(trip.start_date)} – {formatDateDDMMYYYY(trip.end_date)}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          )
-        }
-        ListEmptyComponent={
-          <Text style={styles.empty}>No trips yet — create your first one.</Text>
-        }
-      />
+
+      {searching ? (
+        <FlatList
+          contentContainerStyle={{ padding: 16 }}
+          data={(["trip", "item", "shopping", "expense"] as const).map((kind) => ({ kind, items: resultsByKind[kind] }))}
+          keyExtractor={(s) => s.kind}
+          renderItem={({ item: section }) =>
+            section.items.length === 0 ? null : (
+              <View>
+                <Text style={styles.sectionLabel}>{SEARCH_KIND_LABEL[section.kind]}{section.items.length > 1 ? "s" : ""}</Text>
+                {section.items.map((r) => (
+                  <Pressable key={r.id} style={styles.card} onPress={() => openResult(r)}>
+                    <Text style={styles.tag}>{r.trip_name}</Text>
+                    <Text style={styles.cardTitle}>{r.title}</Text>
+                    {!!r.subtitle && <Text style={styles.dates}>{r.subtitle}</Text>}
+                  </Pressable>
+                ))}
+              </View>
+            )
+          }
+          ListEmptyComponent={
+            <Text style={styles.empty}>{searchLoading ? "Searching…" : "No matches."}</Text>
+          }
+        />
+      ) : (
+        <FlatList
+          contentContainerStyle={{ padding: 16 }}
+          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={onRefresh} />}
+          data={[
+            { label: "Upcoming Trips", items: upcoming },
+            { label: "Previous Trips", items: previous },
+          ]}
+          keyExtractor={(s) => s.label}
+          renderItem={({ item: section }) =>
+            section.items.length === 0 ? null : (
+              <View>
+                <Text style={styles.sectionLabel}>{section.label}</Text>
+                {section.items.map((trip) => (
+                  <Pressable
+                    key={trip.id}
+                    style={styles.card}
+                    onPress={() => router.push(
+                      tripStatus(trip) === "current" ? `/trip/${trip.id}/today` : `/trip/${trip.id}`
+                    )}
+                  >
+                    <Text style={styles.tag}>{trip.type.toUpperCase()}</Text>
+                    <Text style={styles.cardTitle}>{trip.name}</Text>
+                    <Text style={styles.dates}>
+                      {formatDateDDMMYYYY(trip.start_date)} – {formatDateDDMMYYYY(trip.end_date)}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            )
+          }
+          ListEmptyComponent={
+            <Text style={styles.empty}>No trips yet — create your first one.</Text>
+          }
+        />
+      )}
     </View>
   );
 }
@@ -151,6 +220,12 @@ export default function TripList() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   topbar: { padding: 20, paddingBottom: 8 },
+  searchRow: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,
+    borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 10, marginTop: 14,
+  },
+  searchInput: { flex: 1, color: colors.ink, fontSize: 14, padding: 0 },
   eyebrow: { color: colors.amber, fontWeight: "600", fontSize: 11, letterSpacing: 1 },
   title: { color: colors.ink, fontWeight: "800", fontSize: 24, marginTop: 4 },
   sectionLabel: {

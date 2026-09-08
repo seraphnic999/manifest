@@ -14,6 +14,7 @@ import { formatDuration } from "@/lib/duration";
 import HomeButton from "@/components/HomeButton";
 import { useNetworkStatus } from "@/lib/useNetworkStatus";
 import OfflineBanner from "@/components/OfflineBanner";
+import WeatherCarousel from "@/components/WeatherCarousel";
 
 const STATUS_LABEL: Record<string, string> = {
   booked: "Booked", optional: "Optional", planned: "Planned",
@@ -99,7 +100,7 @@ export default function TodayView() {
   }, []);
 
   if (!data) return null;
-  const { todayIso, todayItems, nextDay } = data;
+  const { trip, todayIso, todayItems, nextDay } = data;
 
   const withTimes = todayItems.map((item) => ({ item, at: itemDateTime(item) }));
   const nextEntry = withTimes.find(({ at }) => at !== null && at.getTime() >= now.getTime());
@@ -116,6 +117,8 @@ export default function TodayView() {
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
         <Text style={styles.dateHeading}>{todayIso ? formatDateDDMMYYYY(todayIso) : ""}</Text>
+
+        <WeatherCarousel tripId={tripId} destinations={trip.destinations} />
 
         {nextEntry ? (
           <View style={styles.nextCard}>

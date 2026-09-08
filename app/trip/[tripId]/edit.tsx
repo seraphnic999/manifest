@@ -105,18 +105,18 @@ export default function EditTrip() {
     ]);
   }
 
-  function deleteTrip() {
+  function archiveTrip() {
     Alert.alert(
-      "Delete trip",
-      `Permanently delete "${name}" and everything in it — days, items, shopping list, and expenses? This can't be undone.`,
+      "Archive trip",
+      `Archive "${name}"? It'll disappear from your trip list but nothing is deleted — restore it anytime from Archived Trips.`,
       [
         { text: "Cancel", style: "cancel" },
         {
-          text: "Delete", style: "destructive",
+          text: "Archive",
           onPress: async () => {
-            const { error } = await supabase.from("trips").delete().eq("id", tripId);
+            const { error } = await supabase.from("trips").update({ deleted_at: new Date().toISOString() }).eq("id", tripId);
             if (error) {
-              Alert.alert("Couldn't delete trip", error.message);
+              Alert.alert("Couldn't archive trip", error.message);
               return;
             }
             if (router.canDismiss()) {
@@ -346,9 +346,10 @@ export default function EditTrip() {
         <Text style={styles.duplicateButtonText}>Duplicate trip</Text>
       </Pressable>
 
-      <Pressable style={styles.deleteButton} onPress={deleteTrip}>
-        <Text style={styles.deleteButtonText}>Delete trip</Text>
+      <Pressable style={styles.deleteButton} onPress={archiveTrip}>
+        <Text style={styles.deleteButtonText}>Archive trip</Text>
       </Pressable>
+      <Text style={[styles.hint, { marginBottom: 20 }]}>Archived trips can be restored, or permanently deleted, from Archived Trips on the home screen.</Text>
     </ScrollView>
   );
 }
@@ -379,10 +380,10 @@ const styles = StyleSheet.create({
   },
   duplicateButtonText: { color: colors.teal, fontWeight: "700" },
   deleteButton: {
-    borderWidth: 1, borderColor: colors.coral, borderRadius: radius.md,
-    padding: 14, alignItems: "center", marginTop: 12, marginBottom: 20,
+    borderWidth: 1, borderColor: colors.amber, borderRadius: radius.md,
+    padding: 14, alignItems: "center", marginTop: 12,
   },
-  deleteButtonText: { color: colors.coral, fontWeight: "700" },
+  deleteButtonText: { color: colors.amber, fontWeight: "700" },
   modalBackdrop: { flex: 1, backgroundColor: "rgba(33,47,61,0.4)", justifyContent: "center", padding: 30 },
   modalCard: { backgroundColor: colors.paperRaised, borderRadius: radius.lg, padding: 8, width: "100%", maxWidth: 420, alignSelf: "center" },
   modalRow: {
