@@ -6,7 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Alert } from "@/lib/alert";
 import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
-import { Day, Item, Trip } from "@/lib/types";
+import { Day, Item, Trip, tripStatus } from "@/lib/types";
 import TripNavBar from "@/components/TripNavBar";
 import { computeDurationMinutes, formatDuration } from "@/lib/duration";
 import { formatDateDDMMYYYY, localIsoDate } from "@/lib/dateFormat";
@@ -18,6 +18,8 @@ import HomeButton from "@/components/HomeButton";
 import { useNetworkStatus } from "@/lib/useNetworkStatus";
 import OfflineBanner from "@/components/OfflineBanner";
 import WeatherCarousel from "@/components/WeatherCarousel";
+import TripCountdown from "@/components/TripCountdown";
+import { findLodgingGapDays } from "@/lib/conflicts";
 
 interface OverviewData {
   trip: Trip;
@@ -78,6 +80,7 @@ export default function TripOverview() {
   const flights = data?.flights ?? [];
   const lodgings = data?.lodgings ?? [];
   const totalNis = data?.totalNis ?? null;
+  const lodgingGapDays = findLodgingGapDays(days, lodgings);
 
   useEffect(() => {
     if (!trip) return;
@@ -120,6 +123,9 @@ export default function TripOverview() {
                 <Ionicons name="people-outline" size={16} color={colors.teal} />
               </HeaderIconButton>
             )}
+            <HeaderIconButton onPress={() => router.push(`/trip/${tripId}/currency-converter`)} accessibilityLabel="Currency converter">
+              <Ionicons name="swap-horizontal" size={16} color={colors.teal} />
+            </HeaderIconButton>
             <HeaderIconButton onPress={() => router.push(`/trip/${tripId}/edit`)}>
               <Ionicons name="pencil" size={16} color={colors.amber} />
             </HeaderIconButton>
@@ -142,7 +148,21 @@ export default function TripOverview() {
               )}
             </View>
 
+            {tripStatus(trip) === "future" && (
+              <TripCountdown tripId={tripId} fallbackDateIso={trip.start_date} />
+            )}
+
             <WeatherCarousel tripId={tripId} destinations={trip.destinations} />
+
+            {lodgingGapDays.length > 0 && (
+              <View style={styles.gapWarning}>
+                <Ionicons name="warning" size={14} color={colors.coral} />
+                <Text style={styles.gapWarningText}>
+                  {lodgingGapDays.length} night{lodgingGapDays.length === 1 ? "" : "s"} without lodging booked
+                  {" · "}{lodgingGapDays.map((d) => formatDateDDMMYYYY(d)).join(", ")}
+                </Text>
+              </View>
+            )}
 
             <Pressable style={styles.moneyRow} onPress={() => router.push(`/trip/${tripId}/money`)}>
               <Text style={styles.moneyLabel}>Money</Text>
@@ -156,6 +176,10 @@ export default function TripOverview() {
             </Pressable>
             <Pressable style={styles.shoppingRow} onPress={() => router.push(`/trip/${tripId}/map`)}>
               <Text style={styles.shoppingLabel}>Map</Text>
+              <Text style={styles.shoppingArrow}>{"\u2192"}</Text>
+            </Pressable>
+            <Pressable style={styles.shoppingRow} onPress={() => router.push(`/trip/${tripId}/packing`)}>
+              <Text style={styles.shoppingLabel}>Packing</Text>
               <Text style={styles.shoppingArrow}>{"\u2192"}</Text>
             </Pressable>
 
@@ -244,6 +268,11 @@ const styles = StyleSheet.create({
   tripName: { fontFamily: "Archivo_700Bold" as any, fontWeight: "800", fontSize: 22, color: colors.ink },
   tripDates: { color: colors.inkSoft, fontSize: 13, marginTop: 2 },
   destinations: { color: colors.teal, fontSize: 12, marginTop: 4, fontWeight: "600" },
+  gapWarning: {
+    flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(193,84,63,0.1)",
+    borderRadius: radius.md, padding: 10, marginTop: 10,
+  },
+  gapWarningText: { color: colors.coral, fontWeight: "600", fontSize: 11, flex: 1 },
   moneyRow: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",
     backgroundColor: colors.ink, borderRadius: radius.md, padding: 14, marginTop: 14,

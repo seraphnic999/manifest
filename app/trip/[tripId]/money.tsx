@@ -4,9 +4,11 @@ import { useLocalSearchParams, useRouter, Stack, useFocusEffect } from "expo-rou
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
-import { TripCurrency, TripParty, Expense, Allocation, ExpenseType } from "@/lib/types";
+import { TripCurrency, TripParty, Expense, Allocation, ExpenseType, Trip } from "@/lib/types";
 import { EXPENSE_TYPES, EXPENSE_TYPE_LABELS } from "@/lib/expenseType";
 import { classifyExpenseTiming } from "@/lib/expenseTiming";
+import { computeBudgetProgress } from "@/lib/budget";
+import BudgetProgressBar from "@/components/BudgetProgressBar";
 import AddExpenseModal from "@/components/AddExpenseModal";
 import TripNavBar from "@/components/TripNavBar";
 import { DateField } from "@/components/DateTimeFields";
@@ -19,14 +21,14 @@ import { Alert } from "@/lib/alert";
 type ExpenseWithAllocations = Expense & { allocations: Allocation[] };
 
 interface MoneyData {
-  tripStartDate: string | null;
+  trip: Pick<Trip, "start_date" | "end_date" | "budget_amount"> | null;
   currencies: TripCurrency[];
   parties: TripParty[];
   expenses: ExpenseWithAllocations[];
 }
 
 async function fetchMoneyData(tripId: string): Promise<MoneyData> {
-  const { data: trip, error: tripError } = await supabase.from("trips").select("start_date").eq("id", tripId).single();
+  const { data: trip, error: tripError } = await supabase.from("trips").select("start_date, end_date, budget_amount").eq("id", tripId).single();
   if (tripError) throw tripError;
   const { data: c, error: currenciesError } = await supabase.from("trip_currencies").select("*").eq("trip_id", tripId);
   if (currenciesError) throw currenciesError;
@@ -39,7 +41,7 @@ async function fetchMoneyData(tripId: string): Promise<MoneyData> {
   if (expensesError) throw expensesError;
 
   return {
-    tripStartDate: trip?.start_date ?? null,
+    trip: trip ?? null,
     currencies: (c ?? []) as TripCurrency[],
     parties: (p ?? []) as TripParty[],
     expenses: (e ?? []) as ExpenseWithAllocations[],
@@ -60,7 +62,8 @@ export default function MoneyScreen() {
     queryKey: ["money", tripId],
     queryFn: () => fetchMoneyData(tripId),
   });
-  const tripStartDate = data?.tripStartDate ?? null;
+  const trip = data?.trip ?? null;
+  const tripStartDate = trip?.start_date ?? null;
   const currencies = data?.currencies ?? [];
   const parties = data?.parties ?? [];
   const expenses = data?.expenses ?? [];
@@ -73,6 +76,10 @@ export default function MoneyScreen() {
   function toNis(amount: number, code: string) {
     return amount * rateFor(code);
   }
+
+  // Budget tracking always reflects the trip's true total, independent of
+  // whatever type/date filters are currently narrowing the list below.
+  const budgetProgress = trip ? computeBudgetProgress(trip, expenses, rateFor) : null;
 
   function toggleTypeFilter(t: ExpenseType) {
     setTypeFilter((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
@@ -132,6 +139,8 @@ export default function MoneyScreen() {
             </View>
           ))}
         </View>
+
+        {budgetProgress && <BudgetProgressBar progress={budgetProgress} />}
 
         <Pressable style={styles.reportRow} onPress={() => router.push(`/trip/${tripId}/report`)}>
           <Text style={styles.reportLabel}>View expense report</Text>

@@ -16,6 +16,7 @@ import { normalizeTimeHHMM } from "@/lib/timeFormat";
 import HomeButton from "@/components/HomeButton";
 import { useNetworkStatus } from "@/lib/useNetworkStatus";
 import OfflineBanner from "@/components/OfflineBanner";
+import { findOverlappingItemIds, isLastTripDay } from "@/lib/conflicts";
 import { Alert } from "@/lib/alert";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -151,12 +152,16 @@ export default function DayView() {
     persistOrder(newOrder);
   }
 
+  const overlappingIds = findOverlappingItemIds(orderable);
+  const showLodgingGapWarning = !isProposals && stayBanners.length === 0 && !isLastTripDay(date, allDays);
+
   function renderItem({ item, drag, isActive }: RenderItemParams<Item>) {
     const idx = orderable.findIndex((i) => i.id === item.id);
     const isFirst = idx <= 0;
     const isLast = idx === orderable.length - 1;
+    const isOverlapping = overlappingIds.has(item.id);
     return (
-      <View style={[styles.row, isActive && styles.rowActive]}>
+      <View style={[styles.row, isActive && styles.rowActive, isOverlapping && styles.rowOverlap]}>
         <Pressable
           style={styles.rowMain}
           onPress={() => router.push(`/item/${item.id}`)}
@@ -164,6 +169,7 @@ export default function DayView() {
         >
           <View style={[styles.timeCol, !item.time_start && styles.timeColMuted]}>
             <Text style={styles.timeText}>{normalizeTimeHHMM(item.time_start) || "\u2014"}</Text>
+            {isOverlapping && <Ionicons name="warning" size={11} color={colors.coral} style={{ marginTop: 2 }} />}
             {item.type === "flight" && item.time_end ? (
               <>
                 <Text style={styles.timeArrowSmall}>{"\u2193"}</Text>
@@ -285,6 +291,13 @@ export default function DayView() {
           <Text style={styles.themeEdit}>Edit</Text>
         </Pressable>
 
+        {showLodgingGapWarning && (
+          <View style={styles.gapWarning}>
+            <Ionicons name="warning" size={14} color={colors.coral} />
+            <Text style={styles.gapWarningText}>No lodging booked for this night.</Text>
+          </View>
+        )}
+
         {stayBanners.map((item) => (
           <Pressable key={item.id} style={styles.stayBanner} onPress={() => router.push(`/item/${item.id}`)}>
             <Text style={styles.stayBannerLabel}>STAY</Text>
@@ -352,6 +365,12 @@ const styles = StyleSheet.create({
   themeText: { color: colors.teal, fontWeight: "700", fontSize: 14 },
   themePlaceholder: { color: colors.inkSoft, fontStyle: "italic", fontSize: 13 },
   themeEdit: { color: colors.amber, fontSize: 12, fontWeight: "600" },
+  gapWarning: {
+    flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(193,84,63,0.1)",
+    marginHorizontal: 16, marginTop: 10, padding: 10, borderRadius: radius.md,
+  },
+  gapWarningText: { color: colors.coral, fontWeight: "600", fontSize: 12 },
+  rowOverlap: { borderColor: colors.coral, borderWidth: 2 },
   stayBanner: {
     flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.amberSoft,
     marginHorizontal: 16, marginTop: 10, padding: 10, borderRadius: radius.md,

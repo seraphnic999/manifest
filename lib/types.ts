@@ -19,6 +19,7 @@ export interface Trip {
   destinations: string[];
   default_timezone: string;
   custom_fields: Record<string, unknown>;
+  budget_amount: number | null; // NIS — matches the app's existing NIS-normalized reporting
   deleted_at: string | null;
   created_at: string;
   updated_at: string;
@@ -127,6 +128,29 @@ export interface Allocation {
   shopping_list_item_id: string | null;
   party_id: string | null;
   note: string | null;
+}
+
+export interface PackingItem {
+  id: string;
+  trip_id: string;
+  name: string;
+  category: string | null;
+  packed: boolean;
+  sort_order: number;
+}
+
+export interface PackingTemplate {
+  id: string;
+  user_id: string;
+  name: string;
+}
+
+export interface PackingTemplateItem {
+  id: string;
+  template_id: string;
+  name: string;
+  category: string | null;
+  sort_order: number;
 }
 
 export interface MapRoute {

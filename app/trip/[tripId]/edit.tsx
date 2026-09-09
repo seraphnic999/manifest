@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
 import { Trip, TripType, TripCurrency } from "@/lib/types";
 import { tzOffsetLabel, sortedByOffsetDesc, COMMON_TIMEZONES, COMMON_CURRENCIES } from "@/lib/timezone";
+import { fetchLiveRateToNis } from "@/lib/currencyRates";
 import { DateField } from "@/components/DateTimeFields";
 import HomeButton from "@/components/HomeButton";
 
@@ -29,14 +30,28 @@ export default function EditTrip() {
   const [timezone, setTimezone] = useState("Asia/Jerusalem");
   const [tzPickerOpen, setTzPickerOpen] = useState(false);
   const [customTz, setCustomTz] = useState(false);
+  const [budgetAmount, setBudgetAmount] = useState("");
   const [saving, setSaving] = useState(false);
 
   const [currencies, setCurrencies] = useState<TripCurrency[]>([]);
   const [rateEdits, setRateEdits] = useState<Record<string, string>>({});
   const [newCode, setNewCode] = useState("");
   const [newRate, setNewRate] = useState("");
+  const [lookingUpRate, setLookingUpRate] = useState(false);
   const [currencyPickerOpen, setCurrencyPickerOpen] = useState(false);
   const [customCurrencyInput, setCustomCurrencyInput] = useState("");
+
+  async function lookUpNewRate() {
+    if (!newCode) return;
+    setLookingUpRate(true);
+    const rate = await fetchLiveRateToNis(newCode);
+    setLookingUpRate(false);
+    if (rate === null) {
+      Alert.alert("Couldn't look up rate", `No live rate found for ${newCode}. Enter it manually.`);
+      return;
+    }
+    setNewRate(rate.toFixed(4));
+  }
 
   function loadCurrencies() {
     supabase.from("trip_currencies").select("*").eq("trip_id", tripId)
@@ -56,6 +71,7 @@ export default function EditTrip() {
       setDestinations(trip.destinations.join(", "));
       setTimezone(trip.default_timezone);
       setCustomTz(!COMMON_TIMEZONES.includes(trip.default_timezone));
+      setBudgetAmount(trip.budget_amount != null ? String(trip.budget_amount) : "");
       setLoaded(true);
     });
     loadCurrencies();
@@ -159,6 +175,7 @@ export default function EditTrip() {
       type,
       destinations: destinations.split(",").map((d) => d.trim()).filter(Boolean),
       default_timezone: timezone,
+      budget_amount: budgetAmount ? parseFloat(budgetAmount) || null : null,
     }).eq("id", tripId);
 
     if (error) {
@@ -229,6 +246,13 @@ export default function EditTrip() {
       <Text style={styles.label}>Destinations (comma-separated)</Text>
       <TextInput style={styles.input} value={destinations} onChangeText={setDestinations} placeholder="Barcelona, Palma, Rome, Naples" />
 
+      <Text style={styles.label}>Planned budget (NIS, optional)</Text>
+      <TextInput
+        style={styles.input} value={budgetAmount} onChangeText={setBudgetAmount}
+        placeholder="e.g. 8000" keyboardType="decimal-pad"
+      />
+      <Text style={styles.hint}>Shows a spend-progress bar on the Money screen. Leave blank to hide it.</Text>
+
       {/* --- Timezone --- */}
       <Text style={styles.label}>Default timezone</Text>
       {!customTz ? (
@@ -276,6 +300,13 @@ export default function EditTrip() {
                 onChangeText={(v) => setRateEdits((prev) => ({ ...prev, [c.id]: v }))}
                 keyboardType="decimal-pad"
               />
+              <Pressable onPress={async () => {
+                const rate = await fetchLiveRateToNis(c.code);
+                if (rate === null) { Alert.alert("Couldn't look up rate", `No live rate found for ${c.code}.`); return; }
+                setRateEdits((prev) => ({ ...prev, [c.id]: rate.toFixed(4) }));
+              }}>
+                <Text style={styles.linkText}>Look up</Text>
+              </Pressable>
               <Pressable onPress={() => removeCurrency(c)}>
                 <Text style={styles.removeText}>Remove</Text>
               </Pressable>
@@ -306,6 +337,9 @@ export default function EditTrip() {
           <Text style={styles.buttonText}>Add</Text>
         </Pressable>
       </View>
+      <Pressable onPress={lookUpNewRate} disabled={!newCode || lookingUpRate}>
+        <Text style={styles.linkText}>{lookingUpRate ? "Looking up…" : "Look up current rate"}</Text>
+      </Pressable>
 
       <Modal visible={currencyPickerOpen} transparent animationType="fade">
         <Pressable style={styles.modalBackdrop} onPress={() => setCurrencyPickerOpen(false)}>

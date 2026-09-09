@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   View, Text, TextInput, Pressable, StyleSheet, ScrollView, Modal,
 } from "react-native";
@@ -8,8 +8,11 @@ import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
 import { TripType } from "@/lib/types";
 import { tzOffsetLabel, sortedByOffsetDesc, COMMON_TIMEZONES, COMMON_CURRENCIES } from "@/lib/timezone";
+import { mergePackingItems, fetchTemplateItems, fetchTripPackingAsSource } from "@/lib/packing";
 import { DateField } from "@/components/DateTimeFields";
 import HomeButton from "@/components/HomeButton";
+
+type PackingSource = "empty" | "template" | "trip";
 
 const TYPES: TripType[] = ["pleasure", "business", "mixed"];
 
@@ -34,6 +37,23 @@ export default function NewTrip() {
   const [currencyPickerOpen, setCurrencyPickerOpen] = useState(false);
   const [customCurrencyInput, setCustomCurrencyInput] = useState("");
   const [saving, setSaving] = useState(false);
+
+  const [packingSource, setPackingSource] = useState<PackingSource>("empty");
+  const [packingSourceId, setPackingSourceId] = useState<string | null>(null);
+  const [packingPickerOpen, setPackingPickerOpen] = useState(false);
+  const [templates, setTemplates] = useState<{ id: string; name: string }[]>([]);
+  const [existingTrips, setExistingTrips] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    supabase.from("packing_templates").select("id, name").order("name").then(({ data }) => setTemplates(data ?? []));
+    supabase.from("trips").select("id, name").is("deleted_at", null).order("start_date", { ascending: false }).then(({ data }) => setExistingTrips(data ?? []));
+  }, []);
+
+  function packingSourceLabel(): string {
+    if (packingSource === "empty") return "Empty";
+    const list = packingSource === "template" ? templates : existingTrips;
+    return list.find((x) => x.id === packingSourceId)?.name ?? "Choose one…";
+  }
 
   function addCurrency() {
     if (!newCode || !newRate) return;
@@ -86,6 +106,13 @@ export default function NewTrip() {
       await supabase.from("trip_parties").insert({
         trip_id: trip.id, name: "Work", is_work: true,
       });
+    }
+
+    if (packingSource !== "empty" && packingSourceId) {
+      const source = packingSource === "template"
+        ? await fetchTemplateItems(packingSourceId)
+        : await fetchTripPackingAsSource(packingSourceId);
+      await mergePackingItems(trip.id, source);
     }
 
     setSaving(false);
@@ -228,6 +255,46 @@ export default function NewTrip() {
                 <Text style={styles.buttonText}>Use</Text>
               </Pressable>
             </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* --- Packing list --- */}
+      <Text style={styles.label}>Packing list</Text>
+      <View style={styles.typeRow}>
+        {(["empty", "template", "trip"] as PackingSource[]).map((s) => (
+          <Pressable
+            key={s}
+            style={[styles.typeChip, packingSource === s && styles.typeChipActive]}
+            onPress={() => { setPackingSource(s); setPackingSourceId(null); if (s !== "empty") setPackingPickerOpen(true); }}
+          >
+            <Text style={[styles.typeChipText, packingSource === s && styles.typeChipTextActive]}>
+              {s === "empty" ? "Empty" : s === "template" ? "From template" : "Copy from trip"}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+      {packingSource !== "empty" && (
+        <Pressable style={styles.input} onPress={() => setPackingPickerOpen(true)}>
+          <Text style={{ color: packingSourceId ? colors.ink : colors.inkSoft }}>{packingSourceLabel()}</Text>
+        </Pressable>
+      )}
+
+      <Modal visible={packingPickerOpen} transparent animationType="fade">
+        <Pressable style={styles.modalBackdrop} onPress={() => setPackingPickerOpen(false)}>
+          <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
+            <ScrollView style={{ maxHeight: 360 }}>
+              {(packingSource === "template" ? templates : existingTrips).map((x) => (
+                <Pressable key={x.id} style={styles.modalRow} onPress={() => { setPackingSourceId(x.id); setPackingPickerOpen(false); }}>
+                  <Text style={styles.modalRowText}>{x.name}</Text>
+                </Pressable>
+              ))}
+              {(packingSource === "template" ? templates : existingTrips).length === 0 && (
+                <Text style={styles.hint}>
+                  {packingSource === "template" ? "No templates yet." : "No other trips yet."}
+                </Text>
+              )}
+            </ScrollView>
           </Pressable>
         </Pressable>
       </Modal>

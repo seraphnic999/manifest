@@ -11,6 +11,8 @@ import { useNetworkStatus } from "@/lib/useNetworkStatus";
 import OfflineBanner from "@/components/OfflineBanner";
 import HeaderIconButton from "@/components/HeaderIconButton";
 import { searchEverything, SearchResult, SEARCH_KIND_LABEL } from "@/lib/search";
+import { fetchNextTripForCountdown } from "@/lib/countdown";
+import TripCountdown from "@/components/TripCountdown";
 import { Alert } from "@/lib/alert";
 
 // Set once a current-trip redirect has been attempted this app session, so
@@ -37,6 +39,8 @@ export default function TripList() {
     queryFn: fetchTrips,
   });
   const trips = data ?? [];
+
+  const { data: nextTrip } = useQuery({ queryKey: ["nextTripCountdown"], queryFn: fetchNextTripForCountdown });
 
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -108,6 +112,9 @@ export default function TripList() {
         title: "Trips",
         headerRight: () => (
           <View style={{ flexDirection: "row", gap: 8 }}>
+            <HeaderIconButton onPress={() => router.push("/packingTemplates")} accessibilityLabel="Packing templates">
+              <Ionicons name="briefcase-outline" size={16} color={colors.inkSoft} />
+            </HeaderIconButton>
             <HeaderIconButton onPress={() => router.push("/archived")} accessibilityLabel="Archived trips">
               <Ionicons name="archive-outline" size={16} color={colors.inkSoft} />
             </HeaderIconButton>
@@ -136,6 +143,11 @@ export default function TripList() {
             <Text style={styles.newButtonText}>+ New trip</Text>
           </Pressable>
         </View>
+
+        {nextTrip && (
+          <TripCountdown tripId={nextTrip.tripId} fallbackDateIso={nextTrip.startDate} tripName={nextTrip.tripName} />
+        )}
+
         <View style={styles.searchRow}>
           <Ionicons name="search" size={16} color={colors.inkSoft} />
           <TextInput

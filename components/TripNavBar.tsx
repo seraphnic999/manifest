@@ -5,7 +5,7 @@ import { colors } from "@/lib/theme";
 import { supabase } from "@/lib/supabase";
 import { tripStatus } from "@/lib/types";
 
-type TripSection = "today" | "overview" | "money" | "shopping" | "day" | "map";
+type TripSection = "today" | "overview" | "money" | "shopping" | "day" | "map" | "packing";
 
 const SECTIONS: { key: TripSection; label: string; path: (tripId: string) => string }[] = [
   { key: "today", label: "Today", path: (id) => `/trip/${id}/today` },
@@ -13,6 +13,7 @@ const SECTIONS: { key: TripSection; label: string; path: (tripId: string) => str
   { key: "map", label: "Map", path: (id) => `/trip/${id}/map` },
   { key: "money", label: "Money", path: (id) => `/trip/${id}/money` },
   { key: "shopping", label: "Shopping", path: (id) => `/trip/${id}/shopping` },
+  { key: "packing", label: "Packing", path: (id) => `/trip/${id}/packing` },
 ];
 
 async function fetchTripDates(tripId: string) {
