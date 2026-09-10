@@ -220,6 +220,7 @@ export default function NewTrip() {
           value={newRate}
           onChangeText={setNewRate}
           placeholder="Rate to NIS (e.g. 4.05)"
+          placeholderTextColor={colors.inkSoft}
           keyboardType="decimal-pad"
         />
         <View style={{ width: 8 }} />
@@ -244,6 +245,7 @@ export default function NewTrip() {
                 value={customCurrencyInput}
                 onChangeText={(t) => setCustomCurrencyInput(t.toUpperCase())}
                 placeholder="Other code (e.g. AED)"
+                placeholderTextColor={colors.inkSoft}
                 autoCapitalize="characters"
                 maxLength={3}
               />

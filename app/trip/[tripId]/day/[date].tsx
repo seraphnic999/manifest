@@ -62,13 +62,18 @@ async function fetchDayData(tripId: string, date: string, isProposals: boolean):
   if (itemsError) throw itemsError;
 
   // A "stay spans this date" banner doesn't make sense for the Proposals
-  // day, which has no date at all.
+  // day, which has no date at all. Excludes the checkout day itself
+  // (end_date) — that night isn't covered by this stay, so the banner
+  // showing here used to hide the "no lodging" gap warning on genuine
+  // checkout-with-nothing-booked-next days. Matches lib/conflicts.ts'
+  // findLodgingGapDays, which already treats a stay's range as
+  // [start_date, end_date).
   let stayBanners: Item[] = [];
   if (!isProposals) {
     const { data: spanningLodging, error } = await supabase
       .from("items").select("*")
       .eq("trip_id", tripId).eq("is_stay_span", true).is("deleted_at", null)
-      .lte("start_date", date).gte("end_date", date);
+      .lte("start_date", date).gt("end_date", date);
     if (error) throw error;
     stayBanners = (spanningLodging ?? []) as Item[];
   }

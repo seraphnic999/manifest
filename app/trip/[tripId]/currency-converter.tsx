@@ -97,16 +97,21 @@ export default function CurrencyConverter() {
         <Text style={styles.hint}>Type an amount in any currency — the rest update automatically using this trip's rates.</Text>
         {currencies.map((c) => (
           <View key={c.id} style={styles.row}>
-            <Text style={styles.code}>{c.code}</Text>
+            <View style={styles.codeCol}>
+              <Text style={styles.code}>{c.code}</Text>
+              <Text style={styles.rateStatic}>{c.is_default ? "base" : `1 = ${c.rate_to_nis} NIS`}</Text>
+            </View>
             <TextInput
               style={styles.input}
               value={amounts[c.code] ?? ""}
               onChangeText={(v) => onChangeAmount(c.code, v)}
               keyboardType="decimal-pad"
               placeholder="0.00"
+              placeholderTextColor={colors.inkSoft}
             />
           </View>
         ))}
+        <Text style={styles.hint}>Rates shown per currency are fixed for this trip — change them from the trip's edit screen, not here.</Text>
 
         <Pressable style={styles.addButton} onPress={() => setAddOpen(true)}>
           <Text style={styles.addButtonText}>+ Add currency</Text>
@@ -123,7 +128,7 @@ export default function CurrencyConverter() {
             <View style={{ height: 8 }} />
             <TextInput
               style={styles.input} value={newRate} onChangeText={setNewRate}
-              placeholder="Rate to NIS (e.g. 4.05)" keyboardType="decimal-pad"
+              placeholder="Rate to NIS (e.g. 4.05)" placeholderTextColor={colors.inkSoft} keyboardType="decimal-pad"
             />
             <Pressable onPress={lookUpNewRate} disabled={!newCode || lookingUp}>
               <Text style={styles.linkText}>{lookingUp ? "Looking up…" : "Look up current rate"}</Text>
@@ -160,7 +165,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,
     borderRadius: radius.md, padding: 12, marginBottom: 8,
   },
-  code: { fontFamily: "IBMPlexMono_500Medium", fontWeight: "700", color: colors.ink, width: 48 },
+  codeCol: { width: 64 },
+  code: { fontFamily: "IBMPlexMono_500Medium", fontWeight: "700", color: colors.ink, fontSize: 15 },
+  rateStatic: { fontSize: 9.5, color: colors.inkSoft, marginTop: 2 },
   input: {
     flex: 1, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.line,
     borderRadius: radius.md, padding: 12, fontSize: 16, color: colors.ink,

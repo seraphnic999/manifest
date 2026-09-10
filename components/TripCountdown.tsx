@@ -8,14 +8,17 @@ function pad(n: number): string {
   return String(n).padStart(2, "0");
 }
 
-/** A live Days : Hours : Min countdown to the trip's first scheduled item —
- * the same three-unit format the whole way down, Days just reaching 0
- * once inside the last day rather than the display changing shape.
- * Renders nothing once that moment passes — callers are still responsible
- * for not mounting this at all for a trip that's already current or past. */
-export default function TripCountdown({
-  tripId, fallbackDateIso, tripName,
-}: { tripId: string; fallbackDateIso: string; tripName?: string }) {
+interface Breakdown {
+  days: number;
+  hours: number;
+  mins: number;
+}
+
+/** Shared ticking Days/Hours/Min breakdown to a trip's first scheduled
+ * item. Returns null once that moment passes, or before the target has
+ * loaded — callers are still responsible for not mounting anything for a
+ * trip that's already current or past. */
+function useTripCountdown(tripId: string, fallbackDateIso: string): Breakdown | null {
   const [now, setNow] = useState(new Date());
   const { data: target } = useQuery({
     queryKey: ["countdownTarget", tripId],
@@ -31,30 +34,53 @@ export default function TripCountdown({
   const msLeft = target.getTime() - now.getTime();
   if (msLeft <= 0) return null;
 
-  const daysLeft = Math.floor(msLeft / 86400000);
-  const hoursLeft = Math.floor((msLeft % 86400000) / 3600000);
-  const minsLeft = Math.floor((msLeft % 3600000) / 60000);
+  return {
+    days: Math.floor(msLeft / 86400000),
+    hours: Math.floor((msLeft % 86400000) / 3600000),
+    mins: Math.floor((msLeft % 3600000) / 60000),
+  };
+}
+
+/** The big card version — Overview header, or the home screen's featured trip. */
+export default function TripCountdown({
+  tripId, fallbackDateIso, tripName,
+}: { tripId: string; fallbackDateIso: string; tripName?: string }) {
+  const breakdown = useTripCountdown(tripId, fallbackDateIso);
+  if (!breakdown) return null;
 
   return (
     <View style={styles.card}>
       {tripName && <Text style={styles.tripName}>{tripName}</Text>}
       <View style={styles.row}>
         <View style={styles.unit}>
-          <Text style={styles.num}>{daysLeft}</Text>
+          <Text style={styles.num}>{breakdown.days}</Text>
           <Text style={styles.unitLabel}>Days</Text>
         </View>
         <Text style={styles.colon}>:</Text>
         <View style={styles.unit}>
-          <Text style={styles.num}>{pad(hoursLeft)}</Text>
+          <Text style={styles.num}>{pad(breakdown.hours)}</Text>
           <Text style={styles.unitLabel}>Hours</Text>
         </View>
         <Text style={styles.colon}>:</Text>
         <View style={styles.unit}>
-          <Text style={styles.num}>{pad(minsLeft)}</Text>
+          <Text style={styles.num}>{pad(breakdown.mins)}</Text>
           <Text style={styles.unitLabel}>Min</Text>
         </View>
       </View>
     </View>
+  );
+}
+
+/** A single-line compact version for a trip list row — every upcoming
+ * trip gets one of these, not just the soonest. */
+export function TripCountdownInline({ tripId, fallbackDateIso }: { tripId: string; fallbackDateIso: string }) {
+  const breakdown = useTripCountdown(tripId, fallbackDateIso);
+  if (!breakdown) return null;
+
+  return (
+    <Text style={inlineStyles.text}>
+      {breakdown.days}d {pad(breakdown.hours)}h {pad(breakdown.mins)}m
+    </Text>
   );
 }
 
@@ -69,4 +95,11 @@ const styles = StyleSheet.create({
   num: { color: colors.paper, fontWeight: "800", fontSize: 28, fontFamily: "IBMPlexMono_500Medium" },
   unitLabel: { color: colors.amberSoft, fontSize: 10, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5, marginTop: 2 },
   colon: { color: colors.amberSoft, fontWeight: "800", fontSize: 24, marginHorizontal: 4, marginBottom: 14 },
+});
+
+const inlineStyles = StyleSheet.create({
+  text: {
+    fontFamily: "IBMPlexMono_500Medium", color: colors.amber, fontWeight: "700",
+    fontSize: 11, marginTop: 4,
+  },
 });

@@ -11,8 +11,7 @@ import { useNetworkStatus } from "@/lib/useNetworkStatus";
 import OfflineBanner from "@/components/OfflineBanner";
 import HeaderIconButton from "@/components/HeaderIconButton";
 import { searchEverything, SearchResult, SEARCH_KIND_LABEL } from "@/lib/search";
-import { fetchNextTripForCountdown } from "@/lib/countdown";
-import TripCountdown from "@/components/TripCountdown";
+import { TripCountdownInline } from "@/components/TripCountdown";
 import { Alert } from "@/lib/alert";
 
 // Set once a current-trip redirect has been attempted this app session, so
@@ -39,8 +38,6 @@ export default function TripList() {
     queryFn: fetchTrips,
   });
   const trips = data ?? [];
-
-  const { data: nextTrip } = useQuery({ queryKey: ["nextTripCountdown"], queryFn: fetchNextTripForCountdown });
 
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -79,6 +76,23 @@ export default function TripList() {
   useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
 
   const onRefresh = async () => { await refetch(); };
+
+  function archiveTrip(trip: Trip) {
+    Alert.alert("Archive trip", `Archive "${trip.name}"? It'll disappear from your trip list but nothing is deleted — restore it anytime from Archived Trips.`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Archive",
+        onPress: async () => {
+          const { error } = await supabase.from("trips").update({ deleted_at: new Date().toISOString() }).eq("id", trip.id);
+          if (error) {
+            Alert.alert("Couldn't archive trip", error.message);
+            return;
+          }
+          refetch();
+        },
+      },
+    ]);
+  }
 
   function signOut() {
     Alert.alert("Sign out", "Sign out of Manifest?", [
@@ -144,10 +158,6 @@ export default function TripList() {
           </Pressable>
         </View>
 
-        {nextTrip && (
-          <TripCountdown tripId={nextTrip.tripId} fallbackDateIso={nextTrip.startDate} tripName={nextTrip.tripName} />
-        )}
-
         <View style={styles.searchRow}>
           <Ionicons name="search" size={16} color={colors.inkSoft} />
           <TextInput
@@ -202,21 +212,34 @@ export default function TripList() {
             section.items.length === 0 ? null : (
               <View>
                 <Text style={styles.sectionLabel}>{section.label}</Text>
-                {section.items.map((trip) => (
-                  <Pressable
-                    key={trip.id}
-                    style={styles.card}
-                    onPress={() => router.push(
-                      tripStatus(trip) === "current" ? `/trip/${trip.id}/today` : `/trip/${trip.id}`
-                    )}
-                  >
-                    <Text style={styles.tag}>{trip.type.toUpperCase()}</Text>
-                    <Text style={styles.cardTitle}>{trip.name}</Text>
-                    <Text style={styles.dates}>
-                      {formatDateDDMMYYYY(trip.start_date)} – {formatDateDDMMYYYY(trip.end_date)}
-                    </Text>
-                  </Pressable>
-                ))}
+                {section.items.map((trip) => {
+                  const status = tripStatus(trip);
+                  return (
+                    <Pressable
+                      key={trip.id}
+                      style={styles.card}
+                      onPress={() => router.push(status === "current" ? `/trip/${trip.id}/today` : `/trip/${trip.id}`)}
+                    >
+                      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.tag}>{trip.type.toUpperCase()}</Text>
+                          <Text style={styles.cardTitle}>{trip.name}</Text>
+                          <Text style={styles.dates}>
+                            {formatDateDDMMYYYY(trip.start_date)} – {formatDateDDMMYYYY(trip.end_date)}
+                          </Text>
+                          {status === "future" && (
+                            <TripCountdownInline tripId={trip.id} fallbackDateIso={trip.start_date} />
+                          )}
+                        </View>
+                        {status === "past" && (
+                          <Pressable onPress={() => archiveTrip(trip)} hitSlop={10} style={{ padding: 2 }}>
+                            <Ionicons name="archive-outline" size={18} color={colors.inkSoft} />
+                          </Pressable>
+                        )}
+                      </View>
+                    </Pressable>
+                  );
+                })}
               </View>
             )
           }
