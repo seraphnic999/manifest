@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { useQuery } from "@tanstack/react-query";
-import { colors, radius } from "@/lib/theme";
+import { colors, radius, fonts } from "@/lib/theme";
 import { fetchTripCountdownTarget } from "@/lib/countdown";
 
 function pad(n: number): string {
@@ -31,7 +31,12 @@ function useTripCountdown(tripId: string, fallbackDateIso: string): Breakdown | 
   }, []);
 
   if (!target) return null;
-  const msLeft = target.getTime() - now.getTime();
+  // The query cache persists to AsyncStorage as JSON (see PersistQueryClientProvider
+  // in app/_layout.tsx) — a Date survives one in-memory query lifecycle fine, but
+  // after a restart the rehydrated value is an ISO string, not a Date instance.
+  // new Date() normalizes either case back to a real Date.
+  const targetDate = new Date(target);
+  const msLeft = targetDate.getTime() - now.getTime();
   if (msLeft <= 0) return null;
 
   return {
@@ -87,19 +92,19 @@ export function TripCountdownInline({ tripId, fallbackDateIso }: { tripId: strin
 const styles = StyleSheet.create({
   card: { backgroundColor: colors.ink, borderRadius: radius.lg, padding: 16, marginBottom: 14, alignItems: "center" },
   tripName: {
-    color: colors.amberSoft, fontWeight: "700", fontSize: 12,
+    color: colors.goldSoft, fontFamily: fonts.bodyBold, fontSize: 12,
     textTransform: "uppercase", letterSpacing: 1, marginBottom: 8,
   },
   row: { flexDirection: "row", alignItems: "center" },
   unit: { alignItems: "center", minWidth: 52 },
-  num: { color: colors.paper, fontWeight: "800", fontSize: 28, fontFamily: "IBMPlexMono_500Medium" },
-  unitLabel: { color: colors.amberSoft, fontSize: 10, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5, marginTop: 2 },
-  colon: { color: colors.amberSoft, fontWeight: "800", fontSize: 24, marginHorizontal: 4, marginBottom: 14 },
+  num: { color: colors.paper, fontFamily: fonts.monoBold, fontSize: 28 },
+  unitLabel: { color: colors.goldSoft, fontSize: 10, fontFamily: fonts.bodyBold, textTransform: "uppercase", letterSpacing: 0.5, marginTop: 2 },
+  colon: { color: colors.goldSoft, fontWeight: "800", fontSize: 24, marginHorizontal: 4, marginBottom: 14 },
 });
 
 const inlineStyles = StyleSheet.create({
   text: {
-    fontFamily: "IBMPlexMono_500Medium", color: colors.amber, fontWeight: "700",
+    fontFamily: fonts.mono, color: colors.blue,
     fontSize: 11, marginTop: 4,
   },
 });

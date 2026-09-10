@@ -20,6 +20,7 @@ export interface Trip {
   default_timezone: string;
   custom_fields: Record<string, unknown>;
   budget_amount: number | null; // NIS — matches the app's existing NIS-normalized reporting
+  cover_photo_id: string | null; // see lib/destinationPhotos.ts — id into the bundled photo set, or null for the fallback
   deleted_at: string | null;
   created_at: string;
   updated_at: string;

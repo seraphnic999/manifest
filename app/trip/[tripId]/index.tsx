@@ -1,32 +1,40 @@
 import { useCallback, useEffect, useState } from "react";
-import { View, Text, FlatList, StyleSheet, Pressable, ActivityIndicator } from "react-native";
+import { View, Text, FlatList, StyleSheet, Pressable, ActivityIndicator, ImageBackground } from "react-native";
 import { useLocalSearchParams, useRouter, Stack, useFocusEffect } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
-import { Ionicons } from "@expo/vector-icons";
+import { StatusBar } from "expo-status-bar";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Alert } from "@/lib/alert";
 import { supabase } from "@/lib/supabase";
-import { colors, radius } from "@/lib/theme";
-import { Day, Item, Trip, tripStatus } from "@/lib/types";
-import TripNavBar from "@/components/TripNavBar";
+import { colors, radius, fonts } from "@/lib/theme";
+import { Day, Item, Trip, TripCurrency, Expense, tripStatus } from "@/lib/types";
+import Icon from "@/components/icons/Icon";
+import HamburgerMenu from "@/components/HamburgerMenu";
+import TripTabBar from "@/components/TripTabBar";
 import { computeDurationMinutes, formatDuration } from "@/lib/duration";
 import { formatDateDDMMYYYY, localIsoDate } from "@/lib/dateFormat";
 import { normalizeTimeHHMM } from "@/lib/timeFormat";
 import { exportTripItineraryPdf } from "@/lib/exportItinerary";
 import ShareTripModal from "@/components/ShareTripModal";
-import HeaderIconButton from "@/components/HeaderIconButton";
-import HomeButton from "@/components/HomeButton";
 import { useNetworkStatus } from "@/lib/useNetworkStatus";
 import OfflineBanner from "@/components/OfflineBanner";
 import WeatherCarousel from "@/components/WeatherCarousel";
 import TripCountdown from "@/components/TripCountdown";
 import { findLodgingGapDays } from "@/lib/conflicts";
+import { computeBudgetProgress } from "@/lib/budget";
+import { coverPhotoSource } from "@/lib/destinationPhotos";
+import { fetchDestinationForecast } from "@/lib/weather";
+import { weatherIconName } from "@/lib/weather";
 
 interface OverviewData {
   trip: Trip;
   days: Day[];
   flights: Item[];
   lodgings: Item[];
+  currencies: TripCurrency[];
+  expenses: Pick<Expense, "amount" | "currency_code" | "expense_date">[];
   totalNis: number | null;
+  todayItems: { id: string; title: string; time_start: string | null }[];
 }
 
 async function fetchOverviewData(tripId: string): Promise<OverviewData | null> {
@@ -45,7 +53,8 @@ async function fetchOverviewData(tripId: string): Promise<OverviewData | null> {
 
   const { data: currencies, error: currenciesError } = await supabase.from("trip_currencies").select("*").eq("trip_id", tripId);
   if (currenciesError) throw currenciesError;
-  const { data: expenses, error: expensesError } = await supabase.from("expenses").select("amount, currency_code").eq("trip_id", tripId);
+  const { data: expenses, error: expensesError } = await supabase
+    .from("expenses").select("amount, currency_code, expense_date").eq("trip_id", tripId);
   if (expensesError) throw expensesError;
   const totalNis = currencies && expenses
     ? expenses.reduce((sum, e) => {
@@ -54,18 +63,41 @@ async function fetchOverviewData(tripId: string): Promise<OverviewData | null> {
       }, 0)
     : null;
 
+  // Today section (folded in from the old separate Today screen) — next
+  // couple of upcoming items only, not the full day. Only worth computing
+  // for a trip that's actually under way.
+  let todayItems: OverviewData["todayItems"] = [];
+  if (tripStatus(trip as Trip) === "current") {
+    const iso = localIsoDate();
+    const todayDay = (days ?? []).find((d) => d.date === iso);
+    if (todayDay) {
+      const { data: items } = await supabase
+        .from("items").select("id, title, time_start").eq("day_id", todayDay.id).is("deleted_at", null)
+        .not("time_start", "is", null).order("time_start");
+      const now = new Date();
+      todayItems = (items ?? []).filter((it) => {
+        const t = normalizeTimeHHMM(it.time_start);
+        return t && new Date(`${iso}T${t}:00`).getTime() >= now.getTime();
+      }).slice(0, 3);
+    }
+  }
+
   return {
     trip: trip as Trip,
     days: (days ?? []) as Day[],
     flights: (flights ?? []) as Item[],
     lodgings: (lodgings ?? []) as Item[],
+    currencies: (currencies ?? []) as TripCurrency[],
+    expenses: expenses ?? [],
     totalNis,
+    todayItems,
   };
 }
 
 export default function TripOverview() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
   const isOnline = useNetworkStatus();
+  const insets = useSafeAreaInsets();
   const [exporting, setExporting] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
@@ -80,7 +112,19 @@ export default function TripOverview() {
   const flights = data?.flights ?? [];
   const lodgings = data?.lodgings ?? [];
   const totalNis = data?.totalNis ?? null;
+  const todayItems = data?.todayItems ?? [];
   const lodgingGapDays = findLodgingGapDays(days, lodgings);
+  const isCurrent = trip ? tripStatus(trip) === "current" : false;
+
+  const { data: heroWeather } = useQuery({
+    queryKey: ["overviewHeroWeather", trip?.destinations?.[0]],
+    queryFn: () => fetchDestinationForecast(trip!.destinations[0]),
+    enabled: !!trip && trip.destinations.length > 0,
+  });
+
+  const budgetProgress = trip && data
+    ? computeBudgetProgress(trip, data.expenses, (code) => data.currencies.find((c) => c.code === code)?.rate_to_nis ?? 1)
+    : null;
 
   useEffect(() => {
     if (!trip) return;
@@ -99,6 +143,13 @@ export default function TripOverview() {
     setExporting(false);
   }
 
+  function signOut() {
+    Alert.alert("Sign out", "Sign out of Manifest?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Sign out", style: "destructive", onPress: () => supabase.auth.signOut() },
+    ]);
+  }
+
   // Re-fetch every time this screen regains focus (e.g. navigating back
   // after adding an expense on an item page) — a plain useEffect only runs
   // once on mount/param-change, so the Money total would otherwise go stale
@@ -107,131 +158,149 @@ export default function TripOverview() {
 
   if (!trip) return null;
 
+  const menuItems = [
+    { icon: "export" as const, label: exporting ? "Exporting…" : "Export PDF", onPress: handleExportPdf },
+    { icon: "edit" as const, label: "Edit Trip", onPress: () => router.push(`/trip/${tripId}/edit`) },
+    ...(isOwner ? [{ icon: "share" as const, label: "Share Trip", onPress: () => setShareOpen(true) }] : []),
+    { icon: "signOut" as const, label: "Sign Out", onPress: signOut, danger: true },
+  ];
+
   return (
     <View style={styles.container}>
-      <Stack.Screen options={{
-        title: "Overview",
-        headerRight: () => (
-          <View style={styles.headerButtons}>
-            <HeaderIconButton onPress={handleExportPdf} disabled={exporting} accessibilityLabel="Export PDF">
-              {exporting
-                ? <ActivityIndicator size="small" color={colors.teal} />
-                : <Ionicons name="document-text-outline" size={16} color={colors.teal} />}
-            </HeaderIconButton>
-            {isOwner && (
-              <HeaderIconButton onPress={() => setShareOpen(true)} accessibilityLabel="Share trip">
-                <Ionicons name="people-outline" size={16} color={colors.teal} />
-              </HeaderIconButton>
-            )}
-            <HeaderIconButton onPress={() => router.push(`/trip/${tripId}/currency-converter`)} accessibilityLabel="Currency converter">
-              <Ionicons name="swap-horizontal" size={16} color={colors.teal} />
-            </HeaderIconButton>
-            <HeaderIconButton onPress={() => router.push(`/trip/${tripId}/edit`)}>
-              <Ionicons name="pencil" size={16} color={colors.amber} />
-            </HeaderIconButton>
-            <HomeButton />
-          </View>
-        ),
-      }} />
-      <TripNavBar tripId={tripId} active="overview" />
-      <OfflineBanner dataUpdatedAt={!isOnline ? dataUpdatedAt : undefined} />
+      <Stack.Screen options={{ headerShown: false }} />
+      <StatusBar style="light" />
       <ShareTripModal visible={shareOpen} onClose={() => setShareOpen(false)} tripId={tripId} />
+
       <FlatList
-        contentContainerStyle={{ padding: 16 }}
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: 8 }}
         ListHeaderComponent={
           <>
-            <View style={styles.header}>
-              <Text style={styles.tripName}>{trip.name}</Text>
-              <Text style={styles.tripDates}>{formatDateDDMMYYYY(trip.start_date)} - {formatDateDDMMYYYY(trip.end_date)}</Text>
-              {trip.destinations.length > 0 && (
-                <Text style={styles.destinations}>{trip.destinations.join(" \u00b7 ")}</Text>
-              )}
-            </View>
-
-            {tripStatus(trip) === "future" && (
-              <TripCountdown tripId={tripId} fallbackDateIso={trip.start_date} />
-            )}
-
-            <WeatherCarousel tripId={tripId} destinations={trip.destinations} />
-
-            {lodgingGapDays.length > 0 && (
-              <View style={styles.gapWarning}>
-                <Ionicons name="warning" size={14} color={colors.coral} />
-                <Text style={styles.gapWarningText}>
-                  {lodgingGapDays.length} night{lodgingGapDays.length === 1 ? "" : "s"} without lodging booked
-                  {" · "}{lodgingGapDays.map((d) => formatDateDDMMYYYY(d)).join(", ")}
-                </Text>
+            <ImageBackground
+              source={coverPhotoSource(trip.cover_photo_id)}
+              style={[styles.hero, { height: isCurrent ? 210 : 230 }]}
+            >
+              <View style={styles.heroScrim} />
+              <View style={[styles.headerRow, { top: insets.top + 10 }]}>
+                <Pressable style={styles.hbtn} onPress={() => router.canDismiss() ? router.dismissAll() : router.replace("/")} accessibilityLabel="Home">
+                  <Icon name="home" size={18} color="#fff" />
+                </Pressable>
+                <HamburgerMenu items={menuItems} sheetTop={insets.top + 46} />
               </View>
-            )}
+              {heroWeather && heroWeather.days.length > 0 && (
+                <View style={[styles.weatherBadge, { top: insets.top + 52 }]}>
+                  <Icon name={weatherIconName(heroWeather.days[0].weatherCode)} size={17} color="#fff" />
+                  <Text style={styles.weatherTemp}>{Math.round(heroWeather.days[0].tempMax)}°</Text>
+                  <Text style={styles.weatherDate}>{formatDateDDMMYYYY(localIsoDate()).slice(0, 5)}</Text>
+                </View>
+              )}
+              <Text style={styles.tripName}>{trip.destinations[0] ?? trip.name}</Text>
+              {!isCurrent && <TripCountdown tripId={tripId} fallbackDateIso={trip.start_date} />}
+            </ImageBackground>
 
-            <Pressable style={styles.moneyRow} onPress={() => router.push(`/trip/${tripId}/money`)}>
-              <Text style={styles.moneyLabel}>Money</Text>
-              <Text style={styles.moneyAmt}>
-                {totalNis === null ? "\u2014" : `\u20aa ${totalNis.toFixed(0)}`}
-              </Text>
-            </Pressable>
-            <Pressable style={styles.shoppingRow} onPress={() => router.push(`/trip/${tripId}/shopping`)}>
-              <Text style={styles.shoppingLabel}>Shopping list</Text>
-              <Text style={styles.shoppingArrow}>{"\u2192"}</Text>
-            </Pressable>
-            <Pressable style={styles.shoppingRow} onPress={() => router.push(`/trip/${tripId}/map`)}>
-              <Text style={styles.shoppingLabel}>Map</Text>
-              <Text style={styles.shoppingArrow}>{"\u2192"}</Text>
-            </Pressable>
-            <Pressable style={styles.shoppingRow} onPress={() => router.push(`/trip/${tripId}/packing`)}>
-              <Text style={styles.shoppingLabel}>Packing</Text>
-              <Text style={styles.shoppingArrow}>{"\u2192"}</Text>
-            </Pressable>
+            <View style={styles.body}>
+              <OfflineBanner dataUpdatedAt={!isOnline ? dataUpdatedAt : undefined} />
 
-            {flights.length > 0 && (
-              <>
-                <Text style={styles.sectionLabel}>Flights</Text>
-                {flights.map((f) => {
-                  const flightNumber = (f.custom_fields as any)?.flight_number as string | undefined;
-                  const durationMinutes = computeDurationMinutes(f.start_date, f.time_start, f.end_date, f.time_end);
-                  const durationText = durationMinutes !== null && durationMinutes >= 0 ? formatDuration(durationMinutes) : null;
-                  const arrivesNextDay = !!(f.start_date && f.end_date && f.end_date !== f.start_date);
-                  return (
-                    <Pressable key={f.id} style={styles.flightRow} onPress={() => router.push(`/item/${f.id}`)}>
-                      <View style={styles.flightTimeCol}>
-                        <Text style={styles.flightTimeText}>{normalizeTimeHHMM(f.time_start) || "\u2014"}</Text>
-                        <Text style={styles.flightArrow}>{"\u2193"}</Text>
-                        <Text style={styles.flightTimeText}>
-                          {normalizeTimeHHMM(f.time_end) || "\u2014"}{arrivesNextDay ? " +1" : ""}
-                        </Text>
-                        <Text style={styles.flightDateText}>{formatDateDDMMYYYY(f.start_date)}</Text>
+              <WeatherCarousel tripId={tripId} destinations={trip.destinations} />
+
+              {lodgingGapDays.length > 0 && (
+                <View style={styles.gapWarning}>
+                  <Text style={styles.gapWarningText}>
+                    ⚠ {lodgingGapDays.length} night{lodgingGapDays.length === 1 ? "" : "s"} without lodging booked
+                    {" · "}{lodgingGapDays.map((d) => formatDateDDMMYYYY(d)).join(", ")}
+                  </Text>
+                </View>
+              )}
+
+              <Pressable style={styles.budgetBubble} onPress={() => router.push(`/trip/${tripId}/money`)}>
+                <View style={styles.budgetIconCirc}><Icon name="budget" size={18} color={colors.blue} /></View>
+                <View style={{ flex: 1 }}>
+                  <View style={styles.budgetHead}>
+                    <Text style={styles.budgetLabel}>Budget</Text>
+                    {budgetProgress && <Text style={styles.budgetPct}>{Math.round(budgetProgress.percent)}%</Text>}
+                  </View>
+                  {budgetProgress ? (
+                    <>
+                      <View style={styles.budgetTrack}>
+                        <View style={[styles.budgetFill, { width: `${Math.min(100, budgetProgress.percent)}%`, backgroundColor: budgetProgress.overBudget ? colors.coral : colors.teal }]} />
                       </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.highlightTitle}>{f.title}</Text>
-                        <Text style={styles.highlightMeta}>
-                          {[f.vendor, flightNumber, durationText].filter(Boolean).join(" \u00b7 ") || "No airline set"}
-                        </Text>
+                      <Text style={styles.budgetAmt}>₪{budgetProgress.spentTotal.toFixed(0)} of ₪{budgetProgress.budget.toFixed(0)}</Text>
+                    </>
+                  ) : (
+                    <Text style={styles.budgetAmt}>{totalNis === null ? "—" : `₪${totalNis.toFixed(0)} spent · no budget set`}</Text>
+                  )}
+                </View>
+                <Text style={styles.chevron}>{"›"}</Text>
+              </Pressable>
+
+              {isCurrent && (
+                <>
+                  <Text style={styles.sectionLabel}>Today</Text>
+                  {todayItems.length > 0 ? (
+                    <>
+                      <Pressable style={styles.nextCard} onPress={() => router.push(`/item/${todayItems[0].id}`)}>
+                        <Text style={styles.nextLabel}>Next</Text>
+                        <Text style={styles.nextTitle}>{todayItems[0].title}</Text>
+                        {todayItems[0].time_start && <Text style={styles.nextMeta}>{normalizeTimeHHMM(todayItems[0].time_start)}</Text>}
+                      </Pressable>
+                      {todayItems.slice(1).map((it) => (
+                        <Pressable key={it.id} style={styles.itemRow} onPress={() => router.push(`/item/${it.id}`)}>
+                          <View style={styles.itemTimeCol}>
+                            <Text style={styles.itemTimeText}>{normalizeTimeHHMM(it.time_start) || "—"}</Text>
+                          </View>
+                          <View style={styles.itemBody}>
+                            <Text style={styles.itemTitle}>{it.title}</Text>
+                          </View>
+                        </Pressable>
+                      ))}
+                    </>
+                  ) : (
+                    <View style={styles.doneCard}><Text style={styles.doneText}>Nothing left for today.</Text></View>
+                  )}
+                </>
+              )}
+
+              {flights.length > 0 && (
+                <>
+                  <Text style={styles.sectionLabel}>Flights</Text>
+                  {flights.map((f) => {
+                    const flightNumber = (f.custom_fields as any)?.flight_number as string | undefined;
+                    const durationMinutes = computeDurationMinutes(f.start_date, f.time_start, f.end_date, f.time_end);
+                    const durationText = durationMinutes !== null && durationMinutes >= 0 ? formatDuration(durationMinutes) : null;
+                    return (
+                      <Pressable key={f.id} style={styles.itemRow} onPress={() => router.push(`/item/${f.id}`)}>
+                        <View style={styles.itemIconCol}><Icon name="flight" size={20} color="#fff" /></View>
+                        <View style={styles.itemBody}>
+                          <Text style={styles.itemCat}>{flightNumber ?? "FLIGHT"}</Text>
+                          <Text style={styles.itemTitle}>{f.title}</Text>
+                          <Text style={styles.itemSub}>
+                            {[normalizeTimeHHMM(f.time_start), formatDateDDMMYYYY(f.start_date), durationText].filter(Boolean).join(" · ")}
+                          </Text>
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </>
+              )}
+
+              {lodgings.length > 0 && (
+                <>
+                  <Text style={styles.sectionLabel}>Lodging</Text>
+                  {lodgings.map((l) => (
+                    <Pressable key={l.id} style={styles.itemRow} onPress={() => router.push(`/item/${l.id}`)}>
+                      <View style={styles.itemIconCol}><Icon name="lodging" size={20} color="#fff" /></View>
+                      <View style={styles.itemBody}>
+                        <Text style={styles.itemCat}>LODGING</Text>
+                        <Text style={styles.itemTitle}>{l.title}</Text>
+                        <Text style={styles.itemSub}>{formatDateDDMMYYYY(l.start_date)} – {formatDateDDMMYYYY(l.end_date)}</Text>
                       </View>
                     </Pressable>
-                  );
-                })}
-              </>
-            )}
+                  ))}
+                </>
+              )}
 
-            {lodgings.length > 0 && (
-              <>
-                <Text style={styles.sectionLabel}>Lodging</Text>
-                {lodgings.map((l) => (
-                  <Pressable key={l.id} style={styles.flightRow} onPress={() => router.push(`/item/${l.id}`)}>
-                    <View style={styles.flightTimeCol}>
-                      <Text style={styles.flightTimeText}>{normalizeTimeHHMM(l.time_start) || "\u2014"}</Text>
-                      <Text style={styles.flightDateText}>{formatDateDDMMYYYY(l.start_date)}</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.highlightTitle}>{l.title}</Text>
-                      <Text style={styles.highlightMeta}>Until {formatDateDDMMYYYY(l.end_date)}</Text>
-                    </View>
-                  </Pressable>
-                ))}
-              </>
-            )}
-
-            <Text style={styles.sectionLabel}>Days</Text>
+              <Text style={styles.sectionLabel}>Days</Text>
+            </View>
           </>
         }
         data={days}
@@ -247,75 +316,88 @@ export default function TripOverview() {
               <>
                 <View style={styles.dateRow}>
                   <Text style={styles.date}>{formatDateDDMMYYYY(item.date)}</Text>
-                  {item.date === localIsoDate() && (
-                    <Ionicons name="today" size={14} color={colors.amber} style={{ marginLeft: 6 }} />
-                  )}
+                  {item.date === localIsoDate() && <View style={styles.todayDot} />}
                 </View>
                 {item.theme ? <Text style={styles.theme}>{item.theme}</Text> : <Text style={styles.themeEmpty}>No title</Text>}
               </>
             )}
           </Pressable>
         )}
+        ListFooterComponent={<View style={{ height: 12 }} />}
       />
+
+      <TripTabBar tripId={tripId} active="overview" />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
-  headerButtons: { flexDirection: "row", alignItems: "center", gap: 8, marginRight: 14 },
-  header: { marginBottom: 8 },
-  tripName: { fontFamily: "Archivo_700Bold" as any, fontWeight: "800", fontSize: 22, color: colors.ink },
-  tripDates: { color: colors.inkSoft, fontSize: 13, marginTop: 2 },
-  destinations: { color: colors.teal, fontSize: 12, marginTop: 4, fontWeight: "600" },
-  gapWarning: {
-    flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(193,84,63,0.1)",
-    borderRadius: radius.md, padding: 10, marginTop: 10,
+  body: { paddingHorizontal: 16, paddingTop: 10 },
+
+  hero: { justifyContent: "flex-end", padding: 14 },
+  heroScrim: {
+    position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: "rgba(11,30,63,0.15)",
   },
-  gapWarningText: { color: colors.coral, fontWeight: "600", fontSize: 11, flex: 1 },
-  moneyRow: {
-    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-    backgroundColor: colors.ink, borderRadius: radius.md, padding: 14, marginTop: 14,
+  headerRow: { position: "absolute", right: 14, flexDirection: "row", gap: 8 },
+  hbtn: {
+    width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center",
+    backgroundColor: "rgba(11,30,63,0.4)", borderWidth: 1, borderColor: "rgba(255,255,255,0.5)",
   },
-  moneyLabel: { color: colors.amberSoft, fontWeight: "700", fontSize: 13 },
-  moneyAmt: { color: colors.paper, fontWeight: "800", fontSize: 16, fontFamily: "IBMPlexMono_500Medium" },
-  shoppingRow: {
-    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-    backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,
-    borderRadius: radius.md, padding: 14, marginTop: 8,
+  weatherBadge: {
+    position: "absolute", right: 14, width: 56, height: 66, borderRadius: 33,
+    borderWidth: 1.5, borderColor: "rgba(255,255,255,0.85)", backgroundColor: "rgba(11,30,63,0.35)",
+    alignItems: "center", justifyContent: "center",
   },
-  shoppingLabel: { color: colors.ink, fontWeight: "700", fontSize: 13 },
-  shoppingArrow: { color: colors.inkSoft, fontSize: 14 },
-  sectionLabel: {
-    color: colors.inkSoft, fontWeight: "700", fontSize: 12,
-    textTransform: "uppercase", letterSpacing: 1, marginTop: 18, marginBottom: 8,
+  weatherTemp: { color: "#fff", fontFamily: fonts.monoBold, fontSize: 13.5 },
+  weatherDate: { color: "#fff", fontSize: 7, opacity: 0.85 },
+  tripName: { color: "#fff", fontFamily: fonts.display, fontSize: 21, marginBottom: 4 },
+
+  gapWarning: { backgroundColor: "rgba(216,80,58,0.1)", borderRadius: radius.md, padding: 10, marginTop: 10 },
+  gapWarningText: { color: colors.coral, fontFamily: fonts.bodyBold, fontSize: 11.5 },
+
+  budgetBubble: {
+    flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.paperRaised,
+    borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, padding: 10, marginTop: 10,
   },
-  highlightRow: {
-    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-    backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,
-    borderRadius: radius.md, padding: 12, marginBottom: 6,
+  budgetIconCirc: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.paper, alignItems: "center", justifyContent: "center" },
+  budgetHead: { flexDirection: "row", justifyContent: "space-between", marginBottom: 4 },
+  budgetLabel: { color: colors.inkSoft, fontFamily: fonts.bodyBold, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5 },
+  budgetPct: { color: colors.teal, fontFamily: fonts.monoBold, fontSize: 13 },
+  budgetTrack: { height: 6, backgroundColor: colors.paper, borderRadius: 4, overflow: "hidden" },
+  budgetFill: { height: 6, borderRadius: 4 },
+  budgetAmt: { color: colors.ink, fontSize: 10.5, fontWeight: "600", marginTop: 4 },
+  chevron: { color: colors.inkSoft, fontSize: 18 },
+
+  sectionLabel: { color: colors.inkSoft, fontFamily: fonts.bodyBold, fontSize: 11.5, textTransform: "uppercase", letterSpacing: 1, marginTop: 18, marginBottom: 8 },
+
+  nextCard: { backgroundColor: colors.ink, borderRadius: radius.lg, padding: 14 },
+  nextLabel: { color: colors.goldSoft, fontFamily: fonts.bodyBold, fontSize: 9, textTransform: "uppercase", letterSpacing: 1 },
+  nextTitle: { color: "#fff", fontFamily: fonts.display, fontSize: 16, marginTop: 3 },
+  nextMeta: { color: colors.goldSoft, fontFamily: fonts.mono, fontSize: 11, marginTop: 2 },
+  doneCard: { backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, padding: 14, alignItems: "center" },
+  doneText: { color: colors.inkSoft, fontSize: 13, fontStyle: "italic" },
+
+  itemRow: {
+    flexDirection: "row", alignItems: "stretch", backgroundColor: colors.paperRaised,
+    borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, marginTop: 6, overflow: "hidden",
   },
-  flightRow: {
-    flexDirection: "row", alignItems: "center", backgroundColor: colors.paperRaised,
-    borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, marginBottom: 6, overflow: "hidden",
-  },
-  flightTimeCol: {
-    width: 78, alignSelf: "stretch", backgroundColor: colors.ink,
-    alignItems: "center", justifyContent: "center", paddingVertical: 10,
-  },
-  flightTimeText: { fontFamily: "IBMPlexMono_500Medium", color: colors.paper, fontWeight: "700", fontSize: 13 },
-  flightArrow: { color: colors.amberSoft, fontSize: 10, marginVertical: 1 },
-  flightDateText: { fontFamily: "IBMPlexMono_500Medium", color: colors.amberSoft, fontSize: 9, marginTop: 2 },
-  highlightMono: { fontFamily: "IBMPlexMono_500Medium", color: colors.ink, fontWeight: "600", fontSize: 13 },
-  highlightTitle: { color: colors.ink, fontWeight: "600", fontSize: 13, paddingLeft: 12, paddingTop: 10 },
-  highlightMeta: { color: colors.inkSoft, fontSize: 11, paddingLeft: 12, paddingBottom: 10, paddingTop: 2 },
+  itemTimeCol: { width: 56, backgroundColor: colors.ink, alignItems: "center", justifyContent: "center" },
+  itemTimeText: { fontFamily: fonts.mono, color: "#fff", fontSize: 11 },
+  itemIconCol: { width: 56, backgroundColor: colors.ink, alignItems: "center", justifyContent: "center" },
+  itemBody: { flex: 1, padding: 10 },
+  itemCat: { color: colors.blue, fontFamily: fonts.bodyBold, fontSize: 9, letterSpacing: 0.5 },
+  itemTitle: { color: colors.ink, fontFamily: fonts.bodySemi, fontSize: 13, marginTop: 2 },
+  itemSub: { color: colors.inkSoft, fontSize: 10.5, marginTop: 1 },
+
   dayRow: {
-    backgroundColor: colors.paperRaised,
-    borderWidth: 1, borderColor: colors.line,
-    borderRadius: radius.md, padding: 14, marginBottom: 8,
+    backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,
+    borderRadius: radius.md, padding: 14, marginTop: 8, marginHorizontal: 16,
   },
-  dateRow: { flexDirection: "row", alignItems: "center" },
-  date: { fontFamily: "IBMPlexMono_500Medium", color: colors.ink, fontWeight: "600" },
-  theme: { color: colors.teal, fontSize: 12, marginTop: 2, fontWeight: "600" },
+  dateRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  date: { fontFamily: fonts.mono, color: colors.ink, fontSize: 13 },
+  todayDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.gold },
+  theme: { color: colors.blue, fontFamily: fonts.bodySemi, fontSize: 12, marginTop: 2 },
   themeEmpty: { color: colors.inkSoft, fontSize: 11, marginTop: 2, fontStyle: "italic" },
 });

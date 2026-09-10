@@ -21,6 +21,19 @@ interface WeatherMeta {
   label: string;
 }
 
+// Same WMO code ranges as weatherMeta below, mapped to the generated icon
+// set's own 7 weather glyphs instead of an Ionicons name.
+export function weatherIconName(code: number): "weatherSunny" | "weatherPartlyCloudy" | "weatherCloudy" | "weatherWindy" | "weatherRainy" | "weatherSnowy" | "weatherThunderstorm" {
+  if (code === 0) return "weatherSunny";
+  if (code <= 2) return "weatherPartlyCloudy";
+  if (code === 3 || code === 45 || code === 48) return "weatherCloudy";
+  if (code >= 51 && code <= 67) return "weatherRainy";
+  if (code >= 80 && code <= 82) return "weatherRainy";
+  if ((code >= 71 && code <= 77) || code === 85 || code === 86) return "weatherSnowy";
+  if (code >= 95) return "weatherThunderstorm";
+  return "weatherPartlyCloudy";
+}
+
 // WMO weather codes, as returned by Open-Meteo's `weathercode` field.
 export function weatherMeta(code: number): WeatherMeta {
   if (code === 0) return { icon: "sunny-outline", label: "Clear" };

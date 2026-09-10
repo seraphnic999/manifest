@@ -11,6 +11,7 @@ import { tzOffsetLabel, sortedByOffsetDesc, COMMON_TIMEZONES, COMMON_CURRENCIES 
 import { fetchLiveRateToNis } from "@/lib/currencyRates";
 import { DateField } from "@/components/DateTimeFields";
 import HomeButton from "@/components/HomeButton";
+import CoverPhotoPicker from "@/components/CoverPhotoPicker";
 
 const TYPES: TripType[] = ["pleasure", "business", "mixed"];
 
@@ -27,6 +28,7 @@ export default function EditTrip() {
   const [type, setType] = useState<TripType>("pleasure");
   const [origType, setOrigType] = useState<TripType>("pleasure");
   const [destinations, setDestinations] = useState("");
+  const [coverPhotoId, setCoverPhotoId] = useState<string | null>(null);
   const [timezone, setTimezone] = useState("Asia/Jerusalem");
   const [tzPickerOpen, setTzPickerOpen] = useState(false);
   const [customTz, setCustomTz] = useState(false);
@@ -69,6 +71,7 @@ export default function EditTrip() {
       setType(trip.type);
       setOrigType(trip.type);
       setDestinations(trip.destinations.join(", "));
+      setCoverPhotoId(trip.cover_photo_id);
       setTimezone(trip.default_timezone);
       setCustomTz(!COMMON_TIMEZONES.includes(trip.default_timezone));
       setBudgetAmount(trip.budget_amount != null ? String(trip.budget_amount) : "");
@@ -176,6 +179,7 @@ export default function EditTrip() {
       destinations: destinations.split(",").map((d) => d.trim()).filter(Boolean),
       default_timezone: timezone,
       budget_amount: budgetAmount ? parseFloat(budgetAmount) || null : null,
+      cover_photo_id: coverPhotoId,
     }).eq("id", tripId);
 
     if (error) {
@@ -218,6 +222,9 @@ export default function EditTrip() {
 
       <Text style={styles.label}>Trip name</Text>
       <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="e.g. Summer road trip" />
+
+      <Text style={styles.label}>Cover photo</Text>
+      <CoverPhotoPicker value={coverPhotoId} onChange={setCoverPhotoId} />
 
       <View style={styles.row}>
         <DateField label="Start date" value={startDate} onChange={setStartDate} />

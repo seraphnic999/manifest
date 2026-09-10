@@ -11,6 +11,7 @@ import { tzOffsetLabel, sortedByOffsetDesc, COMMON_TIMEZONES, COMMON_CURRENCIES 
 import { mergePackingItems, fetchTemplateItems, fetchTripPackingAsSource } from "@/lib/packing";
 import { DateField } from "@/components/DateTimeFields";
 import HomeButton from "@/components/HomeButton";
+import CoverPhotoPicker from "@/components/CoverPhotoPicker";
 
 type PackingSource = "empty" | "template" | "trip";
 
@@ -28,6 +29,7 @@ export default function NewTrip() {
   const [endDate, setEndDate] = useState("");
   const [type, setType] = useState<TripType>("pleasure");
   const [destinations, setDestinations] = useState("");
+  const [coverPhotoId, setCoverPhotoId] = useState<string | null>(null);
   const [timezone, setTimezone] = useState("Asia/Jerusalem");
   const [tzPickerOpen, setTzPickerOpen] = useState(false);
   const [customTz, setCustomTz] = useState(false);
@@ -82,6 +84,7 @@ export default function NewTrip() {
         type,
         destinations: destinations.split(",").map((d) => d.trim()).filter(Boolean),
         default_timezone: timezone,
+        cover_photo_id: coverPhotoId,
       })
       .select()
       .single();
@@ -132,6 +135,9 @@ export default function NewTrip() {
 
       <Text style={styles.label}>Trip name</Text>
       <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="e.g. Summer road trip" />
+
+      <Text style={styles.label}>Cover photo</Text>
+      <CoverPhotoPicker value={coverPhotoId} onChange={setCoverPhotoId} />
 
       <View style={styles.row}>
         <DateField label="Start date" value={startDate} onChange={setStartDate} />

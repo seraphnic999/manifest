@@ -6,6 +6,9 @@ import { View, Platform, StyleSheet, I18nManager } from "react-native";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useFonts, Poppins_600SemiBold, Poppins_700Bold } from "@expo-google-fonts/poppins";
+import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from "@expo-google-fonts/inter";
+import { JetBrainsMono_600SemiBold, JetBrainsMono_700Bold } from "@expo-google-fonts/jetbrains-mono";
 import { supabase } from "@/lib/supabase";
 import { claimPendingTripShares } from "@/lib/tripSharing";
 import { registerPushToken } from "@/lib/reminders";
@@ -34,6 +37,11 @@ export default function RootLayout() {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
   const router = useRouter();
   const segments = useSegments();
+  const [fontsLoaded] = useFonts({
+    Poppins_600SemiBold, Poppins_700Bold,
+    Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold,
+    JetBrainsMono_600SemiBold, JetBrainsMono_700Bold,
+  });
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -62,6 +70,15 @@ export default function RootLayout() {
       router.replace("/");
     }
   }, [session, segments]);
+
+  // Deliberately NOT gating the return on fontsLoaded here: the Stack below
+  // is expo-router's root navigator, and the auth redirect effect above can
+  // call router.replace() before this component's first render finishes —
+  // if that render returned null instead of the Stack, expo-router throws
+  // ("Attempted to navigate before mounting the Root Layout component").
+  // Text using a not-yet-loaded custom font just shows the system font for
+  // a frame or two, then swaps in once useFonts resolves — not worth the
+  // navigator race to avoid that.
 
   return (
     <PersistQueryClientProvider
