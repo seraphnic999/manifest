@@ -1,10 +1,8 @@
-// The user's generated travel-icon set (travel-icons-svg.zip), inlined as
-// React Native SVG components — 64x64 viewBox, 3.2 stroke width, matching
-// the source files exactly: flight, lodging, budget, packing, the 7
-// weather icons, countdown, map, currency, shopping, search, archive,
-// menu, add, home, export, edit, share. Every other name in IconName below
-// is hand-drawn (not from that set) to approximate its weight/rounding —
-// a placeholder until a matching icon is generated for it.
+// The user's generated travel-icon set (travel_app_icons_svg_thick.zip, v2),
+// inlined as React Native SVG components — 64x64 viewBox, 3.8 stroke width,
+// #173B8F default color, matching the source files exactly. Only "other"
+// (a generic/misc glyph) has no source file yet and is hand-drawn as a
+// placeholder — see the icon-picker proposal for what's still needed.
 import Svg, { Path, Circle, Rect } from "react-native-svg";
 import { ViewStyle } from "react-native";
 
@@ -16,7 +14,18 @@ export type IconName =
   | "menu" | "add" | "home" | "export" | "edit" | "share"
   | "overview" | "signOut" | "back" | "swap" | "check"
   | "transfer" | "transport" | "dining" | "activity" | "work" | "other" | "locate" | "warning"
-  | "trash" | "duplicate" | "refresh" | "document" | "camera" | "gallery" | "forward";
+  | "trash" | "duplicate" | "refresh" | "document" | "camera" | "gallery" | "forward"
+  | "cafe" | "cocktail" | "museum" | "ship" | "star" | "user";
+
+/** The subset of icons that make sense as a marker glyph on the map — used
+ * to build the map-icon picker's grid. Excludes chrome (menu/home/back/
+ * forward/edit/export/share/search/archive/swap/signOut/overview), weather,
+ * and anything else that isn't a place/activity/transport concept. */
+export const MAP_PICKER_ICONS: IconName[] = [
+  "flight", "transfer", "transport", "ship", "lodging",
+  "dining", "cafe", "cocktail", "shopping", "activity", "museum", "star",
+  "work", "user", "locate", "budget", "other",
+];
 
 type Props = { name: IconName; size?: number; color?: string; strokeWidth?: number; style?: ViewStyle };
 
@@ -157,56 +166,61 @@ function renderPaths(name: IconName, color: string, strokeWidth: number) {
       </>;
     case "overview":
       return <>
-        <Rect x="8" y="8" width="20" height="20" rx="4" {...s} />
-        <Rect x="36" y="8" width="20" height="20" rx="4" {...s} />
-        <Rect x="8" y="36" width="20" height="20" rx="4" {...s} />
-        <Rect x="36" y="36" width="20" height="20" rx="4" {...s} />
+        <Rect x="12" y="12" width="16" height="16" rx="3" {...s} />
+        <Rect x="36" y="12" width="16" height="16" rx="3" {...s} />
+        <Rect x="12" y="36" width="16" height="16" rx="3" {...s} />
+        <Rect x="36" y="36" width="16" height="16" rx="3" {...s} />
       </>;
     case "signOut":
       return <>
-        <Path d="M26 10H14a4 4 0 0 0-4 4v36a4 4 0 0 0 4 4h12" {...s} />
-        <Path d="M34 32h22M48 22l10 10-10 10" {...s} />
+        <Path d="M28 12H14a4 4 0 0 0-4 4v32a4 4 0 0 0 4 4h14" {...s} />
+        <Path d="M34 32h20" {...s} />
+        <Path d="m46 20 12 12-12 12" {...s} />
       </>;
     case "back":
-      return <Path d="M38 12 18 32l20 20" {...s} />;
+      return <>
+        <Path d="M54 32H14" {...s} />
+        <Path d="m26 18-14 14 14 14" {...s} />
+      </>;
     case "swap":
       return <>
-        <Path d="M20 14v30M20 44l-9-9M20 44l9-9" {...s} />
-        <Path d="M44 50V20M44 20l9 9M44 20l-9 9" {...s} />
+        <Path d="M10 22h36" {...s} />
+        <Path d="m34 10 12 12-12 12" {...s} />
+        <Path d="M54 42H18" {...s} />
+        <Path d="m30 30-12 12 12 12" {...s} />
       </>;
     case "check":
-      return <Path d="M14 33l12 12 24-26" fill="none" stroke={color} strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" />;
+      return <Path d="m12 34 12 12 28-28" {...s} />;
     case "transfer":
       return <>
-        <Path d="M10 42 12 28c1-3 4-5 7-5h26c3 0 6 2 7 5l2 14" {...s} />
-        <Path d="M6 42h52" {...s} />
-        <Circle cx="18" cy="46" r="5" {...s} />
-        <Circle cx="46" cy="46" r="5" {...s} />
+        <Path d="M18 38h28l-3-10a7 7 0 0 0-7-5H28a7 7 0 0 0-7 5l-3 10Z" {...s} />
+        <Path d="M14 38h36a4 4 0 0 1 4 4v4H10v-4a4 4 0 0 1 4-4Z" {...s} />
+        <Path d="M24 23h16" {...s} />
+        <Circle cx="18" cy="48" r="3" {...s} />
+        <Circle cx="46" cy="48" r="3" {...s} />
       </>;
     case "transport":
       return <>
-        <Rect x="8" y="14" width="48" height="30" rx="6" {...s} />
-        <Path d="M8 34h48" {...s} />
-        <Path d="M18 20v10M32 20v10M46 20v10" {...s} />
-        <Circle cx="18" cy="50" r="5" {...s} />
-        <Circle cx="46" cy="50" r="5" {...s} />
+        <Rect x="18" y="10" width="28" height="34" rx="7" {...s} />
+        <Rect x="24" y="18" width="16" height="10" rx="2" {...s} />
+        <Path d="M25 48 20 54M39 48l5 6M22 54h20" {...s} />
+        <Circle cx="26" cy="35" r="2" {...s} />
+        <Circle cx="38" cy="35" r="2" {...s} />
       </>;
     case "dining":
       return <>
-        <Path d="M14 8v14M18 8v14M22 8v14" {...s} />
-        <Path d="M18 22v34" {...s} />
-        <Path d="M44 8c8 3 10 10 6 16l-6 4v28" {...s} />
+        <Path d="M18 8v22c0 4 3 7 7 7v19" {...s} />
+        <Path d="M12 8v12M18 8v12M24 8v12" {...s} />
+        <Path d="M40 8v48" {...s} />
+        <Path d="M40 8c8 5 8 15 0 20" {...s} />
       </>;
     case "activity":
-      return <>
-        <Path d="M8 50 24 20l10 16 6-8 16 22Z" {...s} />
-        <Circle cx="46" cy="16" r="6" {...s} />
-      </>;
+      return <Path d="m8 46 14-18 10 10 12-18 12 26H8Z" {...s} />;
     case "work":
       return <>
-        <Rect x="10" y="24" width="44" height="28" rx="5" {...s} />
-        <Path d="M24 24v-6c0-3 2-5 5-5h6c3 0 5 2 5 5v6" {...s} />
-        <Path d="M10 36h44" {...s} />
+        <Rect x="10" y="20" width="44" height="30" rx="5" {...s} />
+        <Path d="M24 20v-4a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v4" {...s} />
+        <Path d="M10 32h44" {...s} />
       </>;
     case "other":
       return <>
@@ -216,57 +230,94 @@ function renderPaths(name: IconName, color: string, strokeWidth: number) {
       </>;
     case "locate":
       return <>
-        <Path d="M32 8c-11 0-20 9-20 20 0 15 20 28 20 28s20-13 20-28c0-11-9-20-20-20Z" {...s} />
-        <Circle cx="32" cy="28" r="7" {...s} />
+        <Path d="M32 56s-13-14-13-26a13 13 0 1 1 26 0c0 12-13 26-13 26Z" {...s} />
+        <Circle cx="32" cy="30" r="5" {...s} />
       </>;
     case "warning":
       return <>
-        <Path d="M32 10 58 54H6Z" {...s} />
-        <Path d="M32 26v14" {...s} />
-        <Circle cx="32" cy="46" r="1.6" fill={color} stroke="none" />
+        <Path d="M32 10 56 52H8L32 10Z" {...s} />
+        <Path d="M32 24v14" {...s} />
+        <Circle cx="32" cy="45" r="2" fill={color} stroke="none" />
       </>;
     case "trash":
       return <>
-        <Path d="M14 18h36" {...s} />
-        <Path d="M24 18v-6h16v6" {...s} />
-        <Path d="M18 18l3 36c0 3 2 5 5 5h12c3 0 5-2 5-5l3-36" {...s} />
-        <Path d="M26 28v20M38 28v20" {...s} />
+        <Path d="M18 18h28" {...s} />
+        <Path d="M24 18v-4h16v4" {...s} />
+        <Rect x="20" y="18" width="24" height="34" rx="3" {...s} />
+        <Path d="M28 26v18M36 26v18" {...s} />
       </>;
     case "duplicate":
       return <>
-        <Rect x="10" y="18" width="32" height="32" rx="6" {...s} />
-        <Path d="M22 18v-4c0-2 2-4 4-4h24c2 0 4 2 4 4v24c0 2-2 4-4 4h-4" {...s} />
+        <Rect x="14" y="18" width="24" height="30" rx="3" {...s} />
+        <Rect x="26" y="14" width="24" height="30" rx="3" {...s} />
       </>;
     case "refresh":
       return <>
-        <Path d="M12 32a20 20 0 0 1 34-14l4 4" {...s} />
-        <Path d="M50 14v10H40" {...s} />
-        <Path d="M52 32a20 20 0 0 1-34 14l-4-4" {...s} />
-        <Path d="M14 50V40h10" {...s} />
+        <Path d="M46 20a18 18 0 0 0-28-2" {...s} />
+        <Path d="m42 12 7 1-1 7" {...s} />
+        <Path d="M18 44a18 18 0 0 0 28 2" {...s} />
+        <Path d="m22 52-7-1 1-7" {...s} />
       </>;
     case "document":
       return <>
-        <Path d="M16 8h24l12 12v36a2 2 0 0 1-2 2H16a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2Z" {...s} />
-        <Path d="M40 8v12h12" {...s} />
-        <Path d="M20 34h24M20 42h24M20 26h12" {...s} />
+        <Path d="M18 10h20l10 10v34H18Z" {...s} />
+        <Path d="M38 10v10h10" {...s} />
+        <Path d="M24 34h16M24 42h12" {...s} />
       </>;
     case "camera":
       return <>
-        <Path d="M10 20a4 4 0 0 1 4-4h6l4-6h16l4 6h6a4 4 0 0 1 4 4v28a4 4 0 0 1-4 4H14a4 4 0 0 1-4-4Z" {...s} />
-        <Circle cx="32" cy="34" r="10" {...s} />
+        <Path d="M16 22h8l3-5h10l3 5h8a4 4 0 0 1 4 4v20a4 4 0 0 1-4 4H16a4 4 0 0 1-4-4V26a4 4 0 0 1 4-4Z" {...s} />
+        <Circle cx="32" cy="36" r="9" {...s} />
       </>;
     case "gallery":
       return <>
-        <Rect x="8" y="12" width="48" height="40" rx="5" {...s} />
-        <Circle cx="22" cy="26" r="5" {...s} />
-        <Path d="M12 46l14-14 10 10 8-8 14 14" {...s} />
+        <Rect x="10" y="16" width="44" height="32" rx="4" {...s} />
+        <Path d="m18 40 9-9 8 8 6-6 9 9" {...s} />
+        <Circle cx="22" cy="24" r="3" {...s} />
       </>;
     case "forward":
-      return <Path d="M26 12l20 20-20 20" {...s} />;
+      return <>
+        <Path d="M10 32h40" {...s} />
+        <Path d="m38 18 14 14-14 14" {...s} />
+      </>;
+    case "cafe":
+      return <>
+        <Path d="M21 26h24v7a13 13 0 0 1-13 13h-5a13 13 0 0 1-13-13v-7a0 0 0 0 1 0 0Z" {...s} />
+        <Path d="M38 28h5a7 7 0 0 1 0 14h-5" {...s} />
+        <Path d="M18 49h26" {...s} />
+        <Path d="M22 14c0 4-2 4-2 8M30 14c0 4-2 4-2 8M38 14c0 4-2 4-2 8" {...s} />
+      </>;
+    case "cocktail":
+      return <>
+        <Path d="M16 14h32L34 30v16" {...s} />
+        <Path d="M22 54h20" {...s} />
+        <Path d="M32 46v8" {...s} />
+        <Path d="m41 18 7-7" {...s} />
+        <Circle cx="50" cy="10" r="3" {...s} />
+      </>;
+    case "museum":
+      return <>
+        <Path d="M10 22h44L32 10 10 22Z" {...s} />
+        <Path d="M14 22v20M24 22v20M34 22v20M44 22v20" {...s} />
+        <Path d="M10 46h44M8 54h48" {...s} />
+      </>;
+    case "ship":
+      return <>
+        <Path d="M24 14h16v8h6l6 15H12l6-15h6v-8Z" {...s} />
+        <Path d="M12 44c4 4 8 4 12 0 4 4 8 4 12 0 4 4 8 4 12 0 4 4 8 4 12 0" {...s} />
+        <Path d="M28 14h8M26 22h12" {...s} />
+      </>;
+    case "star":
+      return <Path d="m32 10 6.8 13.8 15.2 2.2-11 10.7 2.6 15.1L32 44.6 18.4 51.8 21 36.7 10 26l15.2-2.2L32 10Z" {...s} />;
+    case "user":
+      return <>
+        <Circle cx="32" cy="22" r="10" {...s} />
+        <Path d="M14 54c2-10 9-16 18-16s16 6 18 16" {...s} />
+      </>;
   }
 }
 
-export default function Icon({ name, size = 20, color = "#173B8F", strokeWidth = 3.2, style }: Props) {
+export default function Icon({ name, size = 20, color = "#173B8F", strokeWidth = 3.8, style }: Props) {
   return (
     <Svg width={size} height={size} viewBox="0 0 64 64" style={style}>
       {renderPaths(name, color, strokeWidth)}

@@ -73,3 +73,8 @@ export function categoryByKey(key: string) {
 export function categoryForDbType(type: ItemType) {
   return ITEM_CATEGORIES.find((c) => c.dbTypes.includes(type)) ?? ITEM_CATEGORIES[ITEM_CATEGORIES.length - 1];
 }
+
+/** An item's effective map marker icon — its own override if it has one, else its category's default. */
+export function mapIconForItem(item: { type: ItemType; map_icon?: string | null }): IconName {
+  return (item.map_icon as IconName | null) ?? categoryForDbType(item.type).icon;
+}

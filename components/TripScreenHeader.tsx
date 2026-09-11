@@ -27,7 +27,7 @@ export default function TripScreenHeader({
       {left ?? (
         onBack ? (
           <Pressable style={styles.backRow} onPress={onBack} hitSlop={8}>
-            <Icon name="back" size={20} color={colors.inkSoft} />
+            <Icon name="back" size={20} color={colors.blue} />
             <Text style={styles.title}>{title}</Text>
           </Pressable>
         ) : (
@@ -40,7 +40,7 @@ export default function TripScreenHeader({
           onPress={() => (router.canDismiss() ? router.dismissAll() : router.replace("/"))}
           accessibilityLabel="Home"
         >
-          <Icon name="home" size={22} color={colors.inkSoft} />
+          <Icon name="home" size={22} color={colors.blue} />
         </Pressable>
         <HamburgerMenu items={menuItems} solid />
       </View>

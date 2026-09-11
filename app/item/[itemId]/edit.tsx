@@ -19,6 +19,9 @@ import { normalizeTimeHHMM } from "@/lib/timeFormat";
 import ItemPickerModal from "@/components/ItemPickerModal";
 import QuickNotesList from "@/components/QuickNotesList";
 import HomeButton from "@/components/HomeButton";
+import SubpageHeader from "@/components/SubpageHeader";
+import MapIconPickerModal, { MAP_ICON_LABELS } from "@/components/MapIconPickerModal";
+import Icon, { IconName } from "@/components/icons/Icon";
 
 const STATUSES: ItemStatus[] = ["planned", "booked", "optional"];
 
@@ -55,6 +58,8 @@ export default function EditItem() {
   const [itemType, setItemType] = useState("other");
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
+  const [mapIcon, setMapIcon] = useState<IconName | null>(null);
+  const [mapIconPickerOpen, setMapIconPickerOpen] = useState(false);
 
   // Lodging span only
   const [checkInDate, setCheckInDate] = useState("");
@@ -77,7 +82,7 @@ export default function EditItem() {
   function currentSnapshot() {
     return JSON.stringify({
       title, status, itemDate, time, address, phone, vendor, flightNumber,
-      bookingSource, confirmationCode, link, googleMapsLink, latitude, longitude,
+      bookingSource, confirmationCode, link, googleMapsLink, latitude, longitude, mapIcon,
       reminderMinutes,
       checkInDate, checkInTime, checkOutDate, checkOutTime,
       arrivalDate, arrivalTime,
@@ -122,6 +127,7 @@ export default function EditItem() {
       setGoogleMapsLink(item.google_maps_link ?? "");
       setLatitude(item.latitude != null ? String(item.latitude) : "");
       setLongitude(item.longitude != null ? String(item.longitude) : "");
+      setMapIcon((item.map_icon as IconName) ?? null);
       setReminderMinutes(item.reminder_minutes_before != null ? String(item.reminder_minutes_before) : "");
       origReminderKeyRef.current = [item.start_date, item.time_start, item.reminder_minutes_before].join("|");
       setCheckInDate(item.start_date ?? "");
@@ -145,6 +151,7 @@ export default function EditItem() {
         googleMapsLink: item.google_maps_link ?? "",
         latitude: item.latitude != null ? String(item.latitude) : "",
         longitude: item.longitude != null ? String(item.longitude) : "",
+        mapIcon: (item.map_icon as IconName) ?? null,
         reminderMinutes: item.reminder_minutes_before != null ? String(item.reminder_minutes_before) : "",
         checkInDate: item.start_date ?? "", checkInTime: item.time_start ?? "",
         checkOutDate: item.end_date ?? "", checkOutTime: item.time_end ?? "",
@@ -229,6 +236,7 @@ export default function EditItem() {
       google_maps_link: googleMapsLink || null,
       latitude: lat,
       longitude: lon,
+      map_icon: mapIcon,
       reminder_minutes_before: newReminderMinutes,
       ...(reminderKeyChanged ? { reminder_sent_at: null } : {}),
       custom_fields: flightNumber ? { flight_number: flightNumber } : {},
@@ -314,15 +322,10 @@ export default function EditItem() {
 
   return (
     <>
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: 20 }}>
-      <Stack.Screen options={{
-        title: "Edit item",
-        headerRight: () => (
-          <View style={{ marginRight: 14 }}>
-            <HomeButton />
-          </View>
-        ),
-      }} />
+    <View style={styles.container}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <SubpageHeader title="Edit item" right={<HomeButton />} />
+      <ScrollView contentContainerStyle={{ padding: 20 }}>
 
       <Text style={styles.label}>Title</Text>
       <TextInput style={styles.input} value={title} onChangeText={setTitle} />
@@ -420,6 +423,17 @@ export default function EditItem() {
       </View>
       <Text style={styles.hint}>Shown as a pin on the trip map.</Text>
 
+      <Text style={styles.label}>Map icon</Text>
+      <Pressable style={styles.mapIconRow} onPress={() => setMapIconPickerOpen(true)}>
+        <View style={styles.mapIconPreview}>
+          <Icon name={mapIcon ?? categoryForDbType(itemType as any).icon} size={22} color="#fff" />
+        </View>
+        <Text style={styles.mapIconRowText}>
+          {mapIcon ? (MAP_ICON_LABELS[mapIcon] ?? mapIcon) : "Default (matches item type)"}
+        </Text>
+        <Icon name="forward" size={16} color={colors.blue} />
+      </Pressable>
+
       <Text style={styles.label}>Remind me (minutes before, optional)</Text>
       <TextInput
         style={styles.input}
@@ -454,7 +468,16 @@ export default function EditItem() {
       <Pressable style={styles.button} onPress={handleSavePress} disabled={saving}>
         <Text style={styles.buttonText}>{saving ? "Saving…" : "Save changes"}</Text>
       </Pressable>
-    </ScrollView>
+      </ScrollView>
+    </View>
+
+    <MapIconPickerModal
+      visible={mapIconPickerOpen}
+      onClose={() => setMapIconPickerOpen(false)}
+      onSelect={(icon) => { setMapIcon(icon); setMapIconPickerOpen(false); }}
+      defaultIcon={categoryForDbType(itemType as any).icon}
+      selected={mapIcon}
+    />
 
     <ItemPickerModal
       visible={linkPickerOpen}
@@ -502,6 +525,15 @@ const styles = StyleSheet.create({
   chipTextActive: { color: "#fff" },
   button: { backgroundColor: colors.ink, borderRadius: radius.md, padding: 14, alignItems: "center", marginTop: 28 },
   buttonText: { color: colors.paper, fontWeight: "700" },
+  mapIconRow: {
+    flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.paperRaised,
+    borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, padding: 10,
+  },
+  mapIconPreview: {
+    width: 36, height: 36, borderRadius: 10, backgroundColor: colors.blue,
+    alignItems: "center", justifyContent: "center",
+  },
+  mapIconRowText: { flex: 1, color: colors.ink, fontSize: 14 },
   linkedRow: {
     flexDirection: "row", alignItems: "center", backgroundColor: colors.paperRaised,
     borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, padding: 12, marginBottom: 6,

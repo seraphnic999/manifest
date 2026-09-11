@@ -12,6 +12,7 @@ import { mergePackingItems, fetchTemplateItems, fetchTripPackingAsSource } from 
 import { DateField } from "@/components/DateTimeFields";
 import HomeButton from "@/components/HomeButton";
 import CoverPhotoPicker from "@/components/CoverPhotoPicker";
+import SubpageHeader from "@/components/SubpageHeader";
 
 type PackingSource = "empty" | "template" | "trip";
 
@@ -123,15 +124,10 @@ export default function NewTrip() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: 20 }}>
-      <Stack.Screen options={{
-        title: "New Trip",
-        headerRight: () => (
-          <View style={{ marginRight: 14 }}>
-            <HomeButton />
-          </View>
-        ),
-      }} />
+    <View style={styles.container}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <SubpageHeader title="New Trip" right={<HomeButton />} />
+      <ScrollView contentContainerStyle={{ padding: 20 }}>
 
       <Text style={styles.label}>Trip name</Text>
       <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="e.g. Summer road trip" />
@@ -310,7 +306,8 @@ export default function NewTrip() {
       <Pressable style={styles.button} onPress={save} disabled={saving}>
         <Text style={styles.buttonText}>{saving ? "Creating..." : "Create trip"}</Text>
       </Pressable>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 

@@ -202,7 +202,7 @@ export default function MoneyShoppingScreen() {
           )}
         </Pressable>
         <Pressable style={styles.editBtn} onPress={() => setEditRowId(row.id)}>
-          <Icon name="edit" size={16} color={colors.inkSoft} />
+          <Icon name="edit" size={16} color={colors.blue} />
         </Pressable>
       </View>
     );

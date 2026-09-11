@@ -110,7 +110,7 @@ function TripPhotoCard({ trip, showCountdown, onArchive }: { trip: Trip; showCou
         </View>
         {onArchive ? (
           <Pressable onPress={onArchive} hitSlop={10}>
-            <Icon name="archive" size={25} color={colors.inkSoft} />
+            <Icon name="archive" size={25} color={colors.blue} />
           </Pressable>
         ) : (
           <Text style={styles.chevron}>{"›"}</Text>
@@ -248,7 +248,7 @@ export default function TripList() {
         </View>
 
         <View style={styles.searchRow}>
-          <Icon name="search" size={22} color={colors.inkSoft} />
+          <Icon name="search" size={22} color={colors.blue} />
           <TextInput
             style={styles.searchInput}
             value={searchInput}
@@ -259,7 +259,7 @@ export default function TripList() {
           {searchInput.length > 0 && (
             <Pressable onPress={() => setSearchInput("")} hitSlop={8}>
               <View style={{ transform: [{ rotate: "45deg" }] }}>
-                <Icon name="add" size={18} color={colors.inkSoft} strokeWidth={3.5} />
+                <Icon name="add" size={18} color={colors.blue} strokeWidth={3.5} />
               </View>
             </Pressable>
           )}

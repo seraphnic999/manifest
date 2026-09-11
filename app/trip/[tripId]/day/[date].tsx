@@ -186,7 +186,7 @@ export default function DayView() {
           </View>
           <View style={styles.body}>
             <View style={styles.row1}>
-              <Icon name={categoryForDbType(item.type).icon} size={12} color={colors.teal} />
+              <Icon name={categoryForDbType(item.type).icon} size={12} color={colors.blue} />
               <Text style={styles.typeTag}>{item.type.toUpperCase()}</Text>
               <Text style={styles.statusBadge}>{STATUS_LABEL[item.status]}</Text>
             </View>

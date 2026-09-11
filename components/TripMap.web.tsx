@@ -10,7 +10,7 @@ import type { Map as MLMap, Marker } from "maplibre-gl";
 // silently never resolves.
 import "maplibre-gl/dist/maplibre-gl.css";
 import Icon, { IconName } from "@/components/icons/Icon";
-import { categoryForDbType } from "@/lib/itemTypeMeta";
+import { mapIconForItem } from "@/lib/itemTypeMeta";
 import { MapItem } from "@/lib/mapData";
 import { MapRoute, ItemStatus, ItemType } from "@/lib/types";
 
@@ -129,7 +129,7 @@ export default function TripMap(props: TripMapProps) {
         const el = document.createElement("div");
         const root = createRoot(el);
         root.render(
-          <MarkerGlyph color={color} icon={categoryForDbType(item.type).icon} opacity={statusOpacity(item.status)} focused={focused} />
+          <MarkerGlyph color={color} icon={mapIconForItem(item)} opacity={statusOpacity(item.status)} focused={focused} />
         );
         el.addEventListener("click", () => propsRef.current.onItemPress(item));
         const marker = new maplibregl!.Marker({ element: el, anchor: "center" })

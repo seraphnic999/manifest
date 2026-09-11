@@ -25,7 +25,7 @@ export default function HamburgerMenu({
         accessibilityLabel="Menu"
         hitSlop={6}
       >
-        <Icon name="menu" size={25} color={solid ? colors.inkSoft : "#fff"} />
+        <Icon name="menu" size={25} color={solid ? colors.blue : "#fff"} />
       </Pressable>
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>

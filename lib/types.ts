@@ -61,6 +61,7 @@ export interface Item {
   sort_order: number;
   latitude: number | null;
   longitude: number | null;
+  map_icon: string | null; // IconName override for the map marker; falls back to the item type's category icon
   reminder_minutes_before: number | null;
   reminder_sent_at: string | null;
   custom_fields: Record<string, unknown>;

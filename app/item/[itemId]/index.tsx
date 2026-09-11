@@ -291,7 +291,7 @@ export default function ItemDetails() {
           fact we control. */}
       <View style={[styles.customHeader, { paddingTop: insets.top + 10 }]}>
         <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={8}>
-          <Icon name="back" size={22} color={colors.ink} />
+          <Icon name="back" size={22} color={colors.blue} />
         </Pressable>
         <View style={styles.customHeaderTitleWrap}>
           <Text numberOfLines={1} ellipsizeMode="tail" style={styles.headerTitleText}>{item.title}</Text>
@@ -301,7 +301,7 @@ export default function ItemDetails() {
             <Icon name="trash" size={17} color={colors.coral} />
           </HeaderIconButton>
           <HeaderIconButton onPress={duplicateItem} accessibilityLabel="Duplicate item">
-            <Icon name="duplicate" size={17} color={colors.teal} />
+            <Icon name="duplicate" size={17} color={colors.blue} />
           </HeaderIconButton>
           <HeaderIconButton onPress={() => router.push(`/item/${itemId}/edit`)}>
             <Icon name="edit" size={17} color={colors.blue} />
@@ -335,7 +335,7 @@ export default function ItemDetails() {
           onPress={() => Linking.openURL(item.google_maps_link!)}
           style={styles.mapLinkButton}
         >
-          <Icon name="locate" size={15} color={colors.teal} />
+          <Icon name="locate" size={15} color={colors.blue} />
           <Text style={styles.mapLinkButtonText}>Open in Google Maps</Text>
         </Pressable>
       ) : null}
@@ -345,7 +345,7 @@ export default function ItemDetails() {
           onPress={() => router.push(`/trip/${item.trip_id}/map?focusItemId=${item.id}`)}
           style={styles.mapLinkButton}
         >
-          <Icon name="map" size={15} color={colors.teal} />
+          <Icon name="map" size={15} color={colors.blue} />
           <Text style={styles.mapLinkButtonText}>View on map</Text>
         </Pressable>
       ) : null}
@@ -361,7 +361,7 @@ export default function ItemDetails() {
               {flightStatusLoading ? (
                 <ActivityIndicator size="small" color={colors.teal} />
               ) : (
-                <Icon name="refresh" size={18} color={colors.teal} />
+                <Icon name="refresh" size={18} color={colors.blue} />
               )}
             </Pressable>
           </View>
@@ -441,7 +441,7 @@ export default function ItemDetails() {
                   {[li.day_date ? formatDateDDMM(li.day_date) : null, normalizeTimeHHMM(li.time_start)].filter(Boolean).join(" · ") || li.type.toUpperCase()}
                 </Text>
               </View>
-              <Icon name="forward" size={16} color={colors.inkSoft} />
+              <Icon name="forward" size={16} color={colors.blue} />
             </Pressable>
           ))}
         </>
@@ -457,7 +457,7 @@ export default function ItemDetails() {
           ) : (
             <Pressable key={p.id} onPress={() => openAttachment(p)} onLongPress={() => removePhoto(p)} style={styles.photoWrap}>
               <View style={styles.fileTile}>
-                <Icon name="document" size={28} color={colors.inkSoft} />
+                <Icon name="document" size={28} color={colors.blue} />
                 <Text numberOfLines={2} style={styles.fileTileName}>{attachmentDisplayName(p)}</Text>
               </View>
             </Pressable>
@@ -516,7 +516,7 @@ export default function ItemDetails() {
               style={styles.photoSourceOption}
               onPress={() => { setPhotoSourceOpen(false); takePhoto(); }}
             >
-              <Icon name="camera" size={20} color={colors.ink} />
+              <Icon name="camera" size={20} color={colors.blue} />
               <Text style={styles.photoSourceOptionText}>Take Photo</Text>
             </Pressable>
             <View style={styles.photoSourceDivider} />
@@ -524,7 +524,7 @@ export default function ItemDetails() {
               style={styles.photoSourceOption}
               onPress={() => { setPhotoSourceOpen(false); addPhoto(); }}
             >
-              <Icon name="gallery" size={20} color={colors.ink} />
+              <Icon name="gallery" size={20} color={colors.blue} />
               <Text style={styles.photoSourceOptionText}>Choose from Library</Text>
             </Pressable>
           </Pressable>

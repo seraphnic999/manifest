@@ -24,7 +24,7 @@ export default function CoverPhotoPicker({
             {selected ? selected.country : "Optional — a generic placeholder is used until you pick one"}
           </Text>
         </View>
-        <Icon name="edit" size={22} color={colors.inkSoft} />
+        <Icon name="edit" size={22} color={colors.blue} />
       </Pressable>
 
       <Modal visible={open} animationType="slide" onRequestClose={() => setOpen(false)}>
@@ -37,7 +37,7 @@ export default function CoverPhotoPicker({
           </View>
 
           <View style={styles.searchRow}>
-            <Icon name="search" size={22} color={colors.inkSoft} />
+            <Icon name="search" size={22} color={colors.blue} />
             <TextInput
               style={styles.searchInput}
               value={query}

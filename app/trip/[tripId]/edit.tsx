@@ -12,6 +12,7 @@ import { fetchLiveRateToNis } from "@/lib/currencyRates";
 import { DateField } from "@/components/DateTimeFields";
 import HomeButton from "@/components/HomeButton";
 import CoverPhotoPicker from "@/components/CoverPhotoPicker";
+import SubpageHeader from "@/components/SubpageHeader";
 
 const TYPES: TripType[] = ["pleasure", "business", "mixed"];
 
@@ -210,15 +211,10 @@ export default function EditTrip() {
   if (!loaded) return null;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: 20 }}>
-      <Stack.Screen options={{
-        title: "Edit trip",
-        headerRight: () => (
-          <View style={{ marginRight: 14 }}>
-            <HomeButton />
-          </View>
-        ),
-      }} />
+    <View style={styles.container}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <SubpageHeader title="Edit trip" right={<HomeButton />} />
+      <ScrollView contentContainerStyle={{ padding: 20 }}>
 
       <Text style={styles.label}>Trip name</Text>
       <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="e.g. Summer road trip" />
@@ -393,7 +389,8 @@ export default function EditTrip() {
         <Text style={styles.deleteButtonText}>Archive trip</Text>
       </Pressable>
       <Text style={[styles.hint, { marginBottom: 20 }]}>Archived trips can be restored, or permanently deleted, from Archived Trips on the home screen.</Text>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 

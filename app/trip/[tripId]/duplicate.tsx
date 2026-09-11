@@ -12,6 +12,7 @@ import { DateField } from "@/components/DateTimeFields";
 import HomeButton from "@/components/HomeButton";
 import Icon from "@/components/icons/Icon";
 import Checkbox from "@/components/Checkbox";
+import SubpageHeader from "@/components/SubpageHeader";
 
 interface DuplicateData {
   trip: Trip;
@@ -312,14 +313,8 @@ export default function DuplicateTrip() {
 
   return (
     <View style={styles.container}>
-      <Stack.Screen options={{
-        title: "Duplicate trip",
-        headerRight: () => (
-          <View style={{ marginRight: 14 }}>
-            <HomeButton />
-          </View>
-        ),
-      }} />
+      <Stack.Screen options={{ headerShown: false }} />
+      <SubpageHeader title="Duplicate trip" right={<HomeButton />} />
 
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }}>
         <Text style={styles.hint}>

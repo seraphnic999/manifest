@@ -135,7 +135,7 @@ export default function PackingScreen() {
                   <Text style={[styles.itemName, item.packed && styles.itemNamePacked]}>{item.name}</Text>
                   <Pressable onPress={() => removeItem(item.id)} hitSlop={8}>
                     <View style={{ transform: [{ rotate: "45deg" }] }}>
-                      <Icon name="add" size={18} color={colors.inkSoft} strokeWidth={3} />
+                      <Icon name="add" size={18} color={colors.coral} strokeWidth={3} />
                     </View>
                   </Pressable>
                 </Pressable>

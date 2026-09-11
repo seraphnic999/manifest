@@ -13,6 +13,7 @@ import { computeDurationMinutes, formatDuration } from "@/lib/duration";
 import { Item, ItemStatus } from "@/lib/types";
 import { DEFAULT_REMINDER_MINUTES } from "@/lib/reminders";
 import HomeButton from "@/components/HomeButton";
+import SubpageHeader from "@/components/SubpageHeader";
 
 const STATUSES: ItemStatus[] = ["planned", "booked", "optional"];
 
@@ -224,15 +225,10 @@ export default function NewItem() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: 20 }}>
-      <Stack.Screen options={{
-        title: duplicateFrom ? `Duplicate ${cat.label}` : `Add ${cat.label}`,
-        headerRight: () => (
-          <View style={{ marginRight: 14 }}>
-            <HomeButton />
-          </View>
-        ),
-      }} />
+    <View style={styles.container}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <SubpageHeader title={duplicateFrom ? `Duplicate ${cat.label}` : `Add ${cat.label}`} right={<HomeButton />} />
+      <ScrollView contentContainerStyle={{ padding: 20 }}>
 
       <Text style={styles.label}>Title</Text>
       <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder={cat.label} />
@@ -357,7 +353,8 @@ export default function NewItem() {
       <Pressable style={styles.button} onPress={save} disabled={saving}>
         <Text style={styles.buttonText}>{saving ? "Saving…" : duplicateFrom ? "Save duplicate" : "Add item"}</Text>
       </Pressable>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { View, StyleSheet } from "react-native";
 import { MapView, Camera, PointAnnotation, ShapeSource, LineLayer, type CameraStop, type PointAnnotationRef } from "@maplibre/maplibre-react-native";
 import Icon, { IconName } from "@/components/icons/Icon";
-import { categoryForDbType } from "@/lib/itemTypeMeta";
+import { mapIconForItem } from "@/lib/itemTypeMeta";
 import { MapItem } from "@/lib/mapData";
 import { MapRoute, ItemStatus, ItemType } from "@/lib/types";
 
@@ -119,7 +119,7 @@ export default function TripMap(props: TripMapProps) {
               coordinate={[item.longitude, item.latitude]}
               onSelected={() => props.onItemPress(item)}
             >
-              <MarkerGlyph color={color} icon={categoryForDbType(item.type).icon} opacity={statusOpacity(item.status)} focused={focused} />
+              <MarkerGlyph color={color} icon={mapIconForItem(item)} opacity={statusOpacity(item.status)} focused={focused} />
             </PointAnnotation>
           );
         })}
