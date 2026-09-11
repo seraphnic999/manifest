@@ -175,7 +175,7 @@ export default function ExpenseReport() {
         <Text style={styles.sectionLabel}>Pre-trip vs in-trip</Text>
         <View style={styles.card}>
           <Bar label="Pre-trip" value={totalsByTiming["pre-trip"]} maxValue={maxTimingValue} color={colors.amber} />
-          <Bar label="In-trip" value={totalsByTiming["in-trip"]} maxValue={maxTimingValue} color={colors.teal} />
+          <Bar label="In-trip" value={totalsByTiming["in-trip"]} maxValue={maxTimingValue} color={colors.lightBlue} />
         </View>
 
         <Text style={styles.sectionLabel}>Owed to me</Text>
@@ -266,5 +266,5 @@ const styles = StyleSheet.create({
   itemDate: { color: colors.inkSoft, fontSize: 11, marginTop: 2 },
   itemAmt: { fontFamily: "JetBrainsMono_600SemiBold", color: colors.ink, fontWeight: "600", fontSize: 13 },
   modalCloseBtn: { alignItems: "center", padding: 12, marginTop: 10 },
-  modalCloseBtnText: { color: colors.teal, fontWeight: "700", fontSize: 13 },
+  modalCloseBtnText: { color: colors.lightBlue, fontWeight: "700", fontSize: 13 },
 });

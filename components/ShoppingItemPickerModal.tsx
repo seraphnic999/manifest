@@ -75,7 +75,7 @@ export default function ShoppingItemPickerModal({
             {trimmedSearch.length > 0 && !hasExactMatch && (
               <Pressable style={styles.createRow} onPress={createAndSelect} disabled={creating}>
                 {creating
-                  ? <ActivityIndicator size="small" color={colors.teal} />
+                  ? <ActivityIndicator size="small" color={colors.lightBlue} />
                   : <Text style={styles.createRowText}>{`+ Create "${trimmedSearch}"`}</Text>}
               </Pressable>
             )}
@@ -101,5 +101,5 @@ const styles = StyleSheet.create({
   rowTitle: { color: colors.ink, fontSize: 14 },
   empty: { color: colors.inkSoft, textAlign: "center", marginTop: 20, fontSize: 13 },
   createRow: { paddingVertical: 12, alignItems: "center" },
-  createRowText: { color: colors.teal, fontWeight: "700", fontSize: 13 },
+  createRowText: { color: colors.lightBlue, fontWeight: "700", fontSize: 13 },
 });

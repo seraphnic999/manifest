@@ -181,7 +181,7 @@ const styles = StyleSheet.create({
     shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4,
   },
   addButtonText: { color: colors.paper, fontWeight: "700" },
-  linkText: { color: colors.teal, fontSize: 12, fontWeight: "600", marginTop: 8, textAlign: "center" },
+  linkText: { color: colors.lightBlue, fontSize: 12, fontWeight: "600", marginTop: 8, textAlign: "center" },
   modalBackdrop: { flex: 1, backgroundColor: "rgba(33,47,61,0.4)", justifyContent: "center", padding: 30 },
   modalCard: { backgroundColor: colors.paperRaised, borderRadius: radius.lg, padding: 16, width: "100%", maxWidth: 420, alignSelf: "center" },
   modalTitle: { color: colors.ink, fontWeight: "700", fontSize: 16, marginBottom: 10 },

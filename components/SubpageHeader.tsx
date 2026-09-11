@@ -21,7 +21,7 @@ export default function SubpageHeader({ title, right }: { title: string; right?:
         hitSlop={10}
         style={styles.backBtn}
       >
-        <Icon name="back" size={22} color={colors.blue} />
+        <Icon name="back" size={25} color={colors.blue} />
       </Pressable>
       <Text style={styles.title}>{title}</Text>
       {right && <View style={styles.right}>{right}</View>}

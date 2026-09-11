@@ -112,10 +112,10 @@ const styles = StyleSheet.create({
   dates: { color: colors.inkSoft, fontSize: 12, marginTop: 2 },
   actions: { flexDirection: "row", gap: 10, marginTop: 12 },
   restoreButton: {
-    flex: 1, borderWidth: 1, borderColor: colors.teal, borderRadius: radius.md,
+    flex: 1, borderWidth: 1, borderColor: colors.lightBlue, borderRadius: radius.md,
     paddingVertical: 10, alignItems: "center",
   },
-  restoreButtonText: { color: colors.teal, fontFamily: fonts.bodyBold, fontSize: 13 },
+  restoreButtonText: { color: colors.lightBlue, fontFamily: fonts.bodyBold, fontSize: 13 },
   deleteButton: {
     flex: 1, borderWidth: 1, borderColor: colors.coral, borderRadius: radius.md,
     paddingVertical: 10, alignItems: "center",

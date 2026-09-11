@@ -328,7 +328,7 @@ const styles = StyleSheet.create({
   typeChipText: { color: colors.inkSoft, fontWeight: "600", fontSize: 13 },
   typeChipTextActive: { color: "#fff" },
   hint: { color: colors.inkSoft, fontSize: 11, marginTop: 6, fontStyle: "italic" },
-  linkText: { color: colors.teal, fontSize: 12, fontWeight: "600", marginTop: 8 },
+  linkText: { color: colors.lightBlue, fontSize: 12, fontWeight: "600", marginTop: 8 },
   button: { backgroundColor: colors.ink, borderRadius: radius.md, padding: 14, alignItems: "center", marginTop: 28 },
   buttonText: { color: colors.paper, fontWeight: "700" },
   modalBackdrop: { flex: 1, backgroundColor: "rgba(33,47,61,0.4)", justifyContent: "center", padding: 30 },
@@ -353,6 +353,6 @@ const styles = StyleSheet.create({
   currencyCode: { fontFamily: "JetBrainsMono_600SemiBold", fontWeight: "700", color: colors.ink, width: 44 },
   currencyRate: { color: colors.inkSoft, fontSize: 13, flex: 1 },
   removeText: { color: colors.coral, fontSize: 12, fontWeight: "600" },
-  addCurrencyButton: { backgroundColor: colors.teal, borderRadius: radius.md, paddingVertical: 12, paddingHorizontal: 14 },
+  addCurrencyButton: { backgroundColor: colors.lightBlue, borderRadius: radius.md, paddingVertical: 12, paddingHorizontal: 14 },
   currencyCustomRow: { flexDirection: "row", marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.line },
 });

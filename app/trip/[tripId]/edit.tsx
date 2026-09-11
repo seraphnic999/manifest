@@ -411,14 +411,14 @@ const styles = StyleSheet.create({
   typeChipText: { color: colors.inkSoft, fontWeight: "600", fontSize: 13 },
   typeChipTextActive: { color: "#fff" },
   hint: { color: colors.inkSoft, fontSize: 11, marginTop: 6, fontStyle: "italic" },
-  linkText: { color: colors.teal, fontSize: 12, fontWeight: "600", marginTop: 8 },
+  linkText: { color: colors.lightBlue, fontSize: 12, fontWeight: "600", marginTop: 8 },
   button: { backgroundColor: colors.ink, borderRadius: radius.md, padding: 14, alignItems: "center", marginTop: 28 },
   buttonText: { color: colors.paper, fontWeight: "700" },
   duplicateButton: {
-    borderWidth: 1, borderColor: colors.teal, borderRadius: radius.md,
+    borderWidth: 1, borderColor: colors.lightBlue, borderRadius: radius.md,
     padding: 14, alignItems: "center", marginTop: 12,
   },
-  duplicateButtonText: { color: colors.teal, fontWeight: "700" },
+  duplicateButtonText: { color: colors.lightBlue, fontWeight: "700" },
   deleteButton: {
     borderWidth: 1, borderColor: colors.amber, borderRadius: radius.md,
     padding: 14, alignItems: "center", marginTop: 12,
@@ -441,6 +441,6 @@ const styles = StyleSheet.create({
   currencyRate: { color: colors.inkSoft, fontSize: 13, flex: 1 },
   currencyRateInput: { flex: 1, padding: 8, fontSize: 13 },
   removeText: { color: colors.coral, fontSize: 12, fontWeight: "600" },
-  addCurrencyButton: { backgroundColor: colors.teal, borderRadius: radius.md, paddingVertical: 12, paddingHorizontal: 14 },
+  addCurrencyButton: { backgroundColor: colors.lightBlue, borderRadius: radius.md, paddingVertical: 12, paddingHorizontal: 14 },
   currencyCustomRow: { flexDirection: "row", marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.line },
 });

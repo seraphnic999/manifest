@@ -138,7 +138,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md, padding: 10, marginBottom: 6,
   },
   itemName: { color: colors.ink, fontSize: 14, flex: 1 },
-  itemCategory: { color: colors.teal, fontSize: 11, fontWeight: "600" },
+  itemCategory: { color: colors.lightBlue, fontSize: 11, fontWeight: "600" },
   removeText: { color: colors.coral, fontSize: 12, fontWeight: "600" },
   empty: { color: colors.inkSoft, fontStyle: "italic", fontSize: 13, marginTop: 4 },
   addCard: {
@@ -147,7 +147,7 @@ const styles = StyleSheet.create({
   },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 10 },
   chip: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.paper },
-  chipActive: { backgroundColor: colors.teal, borderColor: colors.teal },
+  chipActive: { backgroundColor: colors.lightBlue, borderColor: colors.lightBlue },
   chipText: { color: colors.inkSoft, fontWeight: "600", fontSize: 12 },
   chipTextActive: { color: "#fff" },
   addButton: { backgroundColor: colors.ink, borderRadius: radius.md, padding: 12, alignItems: "center", marginTop: 10 },

@@ -185,8 +185,8 @@ export default function TripMapScreen() {
           onPress={toggleNearMe}
           disabled={locating}
         >
-          <Icon name="locate" size={13} color={nearMeOn ? "#fff" : colors.teal} />
-          <Text style={[styles.chipText, { color: colors.teal }, nearMeOn && styles.chipTextActive]}>
+          <Icon name="locate" size={13} color={nearMeOn ? "#fff" : colors.lightBlue} />
+          <Text style={[styles.chipText, { color: colors.lightBlue }, nearMeOn && styles.chipTextActive]}>
             {locating ? "Locating…" : "Near me"}
           </Text>
         </Pressable>
@@ -210,7 +210,7 @@ export default function TripMapScreen() {
             <ScrollView style={{ maxHeight: 220 }}>
               {nearbyItems.map(({ item, distance_m }) => (
                 <Pressable key={item.id} style={styles.nearMeRow} onPress={() => router.push(`/item/${item.id}`)}>
-                  <Icon name={categoryForDbType(item.type).icon} size={14} color={colors.teal} />
+                  <Icon name={categoryForDbType(item.type).icon} size={14} color={colors.lightBlue} />
                   <Text style={styles.nearMeRowTitle} numberOfLines={1}>{item.title}</Text>
                   <Text style={styles.nearMeRowDistance}>{formatDistance(distance_m)}</Text>
                 </Pressable>
@@ -255,10 +255,10 @@ const styles = StyleSheet.create({
   },
   mapWrap: { flex: 1 },
   nearMeChip: {
-    height: 30, paddingHorizontal: 10, borderRadius: 16, borderWidth: 1.5, borderColor: colors.teal,
+    height: 30, paddingHorizontal: 10, borderRadius: 16, borderWidth: 1.5, borderColor: colors.lightBlue,
     flexDirection: "row", alignItems: "center", gap: 5, justifyContent: "center",
   },
-  nearMeChipActive: { backgroundColor: colors.teal },
+  nearMeChipActive: { backgroundColor: colors.lightBlue },
   nearMePanel: {
     position: "absolute", left: 12, right: 12, bottom: 140,
     backgroundColor: colors.paperRaised, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line,
@@ -273,7 +273,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: colors.line,
   },
   nearMeRowTitle: { flex: 1, color: colors.ink, fontWeight: "600", fontSize: 13 },
-  nearMeRowDistance: { fontFamily: "JetBrainsMono_600SemiBold", color: colors.teal, fontSize: 11, fontWeight: "600" },
+  nearMeRowDistance: { fontFamily: "JetBrainsMono_600SemiBold", color: colors.lightBlue, fontSize: 11, fontWeight: "600" },
   empty: { color: colors.inkSoft, fontSize: 12, fontStyle: "italic", paddingVertical: 8 },
   fab: {
     position: "absolute", bottom: 74, right: 16, width: 52, height: 52, borderRadius: 26,

@@ -102,5 +102,5 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.line, borderStyle: "dashed", borderRadius: radius.md,
     padding: 10, alignItems: "center", marginTop: 2,
   },
-  addBtnText: { color: colors.teal, fontWeight: "700", fontSize: 13 },
+  addBtnText: { color: colors.lightBlue, fontWeight: "700", fontSize: 13 },
 });

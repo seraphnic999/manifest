@@ -547,7 +547,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.line, borderStyle: "dashed", borderRadius: radius.md,
     padding: 12, alignItems: "center", marginTop: 4,
   },
-  linkAddButtonText: { color: colors.teal, fontWeight: "700", fontSize: 13 },
+  linkAddButtonText: { color: colors.lightBlue, fontWeight: "700", fontSize: 13 },
   promptBackdrop: { flex: 1, backgroundColor: "rgba(33,47,61,0.5)", justifyContent: "center", padding: 30 },
   promptCard: { backgroundColor: colors.paperRaised, borderRadius: radius.lg, padding: 20, width: "100%", maxWidth: 420, alignSelf: "center" },
   promptTitle: { color: colors.ink, fontWeight: "800", fontSize: 17, marginBottom: 6 },

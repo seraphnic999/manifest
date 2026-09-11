@@ -185,12 +185,16 @@ export default function DayView() {
             ) : null}
           </View>
           <View style={styles.body}>
-            <View style={styles.row1}>
-              <Icon name={categoryForDbType(item.type).icon} size={12} color={colors.blue} />
-              <Text style={styles.typeTag}>{item.type.toUpperCase()}</Text>
-              <Text style={styles.statusBadge}>{STATUS_LABEL[item.status]}</Text>
+            <View style={styles.itemIconCol}>
+              <Icon name={categoryForDbType(item.type).icon} size={24} color={colors.blue} />
             </View>
-            <Text style={styles.itemTitle}>{item.title}</Text>
+            <View style={styles.itemTextCol}>
+              <View style={styles.row1}>
+                <Text style={styles.typeTag}>{item.type.toUpperCase()}</Text>
+                <Text style={styles.statusBadge}>{STATUS_LABEL[item.status]}</Text>
+              </View>
+              <Text style={styles.itemTitle}>{item.title}</Text>
+            </View>
           </View>
         </Pressable>
         {Platform.OS === "web" ? (
@@ -362,13 +366,13 @@ const styles = StyleSheet.create({
   },
   dayPillActive: { backgroundColor: colors.ink, borderColor: colors.ink },
   dayPillText: { fontFamily: "JetBrainsMono_600SemiBold", fontSize: 11, fontWeight: "600", color: colors.inkSoft },
-  dayPillTheme: { fontSize: 8, color: colors.teal, marginTop: 1, maxWidth: 60 },
+  dayPillTheme: { fontSize: 8, color: colors.lightBlue, marginTop: 1, maxWidth: 60 },
   dayPillTextActive: { color: colors.paper },
   themeRow: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",
     paddingHorizontal: 16, paddingVertical: 10, backgroundColor: colors.paperRaised, borderBottomWidth: 1, borderBottomColor: colors.line,
   },
-  themeText: { color: colors.teal, fontWeight: "700", fontSize: 14 },
+  themeText: { color: colors.lightBlue, fontWeight: "700", fontSize: 14 },
   themePlaceholder: { color: colors.inkSoft, fontStyle: "italic", fontSize: 13 },
   themeEdit: { color: colors.blue, fontSize: 12, fontWeight: "600" },
   gapWarning: {
@@ -394,9 +398,11 @@ const styles = StyleSheet.create({
   timeText: { fontFamily: "JetBrainsMono_600SemiBold", color: colors.paper, fontSize: 11, fontWeight: "600" },
   timeArrowSmall: { color: colors.amberSoft, fontSize: 8, marginVertical: 1 },
   timeTextSecondary: { fontFamily: "JetBrainsMono_600SemiBold", color: colors.amberSoft, fontSize: 9, fontWeight: "600" },
-  body: { flex: 1, padding: 10 },
+  body: { flex: 1, padding: 10, flexDirection: "row", alignItems: "center", gap: 10 },
+  itemIconCol: { alignItems: "center", justifyContent: "center" },
+  itemTextCol: { flex: 1 },
   row1: { flexDirection: "row", alignItems: "center", gap: 6 },
-  typeTag: { fontFamily: "JetBrainsMono_600SemiBold", fontSize: 9, color: colors.teal, fontWeight: "600" },
+  typeTag: { fontFamily: "JetBrainsMono_600SemiBold", fontSize: 9, color: colors.lightBlue, fontWeight: "600" },
   statusBadge: { fontSize: 9, color: colors.inkSoft, marginLeft: "auto" },
   itemTitle: { color: colors.ink, fontWeight: "600", fontSize: 14, marginTop: 2 },
   empty: { textAlign: "center", color: colors.inkSoft, marginTop: 40 },

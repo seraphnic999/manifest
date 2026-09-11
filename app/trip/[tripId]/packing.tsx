@@ -135,7 +135,7 @@ export default function PackingScreen() {
                   <Text style={[styles.itemName, item.packed && styles.itemNamePacked]}>{item.name}</Text>
                   <Pressable onPress={() => removeItem(item.id)} hitSlop={8}>
                     <View style={{ transform: [{ rotate: "45deg" }] }}>
-                      <Icon name="add" size={18} color={colors.coral} strokeWidth={3} />
+                      <Icon name="add" size={18} color={colors.coral} />
                     </View>
                   </Pressable>
                 </Pressable>
@@ -232,8 +232,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   summaryRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 14 },
   summaryText: { color: colors.ink, fontWeight: "700", fontSize: 14 },
-  populateButton: { borderWidth: 1, borderColor: colors.teal, borderRadius: radius.md, paddingVertical: 8, paddingHorizontal: 12 },
-  populateButtonText: { color: colors.teal, fontWeight: "700", fontSize: 12 },
+  populateButton: { borderWidth: 1, borderColor: colors.lightBlue, borderRadius: radius.md, paddingVertical: 8, paddingHorizontal: 12 },
+  populateButtonText: { color: colors.lightBlue, fontWeight: "700", fontSize: 12 },
   group: { marginBottom: 16 },
   groupLabel: {
     color: colors.inkSoft, fontWeight: "700", fontSize: 12,
@@ -257,7 +257,7 @@ const styles = StyleSheet.create({
   },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 10 },
   chip: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.paper },
-  chipActive: { backgroundColor: colors.teal, borderColor: colors.teal },
+  chipActive: { backgroundColor: colors.lightBlue, borderColor: colors.lightBlue },
   chipText: { color: colors.inkSoft, fontWeight: "600", fontSize: 12 },
   chipTextActive: { color: "#fff" },
   addButton: { backgroundColor: colors.ink, borderRadius: radius.md, padding: 12, alignItems: "center", marginTop: 10 },

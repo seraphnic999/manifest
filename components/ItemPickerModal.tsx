@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md, padding: 12, fontSize: 15, color: colors.ink,
   },
   row: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.line },
-  rowType: { fontFamily: "JetBrainsMono_600SemiBold", fontSize: 9, color: colors.teal, fontWeight: "600", width: 70 },
+  rowType: { fontFamily: "JetBrainsMono_600SemiBold", fontSize: 9, color: colors.lightBlue, fontWeight: "600", width: 70 },
   rowTitle: { color: colors.ink, fontSize: 14, flex: 1 },
   empty: { color: colors.inkSoft, textAlign: "center", marginTop: 20, fontSize: 13 },
 });

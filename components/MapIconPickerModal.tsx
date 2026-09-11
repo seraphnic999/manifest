@@ -4,9 +4,16 @@ import Icon, { IconName, MAP_PICKER_ICONS } from "@/components/icons/Icon";
 
 export const MAP_ICON_LABELS: Partial<Record<IconName, string>> = {
   flight: "Flight", transfer: "Transfer", transport: "Transport", ship: "Ship",
-  lodging: "Lodging", dining: "Restaurant", cafe: "Café", cocktail: "Bar",
+  lodging: "Lodging", dining: "Restaurant", cafe: "Café", cocktail: "Cocktail",
   shopping: "Shopping", activity: "Activity", museum: "Museum", star: "Highlight",
   work: "Work", user: "Traveler", locate: "Place", budget: "Money", other: "Other",
+  stadium: "Stadium", soccer: "Soccer", bus: "Bus", beer: "Beer", gym: "Gym", tent: "Tent",
+  hiking: "Hiking", swimmingPool: "Swimming Pool", beach: "Beach", spa: "Spa", music: "Music",
+  burger: "Burger", iceCream: "Ice Cream", supermarketCart: "Supermarket", flag: "Flag",
+  medical: "Medical", amusementPark: "Amusement Park", cinema: "Cinema", theater: "Theater",
+  pizza: "Pizza", steak: "Steak", dollarSign: "Cash", parking: "Parking", park: "Park",
+  obelisk: "Obelisk", castle: "Castle", signpost: "Signpost", club: "Club",
+  carRental: "Car Rental", footprints: "Walking Route", scenicOverlook: "Scenic Overlook",
 };
 
 /** Grid picker for an item's map marker icon — a curated subset of the full

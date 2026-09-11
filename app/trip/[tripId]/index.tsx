@@ -6,7 +6,7 @@ import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { supabase } from "@/lib/supabase";
 import { colors, radius, fonts } from "@/lib/theme";
-import { Day, Item, Trip, TripCurrency, Expense, tripStatus } from "@/lib/types";
+import { Day, Item, Trip, TripCurrency, Expense, ItemType, tripStatus } from "@/lib/types";
 import Icon from "@/components/icons/Icon";
 import HamburgerMenu from "@/components/HamburgerMenu";
 import TripTabBar from "@/components/TripTabBar";
@@ -19,6 +19,7 @@ import OfflineBanner from "@/components/OfflineBanner";
 import WeatherCarousel from "@/components/WeatherCarousel";
 import TripCountdown from "@/components/TripCountdown";
 import { findLodgingGapDays } from "@/lib/conflicts";
+import { categoryForDbType } from "@/lib/itemTypeMeta";
 import { computeBudgetProgress } from "@/lib/budget";
 import { coverPhotoSource } from "@/lib/destinationPhotos";
 import { fetchDestinationForecast } from "@/lib/weather";
@@ -32,7 +33,7 @@ interface OverviewData {
   currencies: TripCurrency[];
   expenses: Pick<Expense, "amount" | "currency_code" | "expense_date">[];
   totalNis: number | null;
-  todayItems: { id: string; title: string; time_start: string | null }[];
+  todayItems: { id: string; title: string; time_start: string | null; type: ItemType }[];
 }
 
 async function fetchOverviewData(tripId: string): Promise<OverviewData | null> {
@@ -70,7 +71,7 @@ async function fetchOverviewData(tripId: string): Promise<OverviewData | null> {
     const todayDay = (days ?? []).find((d) => d.date === iso);
     if (todayDay) {
       const { data: items } = await supabase
-        .from("items").select("id, title, time_start").eq("day_id", todayDay.id).is("deleted_at", null)
+        .from("items").select("id, title, time_start, type").eq("day_id", todayDay.id).is("deleted_at", null)
         .not("time_start", "is", null).order("time_start");
       const now = new Date();
       todayItems = (items ?? []).filter((it) => {
@@ -154,7 +155,7 @@ export default function TripOverview() {
               </View>
               {heroWeather && heroWeather.days.length > 0 && (
                 <View style={[styles.weatherBadge, { top: insets.top + 56 }]}>
-                  <Icon name={weatherIconName(heroWeather.days[0].weatherCode)} size={24} color="#fff" />
+                  <Icon name={weatherIconName(heroWeather.days[0].weatherCode)} size={32} color="#fff" />
                   <Text style={styles.weatherTemp}>{Math.round(heroWeather.days[0].tempMax)}°</Text>
                   <Text style={styles.weatherDate}>{formatDateDDMMYYYY(localIsoDate()).slice(0, 5)}</Text>
                 </View>
@@ -187,7 +188,7 @@ export default function TripOverview() {
                   {budgetProgress ? (
                     <>
                       <View style={styles.budgetTrack}>
-                        <View style={[styles.budgetFill, { width: `${Math.min(100, budgetProgress.percent)}%`, backgroundColor: budgetProgress.overBudget ? colors.coral : colors.teal }]} />
+                        <View style={[styles.budgetFill, { width: `${Math.min(100, budgetProgress.percent)}%`, backgroundColor: budgetProgress.overBudget ? colors.coral : colors.lightBlue }]} />
                       </View>
                       <Text style={styles.budgetAmt}>₪{budgetProgress.spentTotal.toFixed(0)} of ₪{budgetProgress.budget.toFixed(0)}</Text>
                     </>
@@ -204,14 +205,20 @@ export default function TripOverview() {
                   {todayItems.length > 0 ? (
                     <>
                       <Pressable style={styles.nextCard} onPress={() => router.push(`/item/${todayItems[0].id}`)}>
-                        <Text style={styles.nextLabel}>Next</Text>
-                        <Text style={styles.nextTitle}>{todayItems[0].title}</Text>
-                        {todayItems[0].time_start && <Text style={styles.nextMeta}>{normalizeTimeHHMM(todayItems[0].time_start)}</Text>}
+                        <Icon name={categoryForDbType(todayItems[0].type).icon} size={28} color="#fff" />
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.nextLabel}>Next</Text>
+                          <Text style={styles.nextTitle}>{todayItems[0].title}</Text>
+                          {todayItems[0].time_start && <Text style={styles.nextMeta}>{normalizeTimeHHMM(todayItems[0].time_start)}</Text>}
+                        </View>
                       </Pressable>
                       {todayItems.slice(1).map((it) => (
                         <Pressable key={it.id} style={styles.itemRow} onPress={() => router.push(`/item/${it.id}`)}>
                           <View style={styles.itemTimeCol}>
                             <Text style={styles.itemTimeText}>{normalizeTimeHHMM(it.time_start) || "—"}</Text>
+                          </View>
+                          <View style={styles.itemIconCol}>
+                            <Icon name={categoryForDbType(it.type).icon} size={28} color="#fff" />
                           </View>
                           <View style={styles.itemBody}>
                             <Text style={styles.itemTitle}>{it.title}</Text>
@@ -329,7 +336,7 @@ const styles = StyleSheet.create({
   budgetIconCirc: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.paper, alignItems: "center", justifyContent: "center" },
   budgetHead: { flexDirection: "row", justifyContent: "space-between", marginBottom: 4 },
   budgetLabel: { color: colors.inkSoft, fontFamily: fonts.bodyBold, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5 },
-  budgetPct: { color: colors.teal, fontFamily: fonts.monoBold, fontSize: 13 },
+  budgetPct: { color: colors.lightBlue, fontFamily: fonts.monoBold, fontSize: 13 },
   budgetTrack: { height: 6, backgroundColor: colors.paper, borderRadius: 4, overflow: "hidden" },
   budgetFill: { height: 6, borderRadius: 4 },
   budgetAmt: { color: colors.ink, fontSize: 10.5, fontWeight: "600", marginTop: 4 },
@@ -337,7 +344,10 @@ const styles = StyleSheet.create({
 
   sectionLabel: { color: colors.inkSoft, fontFamily: fonts.bodyBold, fontSize: 11.5, textTransform: "uppercase", letterSpacing: 1, marginTop: 18, marginBottom: 8 },
 
-  nextCard: { backgroundColor: colors.ink, borderRadius: radius.lg, padding: 14 },
+  nextCard: {
+    backgroundColor: colors.ink, borderRadius: radius.lg, padding: 14,
+    flexDirection: "row", alignItems: "center", gap: 12,
+  },
   nextLabel: { color: colors.goldSoft, fontFamily: fonts.bodyBold, fontSize: 9, textTransform: "uppercase", letterSpacing: 1 },
   nextTitle: { color: "#fff", fontFamily: fonts.display, fontSize: 16, marginTop: 3 },
   nextMeta: { color: colors.goldSoft, fontFamily: fonts.mono, fontSize: 11, marginTop: 2 },

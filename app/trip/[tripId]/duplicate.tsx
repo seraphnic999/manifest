@@ -480,7 +480,7 @@ const styles = StyleSheet.create({
   dayGroup: { marginTop: 20 },
   dayHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
   dayTitle: { color: colors.ink, fontWeight: "700", fontSize: 14 },
-  selectAllText: { color: colors.teal, fontSize: 12, fontWeight: "600" },
+  selectAllText: { color: colors.lightBlue, fontSize: 12, fontWeight: "600" },
   itemRow: {
     flexDirection: "row", alignItems: "center",
     backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,

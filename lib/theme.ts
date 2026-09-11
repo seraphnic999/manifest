@@ -11,8 +11,8 @@ export const colors = {
   blueSoft: "#E1E7F4",
   gold: "#C9962E",
   goldSoft: "#F7ECD6",
-  teal: "#1F8A82",
-  tealSoft: "#DCF0EE",
+  lightBlue: "#3E82D6",
+  lightBlueSoft: "#DCEAFA",
   coral: "#D8503A",
   line: "#E3E8F2",
 

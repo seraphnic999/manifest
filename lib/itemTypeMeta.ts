@@ -43,7 +43,7 @@ export const ITEM_CATEGORIES: ItemCategory[] = [
     fields: ["time", "address", "phone", "bookingSource", "confirmationCode", "link", "notes"],
   },
   {
-    key: "activity", label: "Activity", icon: "activity", tileColor: "#4C9A6A",
+    key: "activity", label: "Activity", icon: "flag", tileColor: "#4C9A6A",
     dbTypes: ["activity", "attraction", "sightseeing"],
     subtypeLabels: { activity: "Activity", attraction: "Attraction", sightseeing: "Sightseeing" },
     fields: ["time", "address", "bookingSource", "confirmationCode", "link", "notes"],

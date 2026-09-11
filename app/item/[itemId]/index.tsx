@@ -291,20 +291,20 @@ export default function ItemDetails() {
           fact we control. */}
       <View style={[styles.customHeader, { paddingTop: insets.top + 10 }]}>
         <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={8}>
-          <Icon name="back" size={22} color={colors.blue} />
+          <Icon name="back" size={25} color={colors.blue} />
         </Pressable>
         <View style={styles.customHeaderTitleWrap}>
           <Text numberOfLines={1} ellipsizeMode="tail" style={styles.headerTitleText}>{item.title}</Text>
         </View>
         <View style={styles.headerButtons}>
           <HeaderIconButton onPress={deleteItem}>
-            <Icon name="trash" size={17} color={colors.coral} />
+            <Icon name="trash" size={25} color={colors.coral} />
           </HeaderIconButton>
           <HeaderIconButton onPress={duplicateItem} accessibilityLabel="Duplicate item">
-            <Icon name="duplicate" size={17} color={colors.blue} />
+            <Icon name="duplicate" size={25} color={colors.blue} />
           </HeaderIconButton>
           <HeaderIconButton onPress={() => router.push(`/item/${itemId}/edit`)}>
-            <Icon name="edit" size={17} color={colors.blue} />
+            <Icon name="edit" size={25} color={colors.blue} />
           </HeaderIconButton>
           <HomeButton />
         </View>
@@ -335,7 +335,7 @@ export default function ItemDetails() {
           onPress={() => Linking.openURL(item.google_maps_link!)}
           style={styles.mapLinkButton}
         >
-          <Icon name="locate" size={15} color={colors.blue} />
+          <Icon name="locate" size={20} color={colors.blue} />
           <Text style={styles.mapLinkButtonText}>Open in Google Maps</Text>
         </Pressable>
       ) : null}
@@ -345,7 +345,7 @@ export default function ItemDetails() {
           onPress={() => router.push(`/trip/${item.trip_id}/map?focusItemId=${item.id}`)}
           style={styles.mapLinkButton}
         >
-          <Icon name="map" size={15} color={colors.blue} />
+          <Icon name="map" size={20} color={colors.blue} />
           <Text style={styles.mapLinkButtonText}>View on map</Text>
         </Pressable>
       ) : null}
@@ -359,9 +359,9 @@ export default function ItemDetails() {
               disabled={flightStatusLoading}
             >
               {flightStatusLoading ? (
-                <ActivityIndicator size="small" color={colors.teal} />
+                <ActivityIndicator size="small" color={colors.lightBlue} />
               ) : (
-                <Icon name="refresh" size={18} color={colors.blue} />
+                <Icon name="refresh" size={22} color={colors.blue} />
               )}
             </Pressable>
           </View>
@@ -441,7 +441,7 @@ export default function ItemDetails() {
                   {[li.day_date ? formatDateDDMM(li.day_date) : null, normalizeTimeHHMM(li.time_start)].filter(Boolean).join(" · ") || li.type.toUpperCase()}
                 </Text>
               </View>
-              <Icon name="forward" size={16} color={colors.blue} />
+              <Icon name="forward" size={20} color={colors.blue} />
             </Pressable>
           ))}
         </>
@@ -545,7 +545,7 @@ const styles = StyleSheet.create({
   customHeaderTitleWrap: { flex: 1, minWidth: 0, marginHorizontal: 4 },
   headerButtons: { flexDirection: "row", alignItems: "center", gap: 8, marginLeft: 8 },
   headerTitleText: { fontSize: 17, fontWeight: "700", color: colors.ink },
-  typeTag: { fontFamily: "JetBrainsMono_600SemiBold", color: colors.teal, fontWeight: "600", fontSize: 11 },
+  typeTag: { fontFamily: "JetBrainsMono_600SemiBold", color: colors.lightBlue, fontWeight: "600", fontSize: 11 },
   title: { color: colors.ink, fontWeight: "800", fontSize: 22, marginVertical: 6 },
   fieldRow: { paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.line },
   fieldLabel: { color: colors.inkSoft, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5 },
@@ -554,15 +554,15 @@ const styles = StyleSheet.create({
   linkButtonText: { color: colors.paper, fontWeight: "700" },
   mapLinkButton: {
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
-    borderWidth: 1, borderColor: colors.teal, borderRadius: radius.md, padding: 12, marginTop: 10,
+    borderWidth: 1, borderColor: colors.lightBlue, borderRadius: radius.md, padding: 12, marginTop: 10,
   },
-  mapLinkButtonText: { color: colors.teal, fontWeight: "700" },
+  mapLinkButtonText: { color: colors.lightBlue, fontWeight: "700" },
   flightStatusCard: {
     backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,
     borderRadius: radius.md, padding: 12, marginTop: 16,
   },
   flightStatusHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  flightStatusValue: { color: colors.teal, fontWeight: "700", fontSize: 14, marginBottom: 4 },
+  flightStatusValue: { color: colors.lightBlue, fontWeight: "700", fontSize: 14, marginBottom: 4 },
   flightStatusError: { color: colors.coral, fontSize: 12, marginTop: 4 },
   flightStatusChecked: { color: colors.inkSoft, fontSize: 11, fontStyle: "italic", marginTop: 6 },
   sectionLabel: {
@@ -603,8 +603,8 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.line, borderStyle: "dashed", borderRadius: radius.md,
     padding: 12, alignItems: "center", marginTop: 8, marginBottom: 30,
   },
-  addExpenseButtonText: { color: colors.teal, fontWeight: "700", fontSize: 13 },
-  miniCheckbox: { width: 16, height: 16, borderRadius: 5, borderWidth: 2, borderColor: colors.teal, marginRight: 10 },
-  miniCheckboxChecked: { backgroundColor: colors.teal },
+  addExpenseButtonText: { color: colors.lightBlue, fontWeight: "700", fontSize: 13 },
+  miniCheckbox: { width: 16, height: 16, borderRadius: 5, borderWidth: 2, borderColor: colors.lightBlue, marginRight: 10 },
+  miniCheckboxChecked: { backgroundColor: colors.lightBlue },
   shoppingBought: { color: colors.inkSoft, textDecorationLine: "line-through" },
 });

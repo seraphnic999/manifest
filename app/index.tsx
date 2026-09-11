@@ -259,7 +259,7 @@ export default function TripList() {
           {searchInput.length > 0 && (
             <Pressable onPress={() => setSearchInput("")} hitSlop={8}>
               <View style={{ transform: [{ rotate: "45deg" }] }}>
-                <Icon name="add" size={18} color={colors.blue} strokeWidth={3.5} />
+                <Icon name="add" size={18} color={colors.blue} />
               </View>
             </Pressable>
           )}
@@ -314,7 +314,7 @@ export default function TripList() {
                     <View style={styles.heroScrim} />
                     {heroExtra?.weatherTemp != null && heroExtra.weatherCode != null && (
                       <View style={styles.weatherBadge}>
-                        <Icon name={weatherIconName(heroExtra.weatherCode)} size={22} color="#fff" />
+                        <Icon name={weatherIconName(heroExtra.weatherCode)} size={26} color="#fff" />
                         <Text style={styles.weatherTemp}>{heroExtra.weatherTemp}°</Text>
                       </View>
                     )}
