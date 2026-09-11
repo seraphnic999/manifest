@@ -45,6 +45,7 @@ export default function PackingScreen() {
   const [newItemName, setNewItemName] = useState("");
   const [newItemCategory, setNewItemCategory] = useState<string | null>(null);
   const [populateOpen, setPopulateOpen] = useState(false);
+  const [addItemOpen, setAddItemOpen] = useState(false);
   const [sourcePickerOpen, setSourcePickerOpen] = useState<"template" | "trip" | null>(null);
   const { menuItems, shareModal } = useTripHamburgerMenu(tripId);
 
@@ -75,6 +76,7 @@ export default function PackingScreen() {
     });
     setNewItemName("");
     setNewItemCategory(null);
+    setAddItemOpen(false);
     refetch();
   }
 
@@ -140,32 +142,44 @@ export default function PackingScreen() {
               ))}
             </View>
           ))}
-        {items.length === 0 && <Text style={styles.empty}>Nothing on the list yet — add items below, or populate from a template.</Text>}
-
-        <View style={styles.addCard}>
-          <TextInput
-            style={styles.input}
-            value={newItemName}
-            onChangeText={setNewItemName}
-            placeholder="e.g. Passport, Charger, Swimsuit"
-            onSubmitEditing={addItem}
-          />
-          <View style={styles.chipRow}>
-            {PACKING_CATEGORIES.map((c) => (
-              <Pressable
-                key={c}
-                style={[styles.chip, newItemCategory === c && styles.chipActive]}
-                onPress={() => setNewItemCategory(newItemCategory === c ? null : c)}
-              >
-                <Text style={[styles.chipText, newItemCategory === c && styles.chipTextActive]}>{c}</Text>
-              </Pressable>
-            ))}
-          </View>
-          <Pressable style={styles.addButton} onPress={addItem}>
-            <Text style={styles.addButtonText}>+ Add item</Text>
-          </Pressable>
-        </View>
+        {items.length === 0 && <Text style={styles.empty}>Nothing on the list yet — add an item, or populate from a template.</Text>}
       </ScrollView>
+
+      <Pressable style={styles.fab} onPress={() => { if (requireOnline()) setAddItemOpen(true); }}>
+        <Icon name="add" size={24} color="#fff" />
+      </Pressable>
+
+      <Modal visible={addItemOpen} transparent animationType="fade" onRequestClose={() => setAddItemOpen(false)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setAddItemOpen(false)}>
+          <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
+            <Text style={styles.modalTitle}>Add packing item</Text>
+            <View style={styles.addCard}>
+              <TextInput
+                style={styles.input}
+                value={newItemName}
+                onChangeText={setNewItemName}
+                placeholder="e.g. Passport, Charger, Swimsuit"
+                onSubmitEditing={addItem}
+                autoFocus
+              />
+              <View style={styles.chipRow}>
+                {PACKING_CATEGORIES.map((c) => (
+                  <Pressable
+                    key={c}
+                    style={[styles.chip, newItemCategory === c && styles.chipActive]}
+                    onPress={() => setNewItemCategory(newItemCategory === c ? null : c)}
+                  >
+                    <Text style={[styles.chipText, newItemCategory === c && styles.chipTextActive]}>{c}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              <Pressable style={styles.addButton} onPress={addItem}>
+                <Text style={styles.addButtonText}>+ Add item</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <Modal visible={populateOpen} transparent animationType="fade" onRequestClose={() => setPopulateOpen(false)}>
         <Pressable style={styles.modalBackdrop} onPress={() => setPopulateOpen(false)}>
@@ -253,5 +267,10 @@ const styles = StyleSheet.create({
   modalTitle: { color: colors.ink, fontWeight: "700", fontSize: 16, marginBottom: 6 },
   modalHint: { color: colors.inkSoft, fontSize: 12, marginBottom: 12 },
   modalRow: { padding: 12, borderBottomWidth: 1, borderBottomColor: colors.line },
+  fab: {
+    position: "absolute", bottom: 74, right: 16, width: 52, height: 52, borderRadius: 26,
+    backgroundColor: colors.ink, alignItems: "center", justifyContent: "center",
+    shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4,
+  },
   modalRowText: { color: colors.ink, fontSize: 15 },
 });

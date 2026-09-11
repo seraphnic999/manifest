@@ -64,7 +64,7 @@ export default function TripCountdown({
         <Text style={styles.colon}>:</Text>
         <View style={styles.unit}>
           <Text style={styles.num}>{pad(breakdown.hours)}</Text>
-          <Text style={styles.unitLabel}>Hours</Text>
+          <Text style={styles.unitLabel}>Hrs</Text>
         </View>
         <Text style={styles.colon}>:</Text>
         <View style={styles.unit}>
@@ -90,16 +90,20 @@ export function TripCountdownInline({ tripId, fallbackDateIso }: { tripId: strin
 }
 
 const styles = StyleSheet.create({
-  card: { backgroundColor: colors.ink, borderRadius: radius.lg, padding: 16, marginBottom: 14, alignItems: "center" },
+  card: {
+    backgroundColor: "rgba(11,30,63,0.35)", borderRadius: radius.md,
+    paddingVertical: 6, paddingHorizontal: 10, alignSelf: "flex-start",
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.3)",
+  },
   tripName: {
-    color: colors.goldSoft, fontFamily: fonts.bodyBold, fontSize: 12,
-    textTransform: "uppercase", letterSpacing: 1, marginBottom: 8,
+    color: colors.goldSoft, fontFamily: fonts.bodyBold, fontSize: 10,
+    textTransform: "uppercase", letterSpacing: 1, marginBottom: 3,
   },
   row: { flexDirection: "row", alignItems: "center" },
-  unit: { alignItems: "center", minWidth: 52 },
-  num: { color: colors.paper, fontFamily: fonts.monoBold, fontSize: 28 },
-  unitLabel: { color: colors.goldSoft, fontSize: 10, fontFamily: fonts.bodyBold, textTransform: "uppercase", letterSpacing: 0.5, marginTop: 2 },
-  colon: { color: colors.goldSoft, fontWeight: "800", fontSize: 24, marginHorizontal: 4, marginBottom: 14 },
+  unit: { alignItems: "center", minWidth: 34 },
+  num: { color: colors.paper, fontFamily: fonts.monoBold, fontSize: 16 },
+  unitLabel: { color: colors.goldSoft, fontSize: 7, fontFamily: fonts.bodyBold, textTransform: "uppercase", letterSpacing: 0.5, marginTop: 1 },
+  colon: { color: colors.goldSoft, fontWeight: "800", fontSize: 14, marginHorizontal: 2 },
 });
 
 const inlineStyles = StyleSheet.create({

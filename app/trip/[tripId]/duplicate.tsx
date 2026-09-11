@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, Pressable, ScrollView, Modal } from "react-nati
 import { Alert } from "@/lib/alert";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
-import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
 import { Trip, Day, Item } from "@/lib/types";
@@ -11,6 +10,8 @@ import { categoryForDbType } from "@/lib/itemTypeMeta";
 import { formatDateDDMMYYYY } from "@/lib/dateFormat";
 import { DateField } from "@/components/DateTimeFields";
 import HomeButton from "@/components/HomeButton";
+import Icon from "@/components/icons/Icon";
+import Checkbox from "@/components/Checkbox";
 
 interface DuplicateData {
   trip: Trip;
@@ -362,9 +363,9 @@ export default function DuplicateTrip() {
               return (
                 <View key={item.id} style={styles.itemRow}>
                   <Pressable style={styles.checkbox} onPress={() => toggleItem(item.id)}>
-                    <Ionicons name={isChecked ? "checkbox" : "square-outline"} size={22} color={isChecked ? colors.teal : colors.inkSoft} />
+                    <Checkbox checked={isChecked} />
                   </Pressable>
-                  <Ionicons name={category.icon as any} size={18} color={category.tileColor} style={{ marginHorizontal: 8 }} />
+                  <Icon name={category.icon} size={18} color={category.tileColor} style={{ marginHorizontal: 8 }} />
                   <Text style={[styles.itemTitle, !isChecked && styles.itemTitleDim]} numberOfLines={1}>{item.title}</Text>
                   <Pressable
                     style={[styles.dayChip, needsAttention && styles.dayChipWarning]}
@@ -400,9 +401,9 @@ export default function DuplicateTrip() {
                 return (
                   <View key={item.id} style={styles.itemRow}>
                     <Pressable style={styles.checkbox} onPress={() => toggleItem(item.id)}>
-                      <Ionicons name={isChecked ? "checkbox" : "square-outline"} size={22} color={isChecked ? colors.teal : colors.inkSoft} />
+                      <Checkbox checked={isChecked} />
                     </Pressable>
-                    <Ionicons name={category.icon as any} size={18} color={category.tileColor} style={{ marginHorizontal: 8 }} />
+                    <Icon name={category.icon} size={18} color={category.tileColor} style={{ marginHorizontal: 8 }} />
                     <Text style={[styles.itemTitle, !isChecked && styles.itemTitleDim]} numberOfLines={1}>
                       {item.title}
                     </Text>

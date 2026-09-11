@@ -2,8 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { View, Text, Pressable, StyleSheet, ScrollView } from "react-native";
 import { useLocalSearchParams, useRouter, Stack, useFocusEffect } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
-import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/lib/supabase";
+import Icon from "@/components/icons/Icon";
 import { colors, radius } from "@/lib/theme";
 import { Day, Item, ItemType, MapRoute, TripType } from "@/lib/types";
 import { ITEM_CATEGORIES, categoryByKey } from "@/lib/itemTypeMeta";
@@ -175,7 +175,7 @@ export default function TripMapScreen() {
               style={[styles.typeChip, active && { backgroundColor: cat.tileColor, borderColor: cat.tileColor }]}
               onPress={() => cat.dbTypes.forEach(toggleType)}
             >
-              <Ionicons name={cat.icon as any} size={13} color={active ? "#fff" : colors.inkSoft} />
+              <Icon name={cat.icon} size={13} color={active ? "#fff" : colors.inkSoft} />
               <Text style={[styles.chipText, active && styles.chipTextActive]}>{cat.label}</Text>
             </Pressable>
           );
@@ -185,7 +185,7 @@ export default function TripMapScreen() {
           onPress={toggleNearMe}
           disabled={locating}
         >
-          <Ionicons name="locate" size={13} color={nearMeOn ? "#fff" : colors.teal} />
+          <Icon name="locate" size={13} color={nearMeOn ? "#fff" : colors.teal} />
           <Text style={[styles.chipText, { color: colors.teal }, nearMeOn && styles.chipTextActive]}>
             {locating ? "Locating…" : "Near me"}
           </Text>
@@ -210,7 +210,7 @@ export default function TripMapScreen() {
             <ScrollView style={{ maxHeight: 220 }}>
               {nearbyItems.map(({ item, distance_m }) => (
                 <Pressable key={item.id} style={styles.nearMeRow} onPress={() => router.push(`/item/${item.id}`)}>
-                  <Ionicons name={categoryForDbType(item.type).icon as any} size={14} color={colors.teal} />
+                  <Icon name={categoryForDbType(item.type).icon} size={14} color={colors.teal} />
                   <Text style={styles.nearMeRowTitle} numberOfLines={1}>{item.title}</Text>
                   <Text style={styles.nearMeRowDistance}>{formatDistance(distance_m)}</Text>
                 </Pressable>
@@ -228,7 +228,7 @@ export default function TripMapScreen() {
           setPickerOpen(true);
         }}
       >
-        <Text style={styles.fabText}>+ Add proposal</Text>
+        <Icon name="add" size={24} color="#fff" />
       </Pressable>
 
       <ItemTypePickerModal visible={pickerOpen} onClose={() => setPickerOpen(false)} onSelect={handleSelectCategory} />
@@ -276,9 +276,8 @@ const styles = StyleSheet.create({
   nearMeRowDistance: { fontFamily: "JetBrainsMono_600SemiBold", color: colors.teal, fontSize: 11, fontWeight: "600" },
   empty: { color: colors.inkSoft, fontSize: 12, fontStyle: "italic", paddingVertical: 8 },
   fab: {
-    position: "absolute", bottom: 74, alignSelf: "center",
-    backgroundColor: colors.ink, borderRadius: 24, paddingVertical: 14, paddingHorizontal: 24,
+    position: "absolute", bottom: 74, right: 16, width: 52, height: 52, borderRadius: 26,
+    backgroundColor: colors.ink, alignItems: "center", justifyContent: "center",
     shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4,
   },
-  fabText: { color: colors.paper, fontWeight: "700" },
 });

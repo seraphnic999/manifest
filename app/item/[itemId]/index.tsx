@@ -6,8 +6,8 @@ import { useLocalSearchParams, useRouter, Stack, useFocusEffect } from "expo-rou
 import { useQuery } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
-import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/lib/supabase";
+import Icon from "@/components/icons/Icon";
 import { colors, radius } from "@/lib/theme";
 import { Item, ItemPhoto, Expense, TripCurrency, TripParty } from "@/lib/types";
 import { uploadItemPhoto, uploadItemDocument, fetchItemPhotosWithUrls, deleteItemPhoto, isImageAttachment } from "@/lib/photos";
@@ -291,27 +291,27 @@ export default function ItemDetails() {
           fact we control. */}
       <View style={[styles.customHeader, { paddingTop: insets.top + 10 }]}>
         <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={8}>
-          <Ionicons name="chevron-back" size={24} color={colors.ink} />
+          <Icon name="back" size={22} color={colors.ink} />
         </Pressable>
         <View style={styles.customHeaderTitleWrap}>
           <Text numberOfLines={1} ellipsizeMode="tail" style={styles.headerTitleText}>{item.title}</Text>
         </View>
         <View style={styles.headerButtons}>
           <HeaderIconButton onPress={deleteItem}>
-            <Ionicons name="trash" size={16} color={colors.coral} />
+            <Icon name="trash" size={17} color={colors.coral} />
           </HeaderIconButton>
           <HeaderIconButton onPress={duplicateItem} accessibilityLabel="Duplicate item">
-            <Ionicons name="copy-outline" size={16} color={colors.teal} />
+            <Icon name="duplicate" size={17} color={colors.teal} />
           </HeaderIconButton>
           <HeaderIconButton onPress={() => router.push(`/item/${itemId}/edit`)}>
-            <Ionicons name="pencil" size={16} color={colors.blue} />
+            <Icon name="edit" size={17} color={colors.blue} />
           </HeaderIconButton>
           <HomeButton />
         </View>
       </View>
 
       <OfflineBanner dataUpdatedAt={!isOnline ? dataUpdatedAt : undefined} />
-      <ScrollView style={styles.container}>
+      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
       <Text style={styles.typeTag}>{item.type.toUpperCase()}</Text>
       <Text style={styles.title}>{item.title}</Text>
 
@@ -335,7 +335,7 @@ export default function ItemDetails() {
           onPress={() => Linking.openURL(item.google_maps_link!)}
           style={styles.mapLinkButton}
         >
-          <Ionicons name="logo-google" size={15} color={colors.teal} />
+          <Icon name="locate" size={15} color={colors.teal} />
           <Text style={styles.mapLinkButtonText}>Open in Google Maps</Text>
         </Pressable>
       ) : null}
@@ -345,7 +345,7 @@ export default function ItemDetails() {
           onPress={() => router.push(`/trip/${item.trip_id}/map?focusItemId=${item.id}`)}
           style={styles.mapLinkButton}
         >
-          <Ionicons name="map-outline" size={15} color={colors.teal} />
+          <Icon name="map" size={15} color={colors.teal} />
           <Text style={styles.mapLinkButtonText}>View on map</Text>
         </Pressable>
       ) : null}
@@ -361,7 +361,7 @@ export default function ItemDetails() {
               {flightStatusLoading ? (
                 <ActivityIndicator size="small" color={colors.teal} />
               ) : (
-                <Ionicons name="refresh" size={18} color={colors.teal} />
+                <Icon name="refresh" size={18} color={colors.teal} />
               )}
             </Pressable>
           </View>
@@ -441,7 +441,7 @@ export default function ItemDetails() {
                   {[li.day_date ? formatDateDDMM(li.day_date) : null, normalizeTimeHHMM(li.time_start)].filter(Boolean).join(" · ") || li.type.toUpperCase()}
                 </Text>
               </View>
-              <Ionicons name="arrow-forward" size={16} color={colors.inkSoft} />
+              <Icon name="forward" size={16} color={colors.inkSoft} />
             </Pressable>
           ))}
         </>
@@ -457,7 +457,7 @@ export default function ItemDetails() {
           ) : (
             <Pressable key={p.id} onPress={() => openAttachment(p)} onLongPress={() => removePhoto(p)} style={styles.photoWrap}>
               <View style={styles.fileTile}>
-                <Ionicons name="document-text" size={28} color={colors.inkSoft} />
+                <Icon name="document" size={28} color={colors.inkSoft} />
                 <Text numberOfLines={2} style={styles.fileTileName}>{attachmentDisplayName(p)}</Text>
               </View>
             </Pressable>
@@ -516,7 +516,7 @@ export default function ItemDetails() {
               style={styles.photoSourceOption}
               onPress={() => { setPhotoSourceOpen(false); takePhoto(); }}
             >
-              <Ionicons name="camera-outline" size={20} color={colors.ink} />
+              <Icon name="camera" size={20} color={colors.ink} />
               <Text style={styles.photoSourceOptionText}>Take Photo</Text>
             </Pressable>
             <View style={styles.photoSourceDivider} />
@@ -524,7 +524,7 @@ export default function ItemDetails() {
               style={styles.photoSourceOption}
               onPress={() => { setPhotoSourceOpen(false); addPhoto(); }}
             >
-              <Ionicons name="images-outline" size={20} color={colors.ink} />
+              <Icon name="gallery" size={20} color={colors.ink} />
               <Text style={styles.photoSourceOptionText}>Choose from Library</Text>
             </Pressable>
           </Pressable>

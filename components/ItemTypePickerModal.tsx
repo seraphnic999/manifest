@@ -1,7 +1,7 @@
 import { View, Text, Pressable, Modal, StyleSheet, ScrollView } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import { colors, radius } from "@/lib/theme";
 import { ITEM_CATEGORIES } from "@/lib/itemTypeMeta";
+import Icon from "@/components/icons/Icon";
 
 export default function ItemTypePickerModal({
   visible, onClose, onSelect,
@@ -23,7 +23,7 @@ export default function ItemTypePickerModal({
                 onPress={() => onSelect(cat.key)}
               >
                 <View style={[styles.iconCircle, { backgroundColor: cat.tileColor }]}>
-                  <Ionicons name={cat.icon as any} size={26} color="#fff" />
+                  <Icon name={cat.icon} size={26} color="#fff" />
                 </View>
                 <Text style={styles.tileLabel}>{cat.label}</Text>
               </Pressable>

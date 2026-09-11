@@ -1,8 +1,8 @@
 import { useCallback, useState } from "react";
 import { View, Text, TextInput, Pressable, StyleSheet } from "react-native";
 import { useFocusEffect } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
 import { Alert } from "@/lib/alert";
+import Icon from "@/components/icons/Icon";
 import { colors, radius } from "@/lib/theme";
 import { fetchQuickNotes, addQuickNote, updateQuickNoteText, deleteQuickNote, QuickNote } from "@/lib/itemQuickNotes";
 
@@ -76,7 +76,7 @@ export default function QuickNotesList({ itemId }: { itemId: string }) {
             placeholder="Note"
           />
           <Pressable onPress={() => handleRemove(n.id)} hitSlop={8} style={styles.removeBtn}>
-            <Ionicons name="close" size={16} color={colors.coral} />
+            <Icon name="add" size={16} color={colors.coral} style={{ transform: [{ rotate: "45deg" }] }} />
           </Pressable>
         </View>
       ))}

@@ -9,7 +9,7 @@ import type { Map as MLMap, Marker } from "maplibre-gl";
 // runtime `import()` of a .css file isn't a real loadable JS chunk and
 // silently never resolves.
 import "maplibre-gl/dist/maplibre-gl.css";
-import { Ionicons } from "@expo/vector-icons";
+import Icon, { IconName } from "@/components/icons/Icon";
 import { categoryForDbType } from "@/lib/itemTypeMeta";
 import { MapItem } from "@/lib/mapData";
 import { MapRoute, ItemStatus, ItemType } from "@/lib/types";
@@ -34,7 +34,7 @@ function statusOpacity(status: ItemStatus) {
   return status === "optional" ? 0.55 : 1;
 }
 
-function MarkerGlyph({ color, icon, opacity, focused }: { color: string; icon: string; opacity: number; focused?: boolean }) {
+function MarkerGlyph({ color, icon, opacity, focused }: { color: string; icon: IconName; opacity: number; focused?: boolean }) {
   const size = focused ? 36 : 28;
   return (
     <div
@@ -47,7 +47,7 @@ function MarkerGlyph({ color, icon, opacity, focused }: { color: string; icon: s
         border: "2px solid #FFFFFF", cursor: "pointer",
       }}
     >
-      <Ionicons name={icon as any} size={focused ? 17 : 14} color="#FFFFFF" />
+      <Icon name={icon} size={focused ? 17 : 14} color="#FFFFFF" />
     </div>
   );
 }

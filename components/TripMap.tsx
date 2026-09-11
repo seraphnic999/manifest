@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { View, StyleSheet } from "react-native";
 import { MapView, Camera, PointAnnotation, ShapeSource, LineLayer, type CameraStop, type PointAnnotationRef } from "@maplibre/maplibre-react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Icon, { IconName } from "@/components/icons/Icon";
 import { categoryForDbType } from "@/lib/itemTypeMeta";
 import { MapItem } from "@/lib/mapData";
 import { MapRoute, ItemStatus, ItemType } from "@/lib/types";
@@ -25,7 +25,7 @@ function statusOpacity(status: ItemStatus) {
   return status === "optional" ? 0.55 : 1;
 }
 
-function MarkerGlyph({ color, icon, opacity, focused }: { color: string; icon: string; opacity: number; focused?: boolean }) {
+function MarkerGlyph({ color, icon, opacity, focused }: { color: string; icon: IconName; opacity: number; focused?: boolean }) {
   const size = focused ? 36 : 28;
   return (
     <View
@@ -35,7 +35,7 @@ function MarkerGlyph({ color, icon, opacity, focused }: { color: string; icon: s
         focused && styles.glyphFocused,
       ]}
     >
-      <Ionicons name={icon as any} size={focused ? 17 : 14} color="#FFFFFF" />
+      <Icon name={icon} size={focused ? 17 : 14} color="#FFFFFF" />
     </View>
   );
 }

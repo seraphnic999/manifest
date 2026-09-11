@@ -3,6 +3,7 @@
 // the source files exactly. Two names (overview, signOut) aren't in that
 // set and are hand-drawn to match its weight/rounding.
 import Svg, { Path, Circle, Rect } from "react-native-svg";
+import { ViewStyle } from "react-native";
 
 export type IconName =
   | "flight" | "lodging" | "budget" | "packing"
@@ -10,9 +11,11 @@ export type IconName =
   | "weatherSnowy" | "weatherThunderstorm" | "weatherWindy"
   | "countdown" | "map" | "currency" | "shopping" | "search" | "archive"
   | "menu" | "add" | "home" | "export" | "edit" | "share"
-  | "overview" | "signOut" | "back" | "swap" | "check";
+  | "overview" | "signOut" | "back" | "swap" | "check"
+  | "transfer" | "transport" | "dining" | "activity" | "work" | "other" | "locate" | "warning"
+  | "trash" | "duplicate" | "refresh" | "document" | "camera" | "gallery" | "forward";
 
-type Props = { name: IconName; size?: number; color?: string; strokeWidth?: number };
+type Props = { name: IconName; size?: number; color?: string; strokeWidth?: number; style?: ViewStyle };
 
 const commonStroke = { fill: "none", strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
 
@@ -170,12 +173,99 @@ function renderPaths(name: IconName, color: string, strokeWidth: number) {
       </>;
     case "check":
       return <Path d="M14 33l12 12 24-26" fill="none" stroke={color} strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" />;
+    case "transfer":
+      return <>
+        <Path d="M10 42 12 28c1-3 4-5 7-5h26c3 0 6 2 7 5l2 14" {...s} />
+        <Path d="M6 42h52" {...s} />
+        <Circle cx="18" cy="46" r="5" {...s} />
+        <Circle cx="46" cy="46" r="5" {...s} />
+      </>;
+    case "transport":
+      return <>
+        <Rect x="8" y="14" width="48" height="30" rx="6" {...s} />
+        <Path d="M8 34h48" {...s} />
+        <Path d="M18 20v10M32 20v10M46 20v10" {...s} />
+        <Circle cx="18" cy="50" r="5" {...s} />
+        <Circle cx="46" cy="50" r="5" {...s} />
+      </>;
+    case "dining":
+      return <>
+        <Path d="M14 8v14M18 8v14M22 8v14" {...s} />
+        <Path d="M18 22v34" {...s} />
+        <Path d="M44 8c8 3 10 10 6 16l-6 4v28" {...s} />
+      </>;
+    case "activity":
+      return <>
+        <Path d="M8 50 24 20l10 16 6-8 16 22Z" {...s} />
+        <Circle cx="46" cy="16" r="6" {...s} />
+      </>;
+    case "work":
+      return <>
+        <Rect x="10" y="24" width="44" height="28" rx="5" {...s} />
+        <Path d="M24 24v-6c0-3 2-5 5-5h6c3 0 5 2 5 5v6" {...s} />
+        <Path d="M10 36h44" {...s} />
+      </>;
+    case "other":
+      return <>
+        <Circle cx="16" cy="32" r="5" fill={color} stroke="none" />
+        <Circle cx="32" cy="32" r="5" fill={color} stroke="none" />
+        <Circle cx="48" cy="32" r="5" fill={color} stroke="none" />
+      </>;
+    case "locate":
+      return <>
+        <Path d="M32 8c-11 0-20 9-20 20 0 15 20 28 20 28s20-13 20-28c0-11-9-20-20-20Z" {...s} />
+        <Circle cx="32" cy="28" r="7" {...s} />
+      </>;
+    case "warning":
+      return <>
+        <Path d="M32 10 58 54H6Z" {...s} />
+        <Path d="M32 26v14" {...s} />
+        <Circle cx="32" cy="46" r="1.6" fill={color} stroke="none" />
+      </>;
+    case "trash":
+      return <>
+        <Path d="M14 18h36" {...s} />
+        <Path d="M24 18v-6h16v6" {...s} />
+        <Path d="M18 18l3 36c0 3 2 5 5 5h12c3 0 5-2 5-5l3-36" {...s} />
+        <Path d="M26 28v20M38 28v20" {...s} />
+      </>;
+    case "duplicate":
+      return <>
+        <Rect x="10" y="18" width="32" height="32" rx="6" {...s} />
+        <Path d="M22 18v-4c0-2 2-4 4-4h24c2 0 4 2 4 4v24c0 2-2 4-4 4h-4" {...s} />
+      </>;
+    case "refresh":
+      return <>
+        <Path d="M12 32a20 20 0 0 1 34-14l4 4" {...s} />
+        <Path d="M50 14v10H40" {...s} />
+        <Path d="M52 32a20 20 0 0 1-34 14l-4-4" {...s} />
+        <Path d="M14 50V40h10" {...s} />
+      </>;
+    case "document":
+      return <>
+        <Path d="M16 8h24l12 12v36a2 2 0 0 1-2 2H16a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2Z" {...s} />
+        <Path d="M40 8v12h12" {...s} />
+        <Path d="M20 34h24M20 42h24M20 26h12" {...s} />
+      </>;
+    case "camera":
+      return <>
+        <Path d="M10 20a4 4 0 0 1 4-4h6l4-6h16l4 6h6a4 4 0 0 1 4 4v28a4 4 0 0 1-4 4H14a4 4 0 0 1-4-4Z" {...s} />
+        <Circle cx="32" cy="34" r="10" {...s} />
+      </>;
+    case "gallery":
+      return <>
+        <Rect x="8" y="12" width="48" height="40" rx="5" {...s} />
+        <Circle cx="22" cy="26" r="5" {...s} />
+        <Path d="M12 46l14-14 10 10 8-8 14 14" {...s} />
+      </>;
+    case "forward":
+      return <Path d="M26 12l20 20-20 20" {...s} />;
   }
 }
 
-export default function Icon({ name, size = 20, color = "#173B8F", strokeWidth = 3.2 }: Props) {
+export default function Icon({ name, size = 20, color = "#173B8F", strokeWidth = 3.2, style }: Props) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 64 64">
+    <Svg width={size} height={size} viewBox="0 0 64 64" style={style}>
       {renderPaths(name, color, strokeWidth)}
     </Svg>
   );

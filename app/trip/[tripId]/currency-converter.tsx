@@ -112,11 +112,11 @@ export default function CurrencyConverter() {
           </View>
         ))}
         <Text style={styles.hint}>Rates shown per currency are fixed for this trip — change them from the trip's edit screen, not here.</Text>
-
-        <Pressable style={styles.addButton} onPress={() => setAddOpen(true)}>
-          <Text style={styles.addButtonText}>+ Add currency</Text>
-        </Pressable>
       </ScrollView>
+
+      <Pressable style={styles.fab} onPress={() => setAddOpen(true)}>
+        <Icon name="add" size={24} color="#fff" />
+      </Pressable>
 
       <Modal visible={addOpen} transparent animationType="fade" onRequestClose={() => setAddOpen(false)}>
         <Pressable style={styles.modalBackdrop} onPress={() => setAddOpen(false)}>
@@ -175,6 +175,11 @@ const styles = StyleSheet.create({
     borderRadius: radius.md, padding: 12, fontSize: 16, color: colors.ink,
   },
   addButton: { backgroundColor: colors.ink, borderRadius: radius.md, padding: 14, alignItems: "center", marginTop: 14 },
+  fab: {
+    position: "absolute", bottom: 74, right: 16, width: 52, height: 52, borderRadius: 26,
+    backgroundColor: colors.ink, alignItems: "center", justifyContent: "center",
+    shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4,
+  },
   addButtonText: { color: colors.paper, fontWeight: "700" },
   linkText: { color: colors.teal, fontSize: 12, fontWeight: "600", marginTop: 8, textAlign: "center" },
   modalBackdrop: { flex: 1, backgroundColor: "rgba(33,47,61,0.4)", justifyContent: "center", padding: 30 },

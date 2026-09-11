@@ -3,8 +3,8 @@ import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, Modal, Platfo
 import { useLocalSearchParams, useRouter, Stack, useFocusEffect } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { RenderItemParams, NestableScrollContainer, NestableDraggableFlatList } from "react-native-draggable-flatlist";
-import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/lib/supabase";
+import Icon from "@/components/icons/Icon";
 import { colors, radius } from "@/lib/theme";
 import { Item, Day } from "@/lib/types";
 import { renumberedOrders } from "@/lib/reorder";
@@ -176,7 +176,7 @@ export default function DayView() {
         >
           <View style={[styles.timeCol, !item.time_start && styles.timeColMuted]}>
             <Text style={styles.timeText}>{normalizeTimeHHMM(item.time_start) || "\u2014"}</Text>
-            {isOverlapping && <Ionicons name="warning" size={11} color={colors.coral} style={{ marginTop: 2 }} />}
+            {isOverlapping && <Icon name="warning" size={11} color={colors.coral} style={{ marginTop: 2 }} />}
             {item.type === "flight" && item.time_end ? (
               <>
                 <Text style={styles.timeArrowSmall}>{"\u2193"}</Text>
@@ -186,7 +186,7 @@ export default function DayView() {
           </View>
           <View style={styles.body}>
             <View style={styles.row1}>
-              <Ionicons name={categoryForDbType(item.type).icon as any} size={12} color={colors.teal} />
+              <Icon name={categoryForDbType(item.type).icon} size={12} color={colors.teal} />
               <Text style={styles.typeTag}>{item.type.toUpperCase()}</Text>
               <Text style={styles.statusBadge}>{STATUS_LABEL[item.status]}</Text>
             </View>
@@ -298,7 +298,7 @@ export default function DayView() {
 
         {showLodgingGapWarning && (
           <View style={styles.gapWarning}>
-            <Ionicons name="warning" size={14} color={colors.coral} />
+            <Icon name="warning" size={14} color={colors.coral} />
             <Text style={styles.gapWarningText}>No lodging booked for this night.</Text>
           </View>
         )}
@@ -321,7 +321,7 @@ export default function DayView() {
       </NestableScrollContainer>
 
       <Pressable style={styles.fab} onPress={() => { if (requireOnline()) setPickerOpen(true); }}>
-        <Text style={styles.fabText}>+ Add item</Text>
+        <Icon name="add" size={24} color="#fff" />
       </Pressable>
 
       <ItemTypePickerModal visible={pickerOpen} onClose={() => setPickerOpen(false)} onSelect={handleSelectCategory} />
@@ -407,11 +407,10 @@ const styles = StyleSheet.create({
   reorderBtnDisabled: { opacity: 0.25 },
   reorderBtnText: { color: colors.inkSoft, fontSize: 13, fontWeight: "700" },
   fab: {
-    position: "absolute", bottom: 74, alignSelf: "center",
-    backgroundColor: colors.ink, borderRadius: 24, paddingVertical: 14, paddingHorizontal: 24,
+    position: "absolute", bottom: 74, right: 16, width: 52, height: 52, borderRadius: 26,
+    backgroundColor: colors.ink, alignItems: "center", justifyContent: "center",
     shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4,
   },
-  fabText: { color: colors.paper, fontWeight: "700" },
   modalBackdrop: { flex: 1, backgroundColor: "rgba(33,47,61,0.4)", justifyContent: "center", padding: 30 },
   modalCard: { backgroundColor: colors.paperRaised, borderRadius: radius.lg, padding: 18, width: "100%", maxWidth: 420, alignSelf: "center" },
   modalLabel: { color: colors.inkSoft, fontSize: 11, fontWeight: "700", textTransform: "uppercase", marginBottom: 8 },

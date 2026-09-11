@@ -27,7 +27,7 @@ export default function WeatherCarousel({ tripId, destinations }: { tripId: stri
   if (destinations.length === 0 || !data || data.length === 0) return null;
 
   return (
-    <View style={{ marginTop: 8 }}>
+    <View style={{ marginTop: 6 }}>
       <Text style={styles.sectionLabel}>Weather</Text>
       <ScrollView
         horizontal
@@ -43,7 +43,7 @@ export default function WeatherCarousel({ tripId, destinations }: { tripId: stri
               {forecast.days.map((d, i) => (
                 <View key={d.date} style={styles.dayCell}>
                   <Text style={styles.dayLabel}>{i === 0 ? "Today" : formatDateDDMM(d.date)}</Text>
-                  <Icon name={weatherIconName(d.weatherCode)} size={27} color={colors.blue} />
+                  <Icon name={weatherIconName(d.weatherCode)} size={20} color={colors.blue} />
                   <Text style={styles.temp}>{Math.round(d.tempMax)}°/{Math.round(d.tempMin)}°</Text>
                   <Text style={styles.precip}>{d.precipProb !== null && d.precipProb > 0 ? `${d.precipProb}%` : " "}</Text>
                 </View>
@@ -59,16 +59,16 @@ export default function WeatherCarousel({ tripId, destinations }: { tripId: stri
 const styles = StyleSheet.create({
   sectionLabel: {
     color: colors.inkSoft, fontFamily: fonts.bodyBold, fontSize: 11.5,
-    textTransform: "uppercase", letterSpacing: 1, marginBottom: 8,
+    textTransform: "uppercase", letterSpacing: 1, marginBottom: 6,
   },
   card: {
     backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,
-    borderRadius: radius.md, padding: 14,
+    borderRadius: radius.md, paddingVertical: 8, paddingHorizontal: 14,
   },
-  destination: { color: colors.ink, fontFamily: fonts.bodyBold, fontSize: 14, marginBottom: 10 },
+  destination: { color: colors.ink, fontFamily: fonts.bodyBold, fontSize: 13, marginBottom: 6 },
   daysRow: { flexDirection: "row", justifyContent: "space-between" },
   dayCell: { alignItems: "center", flex: 1 },
-  dayLabel: { color: colors.inkSoft, fontSize: 10, fontFamily: fonts.bodyBold, marginBottom: 4 },
-  temp: { fontFamily: fonts.mono, color: colors.ink, fontSize: 12, marginTop: 4 },
-  precip: { color: colors.teal, fontSize: 10, marginTop: 2 },
+  dayLabel: { color: colors.inkSoft, fontSize: 9, fontFamily: fonts.bodyBold, marginBottom: 2 },
+  temp: { fontFamily: fonts.mono, color: colors.ink, fontSize: 11, marginTop: 2 },
+  precip: { color: colors.teal, fontSize: 9, marginTop: 1 },
 });

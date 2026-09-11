@@ -305,29 +305,31 @@ export default function TripList() {
             if (section.label === "__hero__") {
               const trip = section.items[0];
               return (
-                <ImageBackground
-                  source={coverPhotoSource(trip.cover_photo_id)}
-                  style={styles.hero}
-                  imageStyle={{ borderRadius: radius.xl }}
-                >
-                  <View style={styles.heroScrim} />
-                  {heroExtra?.weatherTemp != null && heroExtra.weatherCode != null && (
-                    <View style={styles.weatherBadge}>
-                      <Icon name={weatherIconName(heroExtra.weatherCode)} size={22} color="#fff" />
-                      <Text style={styles.weatherTemp}>{heroExtra.weatherTemp}°</Text>
-                    </View>
-                  )}
-                  <Text style={styles.heroDest}>{trip.destinations[0] ?? trip.name}</Text>
-                  {heroExtra?.nextItemTitle ? (
-                    <>
-                      <Text style={styles.comingUpLabel}>Coming up</Text>
-                      <Text style={styles.comingUpTitle} numberOfLines={1}>{heroExtra.nextItemTitle}</Text>
-                      {heroExtra.nextItemTime && <Text style={styles.comingUpMeta}>{heroExtra.nextItemTime}</Text>}
-                    </>
-                  ) : (
-                    <Text style={styles.comingUpLabel}>Ongoing</Text>
-                  )}
-                </ImageBackground>
+                <Pressable onPress={() => router.push(`/trip/${trip.id}`)}>
+                  <ImageBackground
+                    source={coverPhotoSource(trip.cover_photo_id)}
+                    style={styles.hero}
+                    imageStyle={{ borderRadius: radius.xl }}
+                  >
+                    <View style={styles.heroScrim} />
+                    {heroExtra?.weatherTemp != null && heroExtra.weatherCode != null && (
+                      <View style={styles.weatherBadge}>
+                        <Icon name={weatherIconName(heroExtra.weatherCode)} size={22} color="#fff" />
+                        <Text style={styles.weatherTemp}>{heroExtra.weatherTemp}°</Text>
+                      </View>
+                    )}
+                    <Text style={styles.heroDest}>{trip.destinations[0] ?? trip.name}</Text>
+                    {heroExtra?.nextItemTitle ? (
+                      <>
+                        <Text style={styles.comingUpLabel}>Coming up</Text>
+                        <Text style={styles.comingUpTitle} numberOfLines={1}>{heroExtra.nextItemTitle}</Text>
+                        {heroExtra.nextItemTime && <Text style={styles.comingUpMeta}>{heroExtra.nextItemTime}</Text>}
+                      </>
+                    ) : (
+                      <Text style={styles.comingUpLabel}>Ongoing</Text>
+                    )}
+                  </ImageBackground>
+                </Pressable>
               );
             }
             return (
