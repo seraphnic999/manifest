@@ -28,6 +28,32 @@ export function buildDayColorMap(days: Day[]): Map<string, string> {
   return map;
 }
 
+/** date (yyyy-mm-dd) -> day.id, for the trip's real (dated) days only —
+ * used to color a day_id-less item (a lodging stay span, which spans a
+ * date range rather than belonging to one day row) by its check-in date. */
+export function buildDateToDayId(days: Day[]): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const d of days) if (d.date) map.set(d.date, d.id);
+  return map;
+}
+
+/** A map item's effective marker color: its own day's color if it has
+ * one; otherwise (a stay-span lodging item, day_id null) the color of the
+ * day its start_date falls on; otherwise the neutral fallback. */
+export function colorForMapItem(
+  item: { day_id: string | null; start_date: string | null },
+  dayColors: Map<string, string>,
+  dateToDayId: Map<string, string>,
+  neutralColor: string
+): string {
+  if (item.day_id) return dayColors.get(item.day_id) ?? neutralColor;
+  if (item.start_date) {
+    const dayId = dateToDayId.get(item.start_date);
+    if (dayId) return dayColors.get(dayId) ?? neutralColor;
+  }
+  return neutralColor;
+}
+
 export async function fetchTripDays(tripId: string): Promise<Day[]> {
   const { data } = await supabase
     .from("days").select("*").eq("trip_id", tripId).order("sort_order");

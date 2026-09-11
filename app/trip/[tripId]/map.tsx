@@ -8,7 +8,7 @@ import { colors, radius } from "@/lib/theme";
 import { Day, Item, ItemType, MapRoute, TripType } from "@/lib/types";
 import { ITEM_CATEGORIES, categoryByKey } from "@/lib/itemTypeMeta";
 import {
-  MapItem, buildDayColorMap, fetchTripDays, fetchTripMapItems,
+  MapItem, buildDayColorMap, buildDateToDayId, fetchTripDays, fetchTripMapItems,
   fetchTripRoutes, NEUTRAL_DAY_COLOR,
 } from "@/lib/mapData";
 import TripMap from "@/components/TripMap";
@@ -90,10 +90,10 @@ export default function TripMapScreen() {
     }
   }, [data, focusItemId]);
 
-  // Memoized so its identity only changes when `days` itself does (e.g.
-  // after a color edit refetches) — TripMap's marker-refresh effect keys
-  // off this reference to know when it needs to re-snapshot marker bitmaps.
   const dayColors = useMemo(() => buildDayColorMap(days), [days]);
+  // Colors a lodging stay-span item (day_id null, spans a date range) by
+  // the day its check-in date falls on.
+  const dateToDayId = useMemo(() => buildDateToDayId(days), [days]);
   const proposalsDayId = days.find((d) => d.date === null)?.id;
 
   function toggleDay(id: string) {
@@ -175,7 +175,7 @@ export default function TripMapScreen() {
           return (
             <Pressable
               key={cat.key}
-              style={[styles.typeChip, active && { backgroundColor: cat.tileColor, borderColor: cat.tileColor }]}
+              style={[styles.typeChip, active && styles.typeChipActive]}
               onPress={() => cat.dbTypes.forEach(toggleType)}
             >
               <Icon name={cat.icon} size={13} color={active ? "#fff" : colors.inkSoft} />
@@ -200,6 +200,7 @@ export default function TripMapScreen() {
           items={items}
           routes={routes}
           dayColors={dayColors}
+          dateToDayId={dateToDayId}
           neutralColor={NEUTRAL_DAY_COLOR}
           visibleDayIds={visibleDayIds}
           visibleTypes={visibleTypes}
@@ -254,8 +255,10 @@ const styles = StyleSheet.create({
   chipTextActive: { color: "#fff" },
   typeChip: {
     height: 30, paddingHorizontal: 10, borderRadius: 16, borderWidth: 1.5, borderColor: colors.line,
+    backgroundColor: "#fff",
     flexDirection: "row", alignItems: "center", gap: 5, justifyContent: "center",
   },
+  typeChipActive: { backgroundColor: colors.blue, borderColor: colors.blue },
   mapWrap: { flex: 1 },
   nearMeChip: {
     height: 30, paddingHorizontal: 10, borderRadius: 16, borderWidth: 1.5, borderColor: colors.lightBlue,

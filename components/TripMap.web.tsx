@@ -11,7 +11,7 @@ import type { Map as MLMap, Marker } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import Icon, { IconName } from "@/components/icons/Icon";
 import { mapIconForItem } from "@/lib/itemTypeMeta";
-import { MapItem } from "@/lib/mapData";
+import { MapItem, colorForMapItem } from "@/lib/mapData";
 import { MapRoute, ItemStatus, ItemType } from "@/lib/types";
 
 // Free, no API key/signup/billing — see MANIFEST-MAP-HANDOFF.md §4.6 for
@@ -23,6 +23,7 @@ export interface TripMapProps {
   items: MapItem[];
   routes: MapRoute[];
   dayColors: Map<string, string>;
+  dateToDayId: Map<string, string>;
   neutralColor: string;
   visibleDayIds: Set<string>;
   visibleTypes: Set<ItemType>;
@@ -123,7 +124,7 @@ export default function TripMap(props: TripMapProps) {
       let focusedItem: typeof visibleItems[number] | undefined;
 
       visibleItems.forEach((item) => {
-        const color = item.day_id ? p.dayColors.get(item.day_id) ?? p.neutralColor : p.neutralColor;
+        const color = colorForMapItem(item, p.dayColors, p.dateToDayId, p.neutralColor);
         const focused = item.id === p.focusItemId;
         if (focused) focusedItem = item;
         const el = document.createElement("div");
@@ -149,7 +150,7 @@ export default function TripMap(props: TripMapProps) {
 
     if (map.isStyleLoaded()) renderMarkers(map);
     else map.once("load", () => renderMarkers(map));
-  }, [maplibregl, props.items, props.visibleDayIds, props.visibleTypes, props.dayColors, props.neutralColor, props.focusItemId]);
+  }, [maplibregl, props.items, props.visibleDayIds, props.visibleTypes, props.dayColors, props.dateToDayId, props.neutralColor, props.focusItemId]);
 
   useEffect(() => {
     const map = mapRef.current;

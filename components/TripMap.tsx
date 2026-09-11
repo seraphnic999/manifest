@@ -3,7 +3,7 @@ import { View, StyleSheet } from "react-native";
 import { MapView, Camera, PointAnnotation, ShapeSource, LineLayer, type CameraStop, type PointAnnotationRef } from "@maplibre/maplibre-react-native";
 import Icon, { IconName } from "@/components/icons/Icon";
 import { mapIconForItem } from "@/lib/itemTypeMeta";
-import { MapItem } from "@/lib/mapData";
+import { MapItem, colorForMapItem } from "@/lib/mapData";
 import { MapRoute, ItemStatus, ItemType } from "@/lib/types";
 
 // Same free, no-API-key OpenFreeMap style used on web — see
@@ -14,6 +14,7 @@ export interface TripMapProps {
   items: MapItem[];
   routes: MapRoute[];
   dayColors: Map<string, string>;
+  dateToDayId: Map<string, string>;
   neutralColor: string;
   visibleDayIds: Set<string>;
   visibleTypes: Set<ItemType>;
@@ -63,7 +64,7 @@ export default function TripMap(props: TripMapProps) {
       annotationRefs.current.forEach((ref) => ref?.refresh());
     }, 350);
     return () => clearTimeout(t);
-  }, [visibleItems, props.dayColors]);
+  }, [visibleItems]);
 
   // Declarative camera props (not an imperative ref call) so the very
   // first render already has the right view — no waiting on a native ref
@@ -109,17 +110,25 @@ export default function TripMap(props: TripMapProps) {
         })}
 
         {visibleItems.map((item) => {
-          const color = item.day_id ? props.dayColors.get(item.day_id) ?? props.neutralColor : props.neutralColor;
+          const color = colorForMapItem(item, props.dayColors, props.dateToDayId, props.neutralColor);
           const focused = item.id === props.focusItemId;
+          const icon = mapIconForItem(item);
           return (
+            // PointAnnotation snapshots its children to a bitmap once and
+            // never re-snapshots on a prop change on its own (see the
+            // .refresh() workaround below, for the initial-paint race) —
+            // keying on color+icon+focus forces a full remount instead,
+            // which is the one thing guaranteed to produce a fresh
+            // snapshot, so a day-color edit is reflected immediately
+            // rather than only after some unrelated filter change.
             <PointAnnotation
-              key={item.id}
+              key={`${item.id}-${color}-${icon}-${focused}`}
               ref={(r) => { if (r) annotationRefs.current.set(item.id, r); else annotationRefs.current.delete(item.id); }}
               id={item.id}
               coordinate={[item.longitude, item.latitude]}
               onSelected={() => props.onItemPress(item)}
             >
-              <MarkerGlyph color={color} icon={mapIconForItem(item)} opacity={statusOpacity(item.status)} focused={focused} />
+              <MarkerGlyph color={color} icon={icon} opacity={statusOpacity(item.status)} focused={focused} />
             </PointAnnotation>
           );
         })}
