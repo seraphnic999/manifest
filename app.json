@@ -14,7 +14,7 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#212F3D"
+      "backgroundColor": "#0B1E3D"
     },
     "ios": {
       "supportsTablet": false
@@ -25,7 +25,7 @@
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#212F3D"
+        "backgroundColor": "#F7F9FC"
       },
       "permissions": [
         "android.permission.RECORD_AUDIO",

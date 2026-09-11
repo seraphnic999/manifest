@@ -25,7 +25,7 @@ export default function HamburgerMenu({
         accessibilityLabel="Menu"
         hitSlop={6}
       >
-        <Icon name="menu" size={18} color={solid ? colors.inkSoft : "#fff"} />
+        <Icon name="menu" size={25} color={solid ? colors.inkSoft : "#fff"} />
       </Pressable>
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
@@ -37,7 +37,7 @@ export default function HamburgerMenu({
                 style={[styles.row, i > 0 && styles.rowBorder]}
                 onPress={() => { setOpen(false); item.onPress(); }}
               >
-                <Icon name={item.icon} size={19} color={item.danger ? colors.coral : colors.blue} />
+                <Icon name={item.icon} size={26} color={item.danger ? colors.coral : colors.blue} />
                 <Text style={[styles.rowText, item.danger && { color: colors.coral }]}>{item.label}</Text>
               </Pressable>
             ))}
@@ -50,17 +50,17 @@ export default function HamburgerMenu({
 
 const styles = StyleSheet.create({
   btn: {
-    width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center",
+    width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center",
   },
   btnSolid: { backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line },
   btnOnPhoto: { backgroundColor: "rgba(11,30,63,0.4)", borderWidth: 1, borderColor: "rgba(255,255,255,0.5)" },
   backdrop: { flex: 1, backgroundColor: "rgba(11,30,63,0.35)" },
   sheet: {
-    position: "absolute", right: 14, width: 210, backgroundColor: colors.paperRaised,
+    position: "absolute", right: 14, width: 224, backgroundColor: colors.paperRaised,
     borderRadius: radius.lg, overflow: "hidden",
     shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 8,
   },
-  row: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 13, paddingHorizontal: 16 },
+  row: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 14, paddingHorizontal: 16 },
   rowBorder: { borderTopWidth: 1, borderTopColor: colors.line },
-  rowText: { color: colors.ink, fontFamily: fonts.bodySemi, fontSize: 14 },
+  rowText: { color: colors.ink, fontFamily: fonts.bodySemi, fontSize: 15 },
 });

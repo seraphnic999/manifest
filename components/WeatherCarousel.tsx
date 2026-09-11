@@ -43,7 +43,7 @@ export default function WeatherCarousel({ tripId, destinations }: { tripId: stri
               {forecast.days.map((d, i) => (
                 <View key={d.date} style={styles.dayCell}>
                   <Text style={styles.dayLabel}>{i === 0 ? "Today" : formatDateDDMM(d.date)}</Text>
-                  <Icon name={weatherIconName(d.weatherCode)} size={19} color={colors.blue} />
+                  <Icon name={weatherIconName(d.weatherCode)} size={27} color={colors.blue} />
                   <Text style={styles.temp}>{Math.round(d.tempMax)}°/{Math.round(d.tempMin)}°</Text>
                   <Text style={styles.precip}>{d.precipProb !== null && d.precipProb > 0 ? `${d.precipProb}%` : " "}</Text>
                 </View>

@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.paper, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: "80%",
     width: "100%", maxWidth: 480, alignSelf: "center",
   },
-  title: { fontFamily: "Archivo_700Bold" as any, fontWeight: "800", fontSize: 18, color: colors.ink, marginBottom: 12 },
+  title: { fontFamily: "Poppins_700Bold" as any, fontWeight: "800", fontSize: 18, color: colors.ink, marginBottom: 12 },
   input: {
     backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,
     borderRadius: radius.md, padding: 12, fontSize: 15, color: colors.ink,

@@ -16,7 +16,7 @@ export default function HeaderIconButton({
 
 const styles = StyleSheet.create({
   button: {
-    width: 32, height: 32, borderRadius: 16,
+    width: 38, height: 38, borderRadius: 19,
     backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,
     alignItems: "center", justifyContent: "center",
   },

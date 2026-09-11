@@ -68,13 +68,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.paper, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: "80%",
     width: "100%", maxWidth: 480, alignSelf: "center",
   },
-  title: { fontFamily: "Archivo_700Bold" as any, fontWeight: "800", fontSize: 18, color: colors.ink, marginBottom: 12 },
+  title: { fontFamily: "Poppins_700Bold" as any, fontWeight: "800", fontSize: 18, color: colors.ink, marginBottom: 12 },
   input: {
     backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,
     borderRadius: radius.md, padding: 12, fontSize: 15, color: colors.ink,
   },
   row: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.line },
-  rowType: { fontFamily: "IBMPlexMono_500Medium", fontSize: 9, color: colors.teal, fontWeight: "600", width: 70 },
+  rowType: { fontFamily: "JetBrainsMono_600SemiBold", fontSize: 9, color: colors.teal, fontWeight: "600", width: 70 },
   rowTitle: { color: colors.ink, fontSize: 14, flex: 1 },
   empty: { color: colors.inkSoft, textAlign: "center", marginTop: 20, fontSize: 13 },
 });

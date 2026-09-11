@@ -9,7 +9,10 @@ import { colors, radius } from "@/lib/theme";
 import { TripCurrency } from "@/lib/types";
 import { COMMON_CURRENCIES } from "@/lib/timezone";
 import { fetchLiveRateToNis } from "@/lib/currencyRates";
-import HomeButton from "@/components/HomeButton";
+import TripScreenHeader from "@/components/TripScreenHeader";
+import TripTabBar from "@/components/TripTabBar";
+import { useTripHamburgerMenu } from "@/components/useTripHamburgerMenu";
+import Icon from "@/components/icons/Icon";
 
 async function fetchCurrencies(tripId: string): Promise<TripCurrency[]> {
   const { data, error } = await supabase.from("trip_currencies").select("*").eq("trip_id", tripId)
@@ -26,6 +29,7 @@ export default function CurrencyConverter() {
   const [newRate, setNewRate] = useState("");
   const [currencyPickerOpen, setCurrencyPickerOpen] = useState(false);
   const [lookingUp, setLookingUp] = useState(false);
+  const { menuItems, shareModal } = useTripHamburgerMenu(tripId);
 
   const { data, refetch } = useQuery({ queryKey: ["tripCurrencies", tripId], queryFn: () => fetchCurrencies(tripId) });
   const currencies = data ?? [];
@@ -85,18 +89,14 @@ export default function CurrencyConverter() {
 
   return (
     <View style={styles.container}>
-      <Stack.Screen options={{
-        title: "Currency Converter",
-        headerRight: () => (
-          <View style={{ marginRight: 14 }}>
-            <HomeButton />
-          </View>
-        ),
-      }} />
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <TripScreenHeader title="Currency" tripId={tripId} menuItems={menuItems} />
+      {shareModal}
+      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 90 }}>
         <Text style={styles.hint}>Type an amount in any currency — the rest update automatically using this trip's rates.</Text>
         {currencies.map((c) => (
           <View key={c.id} style={styles.row}>
+            <View style={styles.rowIconCirc}><Icon name="currency" size={22} color={colors.blue} /></View>
             <View style={styles.codeCol}>
               <Text style={styles.code}>{c.code}</Text>
               <Text style={styles.rateStatic}>{c.is_default ? "base" : `1 = ${c.rate_to_nis} NIS`}</Text>
@@ -153,6 +153,7 @@ export default function CurrencyConverter() {
           </Pressable>
         </Pressable>
       </Modal>
+      <TripTabBar tripId={tripId} active="currency" />
     </View>
   );
 }
@@ -165,8 +166,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,
     borderRadius: radius.md, padding: 12, marginBottom: 8,
   },
+  rowIconCirc: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.paper, alignItems: "center", justifyContent: "center" },
   codeCol: { width: 64 },
-  code: { fontFamily: "IBMPlexMono_500Medium", fontWeight: "700", color: colors.ink, fontSize: 15 },
+  code: { fontFamily: "JetBrainsMono_600SemiBold", fontWeight: "700", color: colors.ink, fontSize: 15 },
   rateStatic: { fontSize: 9.5, color: colors.inkSoft, marginTop: 2 },
   input: {
     flex: 1, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.line,

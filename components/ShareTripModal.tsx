@@ -95,7 +95,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.paper, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: "80%",
     width: "100%", maxWidth: 480, alignSelf: "center",
   },
-  title: { fontFamily: "Archivo_700Bold" as any, fontWeight: "800", fontSize: 18, color: colors.ink, marginBottom: 6 },
+  title: { fontFamily: "Poppins_700Bold" as any, fontWeight: "800", fontSize: 18, color: colors.ink, marginBottom: 6 },
   hint: { color: colors.inkSoft, fontSize: 12, marginBottom: 14, lineHeight: 17 },
   row: { flexDirection: "row", gap: 8, alignItems: "center" },
   input: {

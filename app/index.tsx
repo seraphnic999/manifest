@@ -22,7 +22,7 @@ import { Alert } from "@/lib/alert";
 // Set once a current-trip redirect has been attempted this app session, so
 // it only ever fires on the first load after launch — the Home button (the
 // only other way back to this screen) must keep working as a real trip list
-// even while a trip is current, not bounce straight back to Today.
+// even while a trip is current, not bounce straight back to its Overview.
 let hasCheckedLaunchRedirect = false;
 
 async function fetchTrips(): Promise<Trip[]> {
@@ -44,8 +44,9 @@ interface HeroExtra {
 
 // The ongoing-trip hero needs two things nothing else on this screen fetches:
 // the very next scheduled item (today's remainder, or the next day that has
-// one), and today's weather for the trip's first destination. Trimmed down
-// from today.tsx's fuller "next item" logic since the hero only shows one line.
+// one), and today's weather for the trip's first destination. Same "next
+// item" idea as the Today section on the trip's own Overview screen, just
+// trimmed down since the hero only shows one line.
 async function fetchHeroExtra(tripId: string, destinations: string[]): Promise<HeroExtra> {
   const iso = localIsoDate();
   const { data: days } = await supabase.from("days").select("id, date").eq("trip_id", tripId).order("sort_order");
@@ -93,7 +94,7 @@ function TripPhotoCard({ trip, showCountdown, onArchive }: { trip: Trip; showCou
   return (
     <Pressable
       style={styles.tripCard}
-      onPress={() => router.push(tripStatus(trip) === "current" ? `/trip/${trip.id}/today` : `/trip/${trip.id}`)}
+      onPress={() => router.push(`/trip/${trip.id}`)}
     >
       <ImageBackground source={coverPhotoSource(trip.cover_photo_id)} style={styles.tripCardTop} imageStyle={{ resizeMode: "cover" }}>
         <View style={styles.tripCardScrim} />
@@ -109,7 +110,7 @@ function TripPhotoCard({ trip, showCountdown, onArchive }: { trip: Trip; showCou
         </View>
         {onArchive ? (
           <Pressable onPress={onArchive} hitSlop={10}>
-            <Icon name="archive" size={18} color={colors.inkSoft} />
+            <Icon name="archive" size={25} color={colors.inkSoft} />
           </Pressable>
         ) : (
           <Text style={styles.chevron}>{"›"}</Text>
@@ -167,7 +168,7 @@ export default function TripList() {
     redirectChecked.current = true;
     hasCheckedLaunchRedirect = true;
     const current = data.find((t) => tripStatus(t) === "current");
-    if (current) router.replace(`/trip/${current.id}/today`);
+    if (current) router.replace(`/trip/${current.id}`);
   }, [data]);
 
   useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
@@ -233,7 +234,7 @@ export default function TripList() {
               }}
               accessibilityLabel="New trip"
             >
-              <Icon name="add" size={18} color="#fff" />
+              <Icon name="add" size={25} color="#fff" />
             </Pressable>
             <HamburgerMenu
               items={[
@@ -247,7 +248,7 @@ export default function TripList() {
         </View>
 
         <View style={styles.searchRow}>
-          <Icon name="search" size={16} color={colors.inkSoft} />
+          <Icon name="search" size={22} color={colors.inkSoft} />
           <TextInput
             style={styles.searchInput}
             value={searchInput}
@@ -257,7 +258,9 @@ export default function TripList() {
           />
           {searchInput.length > 0 && (
             <Pressable onPress={() => setSearchInput("")} hitSlop={8}>
-              <Icon name="add" size={14} color={colors.inkSoft} strokeWidth={4} />
+              <View style={{ transform: [{ rotate: "45deg" }] }}>
+                <Icon name="add" size={18} color={colors.inkSoft} strokeWidth={3.5} />
+              </View>
             </Pressable>
           )}
         </View>
@@ -310,7 +313,7 @@ export default function TripList() {
                   <View style={styles.heroScrim} />
                   {heroExtra?.weatherTemp != null && heroExtra.weatherCode != null && (
                     <View style={styles.weatherBadge}>
-                      <Icon name={weatherIconName(heroExtra.weatherCode)} size={16} color="#fff" />
+                      <Icon name={weatherIconName(heroExtra.weatherCode)} size={22} color="#fff" />
                       <Text style={styles.weatherTemp}>{heroExtra.weatherTemp}°</Text>
                     </View>
                   )}
@@ -357,7 +360,7 @@ const styles = StyleSheet.create({
   title: { fontFamily: fonts.display, fontSize: 22, color: colors.ink },
   headerBtns: { flexDirection: "row", gap: 8 },
   addBtn: {
-    width: 34, height: 34, borderRadius: 17, backgroundColor: colors.ink,
+    width: 42, height: 42, borderRadius: 21, backgroundColor: colors.ink,
     alignItems: "center", justifyContent: "center",
   },
   searchRow: {
@@ -367,8 +370,8 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, color: colors.ink, fontSize: 14, padding: 0 },
   sectionLabel: {
-    color: colors.inkSoft, fontFamily: fonts.bodyBold, fontSize: 11,
-    textTransform: "uppercase", letterSpacing: 1, marginVertical: 10,
+    color: colors.ink, fontFamily: fonts.display, fontSize: 18,
+    marginTop: 14, marginBottom: 10,
   },
   empty: { textAlign: "center", color: colors.inkSoft, marginTop: 40 },
 

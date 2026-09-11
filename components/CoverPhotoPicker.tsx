@@ -24,7 +24,7 @@ export default function CoverPhotoPicker({
             {selected ? selected.country : "Optional — a generic placeholder is used until you pick one"}
           </Text>
         </View>
-        <Icon name="edit" size={16} color={colors.inkSoft} />
+        <Icon name="edit" size={22} color={colors.inkSoft} />
       </Pressable>
 
       <Modal visible={open} animationType="slide" onRequestClose={() => setOpen(false)}>
@@ -37,7 +37,7 @@ export default function CoverPhotoPicker({
           </View>
 
           <View style={styles.searchRow}>
-            <Icon name="search" size={16} color={colors.inkSoft} />
+            <Icon name="search" size={22} color={colors.inkSoft} />
             <TextInput
               style={styles.searchInput}
               value={query}
@@ -53,7 +53,7 @@ export default function CoverPhotoPicker({
           >
             <Image source={FALLBACK_COVER_PHOTO} style={styles.clearThumb} />
             <Text style={styles.clearText}>Use default placeholder</Text>
-            {!value && <Icon name="check" size={14} color={colors.blue} />}
+            {!value && <Icon name="check" size={20} color={colors.blue} />}
           </Pressable>
 
           <FlatList
@@ -77,7 +77,7 @@ export default function CoverPhotoPicker({
                   <Text style={styles.tileCountry} numberOfLines={1}>{item.country}</Text>
                 </View>
                 {value === item.id && (
-                  <View style={styles.tileCheck}><Icon name="check" size={12} color="#fff" /></View>
+                  <View style={styles.tileCheck}><Icon name="check" size={16} color="#fff" /></View>
                 )}
               </Pressable>
             )}
@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
   tileCity: { color: colors.ink, fontFamily: fonts.bodySemi, fontSize: 12.5 },
   tileCountry: { color: colors.inkSoft, fontSize: 10.5, marginTop: 1 },
   tileCheck: {
-    position: "absolute", top: 8, right: 8, width: 22, height: 22, borderRadius: 11,
+    position: "absolute", top: 8, right: 8, width: 26, height: 26, borderRadius: 13,
     backgroundColor: colors.blue, alignItems: "center", justifyContent: "center",
   },
   empty: { textAlign: "center", color: colors.inkSoft, marginTop: 40, paddingHorizontal: 24 },

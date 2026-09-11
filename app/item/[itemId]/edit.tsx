@@ -497,7 +497,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row" },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.paperRaised },
-  chipActive: { backgroundColor: colors.amber, borderColor: colors.amber },
+  chipActive: { backgroundColor: colors.blue, borderColor: colors.blue },
   chipText: { color: colors.inkSoft, fontWeight: "600", fontSize: 13 },
   chipTextActive: { color: "#fff" },
   button: { backgroundColor: colors.ink, borderRadius: radius.md, padding: 14, alignItems: "center", marginTop: 28 },

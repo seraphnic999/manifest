@@ -33,7 +33,7 @@ const styles = StyleSheet.create({
   },
   headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
   label: { color: colors.inkSoft, fontWeight: "700", fontSize: 12, textTransform: "uppercase", letterSpacing: 1 },
-  percent: { fontFamily: "IBMPlexMono_500Medium", color: colors.teal, fontWeight: "700", fontSize: 14 },
+  percent: { fontFamily: "JetBrainsMono_600SemiBold", color: colors.teal, fontWeight: "700", fontSize: 14 },
   percentOver: { color: colors.coral },
   track: { height: 10, backgroundColor: colors.paper, borderRadius: 6, overflow: "hidden" },
   fill: { height: 10, backgroundColor: colors.teal, borderRadius: 6 },

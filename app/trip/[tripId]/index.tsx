@@ -1,21 +1,19 @@
-import { useCallback, useEffect, useState } from "react";
-import { View, Text, FlatList, StyleSheet, Pressable, ActivityIndicator, ImageBackground } from "react-native";
+import { useCallback } from "react";
+import { View, Text, FlatList, StyleSheet, Pressable, ImageBackground } from "react-native";
 import { useLocalSearchParams, useRouter, Stack, useFocusEffect } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Alert } from "@/lib/alert";
 import { supabase } from "@/lib/supabase";
 import { colors, radius, fonts } from "@/lib/theme";
 import { Day, Item, Trip, TripCurrency, Expense, tripStatus } from "@/lib/types";
 import Icon from "@/components/icons/Icon";
 import HamburgerMenu from "@/components/HamburgerMenu";
 import TripTabBar from "@/components/TripTabBar";
+import { useTripHamburgerMenu } from "@/components/useTripHamburgerMenu";
 import { computeDurationMinutes, formatDuration } from "@/lib/duration";
 import { formatDateDDMMYYYY, localIsoDate } from "@/lib/dateFormat";
 import { normalizeTimeHHMM } from "@/lib/timeFormat";
-import { exportTripItineraryPdf } from "@/lib/exportItinerary";
-import ShareTripModal from "@/components/ShareTripModal";
 import { useNetworkStatus } from "@/lib/useNetworkStatus";
 import OfflineBanner from "@/components/OfflineBanner";
 import WeatherCarousel from "@/components/WeatherCarousel";
@@ -98,9 +96,7 @@ export default function TripOverview() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
   const isOnline = useNetworkStatus();
   const insets = useSafeAreaInsets();
-  const [exporting, setExporting] = useState(false);
-  const [isOwner, setIsOwner] = useState(false);
-  const [shareOpen, setShareOpen] = useState(false);
+  const { menuItems, shareModal } = useTripHamburgerMenu(tripId);
   const router = useRouter();
 
   const { data, dataUpdatedAt, refetch } = useQuery({
@@ -126,30 +122,6 @@ export default function TripOverview() {
     ? computeBudgetProgress(trip, data.expenses, (code) => data.currencies.find((c) => c.code === code)?.rate_to_nis ?? 1)
     : null;
 
-  useEffect(() => {
-    if (!trip) return;
-    supabase.auth.getUser().then(({ data }) => {
-      if (data.user) setIsOwner(data.user.id === trip.user_id);
-    });
-  }, [trip?.user_id]);
-
-  async function handleExportPdf() {
-    setExporting(true);
-    try {
-      await exportTripItineraryPdf(tripId);
-    } catch (e: any) {
-      Alert.alert("Export failed", e.message ?? "Unknown error");
-    }
-    setExporting(false);
-  }
-
-  function signOut() {
-    Alert.alert("Sign out", "Sign out of Manifest?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Sign out", style: "destructive", onPress: () => supabase.auth.signOut() },
-    ]);
-  }
-
   // Re-fetch every time this screen regains focus (e.g. navigating back
   // after adding an expense on an item page) — a plain useEffect only runs
   // once on mount/param-change, so the Money total would otherwise go stale
@@ -158,18 +130,11 @@ export default function TripOverview() {
 
   if (!trip) return null;
 
-  const menuItems = [
-    { icon: "export" as const, label: exporting ? "Exporting…" : "Export PDF", onPress: handleExportPdf },
-    { icon: "edit" as const, label: "Edit Trip", onPress: () => router.push(`/trip/${tripId}/edit`) },
-    ...(isOwner ? [{ icon: "share" as const, label: "Share Trip", onPress: () => setShareOpen(true) }] : []),
-    { icon: "signOut" as const, label: "Sign Out", onPress: signOut, danger: true },
-  ];
-
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
       <StatusBar style="light" />
-      <ShareTripModal visible={shareOpen} onClose={() => setShareOpen(false)} tripId={tripId} />
+      {shareModal}
 
       <FlatList
         style={{ flex: 1 }}
@@ -183,13 +148,13 @@ export default function TripOverview() {
               <View style={styles.heroScrim} />
               <View style={[styles.headerRow, { top: insets.top + 10 }]}>
                 <Pressable style={styles.hbtn} onPress={() => router.canDismiss() ? router.dismissAll() : router.replace("/")} accessibilityLabel="Home">
-                  <Icon name="home" size={18} color="#fff" />
+                  <Icon name="home" size={25} color="#fff" />
                 </Pressable>
-                <HamburgerMenu items={menuItems} sheetTop={insets.top + 46} />
+                <HamburgerMenu items={menuItems} sheetTop={insets.top + 50} />
               </View>
               {heroWeather && heroWeather.days.length > 0 && (
-                <View style={[styles.weatherBadge, { top: insets.top + 52 }]}>
-                  <Icon name={weatherIconName(heroWeather.days[0].weatherCode)} size={17} color="#fff" />
+                <View style={[styles.weatherBadge, { top: insets.top + 56 }]}>
+                  <Icon name={weatherIconName(heroWeather.days[0].weatherCode)} size={24} color="#fff" />
                   <Text style={styles.weatherTemp}>{Math.round(heroWeather.days[0].tempMax)}°</Text>
                   <Text style={styles.weatherDate}>{formatDateDDMMYYYY(localIsoDate()).slice(0, 5)}</Text>
                 </View>
@@ -213,7 +178,7 @@ export default function TripOverview() {
               )}
 
               <Pressable style={styles.budgetBubble} onPress={() => router.push(`/trip/${tripId}/money`)}>
-                <View style={styles.budgetIconCirc}><Icon name="budget" size={18} color={colors.blue} /></View>
+                <View style={styles.budgetIconCirc}><Icon name="budget" size={25} color={colors.blue} /></View>
                 <View style={{ flex: 1 }}>
                   <View style={styles.budgetHead}>
                     <Text style={styles.budgetLabel}>Budget</Text>
@@ -269,7 +234,7 @@ export default function TripOverview() {
                     const durationText = durationMinutes !== null && durationMinutes >= 0 ? formatDuration(durationMinutes) : null;
                     return (
                       <Pressable key={f.id} style={styles.itemRow} onPress={() => router.push(`/item/${f.id}`)}>
-                        <View style={styles.itemIconCol}><Icon name="flight" size={20} color="#fff" /></View>
+                        <View style={styles.itemIconCol}><Icon name="flight" size={28} color="#fff" /></View>
                         <View style={styles.itemBody}>
                           <Text style={styles.itemCat}>{flightNumber ?? "FLIGHT"}</Text>
                           <Text style={styles.itemTitle}>{f.title}</Text>
@@ -288,7 +253,7 @@ export default function TripOverview() {
                   <Text style={styles.sectionLabel}>Lodging</Text>
                   {lodgings.map((l) => (
                     <Pressable key={l.id} style={styles.itemRow} onPress={() => router.push(`/item/${l.id}`)}>
-                      <View style={styles.itemIconCol}><Icon name="lodging" size={20} color="#fff" /></View>
+                      <View style={styles.itemIconCol}><Icon name="lodging" size={28} color="#fff" /></View>
                       <View style={styles.itemBody}>
                         <Text style={styles.itemCat}>LODGING</Text>
                         <Text style={styles.itemTitle}>{l.title}</Text>
@@ -342,15 +307,15 @@ const styles = StyleSheet.create({
   },
   headerRow: { position: "absolute", right: 14, flexDirection: "row", gap: 8 },
   hbtn: {
-    width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center",
+    width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center",
     backgroundColor: "rgba(11,30,63,0.4)", borderWidth: 1, borderColor: "rgba(255,255,255,0.5)",
   },
   weatherBadge: {
-    position: "absolute", right: 14, width: 56, height: 66, borderRadius: 33,
+    position: "absolute", right: 14, width: 66, height: 78, borderRadius: 39,
     borderWidth: 1.5, borderColor: "rgba(255,255,255,0.85)", backgroundColor: "rgba(11,30,63,0.35)",
     alignItems: "center", justifyContent: "center",
   },
-  weatherTemp: { color: "#fff", fontFamily: fonts.monoBold, fontSize: 13.5 },
+  weatherTemp: { color: "#fff", fontFamily: fonts.monoBold, fontSize: 15 },
   weatherDate: { color: "#fff", fontSize: 7, opacity: 0.85 },
   tripName: { color: "#fff", fontFamily: fonts.display, fontSize: 21, marginBottom: 4 },
 
@@ -361,7 +326,7 @@ const styles = StyleSheet.create({
     flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.paperRaised,
     borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, padding: 10, marginTop: 10,
   },
-  budgetIconCirc: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.paper, alignItems: "center", justifyContent: "center" },
+  budgetIconCirc: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.paper, alignItems: "center", justifyContent: "center" },
   budgetHead: { flexDirection: "row", justifyContent: "space-between", marginBottom: 4 },
   budgetLabel: { color: colors.inkSoft, fontFamily: fonts.bodyBold, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5 },
   budgetPct: { color: colors.teal, fontFamily: fonts.monoBold, fontSize: 13 },

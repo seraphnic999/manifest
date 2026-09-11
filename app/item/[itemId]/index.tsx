@@ -304,7 +304,7 @@ export default function ItemDetails() {
             <Ionicons name="copy-outline" size={16} color={colors.teal} />
           </HeaderIconButton>
           <HeaderIconButton onPress={() => router.push(`/item/${itemId}/edit`)}>
-            <Ionicons name="pencil" size={16} color={colors.amber} />
+            <Ionicons name="pencil" size={16} color={colors.blue} />
           </HeaderIconButton>
           <HomeButton />
         </View>
@@ -545,7 +545,7 @@ const styles = StyleSheet.create({
   customHeaderTitleWrap: { flex: 1, minWidth: 0, marginHorizontal: 4 },
   headerButtons: { flexDirection: "row", alignItems: "center", gap: 8, marginLeft: 8 },
   headerTitleText: { fontSize: 17, fontWeight: "700", color: colors.ink },
-  typeTag: { fontFamily: "IBMPlexMono_500Medium", color: colors.teal, fontWeight: "600", fontSize: 11 },
+  typeTag: { fontFamily: "JetBrainsMono_600SemiBold", color: colors.teal, fontWeight: "600", fontSize: 11 },
   title: { color: colors.ink, fontWeight: "800", fontSize: 22, marginVertical: 6 },
   fieldRow: { paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.line },
   fieldLabel: { color: colors.inkSoft, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5 },
@@ -597,7 +597,7 @@ const styles = StyleSheet.create({
   },
   expenseDesc: { color: colors.ink, fontWeight: "600", fontSize: 13 },
   expenseDate: { color: colors.inkSoft, fontSize: 11, marginTop: 2 },
-  expenseAmt: { fontFamily: "IBMPlexMono_500Medium", color: colors.ink, fontWeight: "600", fontSize: 13 },
+  expenseAmt: { fontFamily: "JetBrainsMono_600SemiBold", color: colors.ink, fontWeight: "600", fontSize: 13 },
   empty: { color: colors.inkSoft, fontSize: 12, fontStyle: "italic", marginTop: 4 },
   addExpenseButton: {
     borderWidth: 1, borderColor: colors.line, borderStyle: "dashed", borderRadius: radius.md,

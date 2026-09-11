@@ -2,13 +2,15 @@ import { useCallback, useState } from "react";
 import { View, Text, TextInput, Pressable, StyleSheet, ScrollView, Modal } from "react-native";
 import { useLocalSearchParams, Stack, useFocusEffect, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
-import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/lib/supabase";
-import { colors, radius } from "@/lib/theme";
+import { colors, radius, fonts } from "@/lib/theme";
 import { PackingItem } from "@/lib/types";
 import { PACKING_CATEGORIES, mergePackingItems, fetchTemplateItems, fetchTripPackingAsSource } from "@/lib/packing";
-import TripNavBar from "@/components/TripNavBar";
-import HomeButton from "@/components/HomeButton";
+import TripScreenHeader from "@/components/TripScreenHeader";
+import TripTabBar from "@/components/TripTabBar";
+import { useTripHamburgerMenu } from "@/components/useTripHamburgerMenu";
+import Icon from "@/components/icons/Icon";
+import Checkbox from "@/components/Checkbox";
 import { useNetworkStatus } from "@/lib/useNetworkStatus";
 import OfflineBanner from "@/components/OfflineBanner";
 import { Alert } from "@/lib/alert";
@@ -44,6 +46,7 @@ export default function PackingScreen() {
   const [newItemCategory, setNewItemCategory] = useState<string | null>(null);
   const [populateOpen, setPopulateOpen] = useState(false);
   const [sourcePickerOpen, setSourcePickerOpen] = useState<"template" | "trip" | null>(null);
+  const { menuItems, shareModal } = useTripHamburgerMenu(tripId);
 
   const { data, dataUpdatedAt, refetch } = useQuery({ queryKey: ["packing", tripId], queryFn: () => fetchPackingData(tripId) });
   const items = data?.items ?? [];
@@ -106,15 +109,9 @@ export default function PackingScreen() {
 
   return (
     <View style={styles.container}>
-      <Stack.Screen options={{
-        title: "Packing",
-        headerRight: () => (
-          <View style={{ marginRight: 14 }}>
-            <HomeButton />
-          </View>
-        ),
-      }} />
-      <TripNavBar tripId={tripId} active="packing" />
+      <Stack.Screen options={{ headerShown: false }} />
+      <TripScreenHeader title="Packing" tripId={tripId} menuItems={menuItems} />
+      {shareModal}
       <OfflineBanner dataUpdatedAt={!isOnline ? dataUpdatedAt : undefined} />
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
@@ -132,10 +129,12 @@ export default function PackingScreen() {
               <Text style={styles.groupLabel}>{cat}</Text>
               {grouped.get(cat)!.map((item) => (
                 <Pressable key={item.id} style={styles.itemRow} onPress={() => togglePacked(item)}>
-                  <Ionicons name={item.packed ? "checkbox" : "square-outline"} size={22} color={item.packed ? colors.teal : colors.inkSoft} />
+                  <Checkbox checked={item.packed} />
                   <Text style={[styles.itemName, item.packed && styles.itemNamePacked]}>{item.name}</Text>
                   <Pressable onPress={() => removeItem(item.id)} hitSlop={8}>
-                    <Ionicons name="close" size={16} color={colors.inkSoft} />
+                    <View style={{ transform: [{ rotate: "45deg" }] }}>
+                      <Icon name="add" size={18} color={colors.inkSoft} strokeWidth={3} />
+                    </View>
                   </Pressable>
                 </Pressable>
               ))}
@@ -210,6 +209,7 @@ export default function PackingScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+      <TripTabBar tripId={tripId} active="packing" />
     </View>
   );
 }

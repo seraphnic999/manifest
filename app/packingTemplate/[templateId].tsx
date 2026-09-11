@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
 import { PackingTemplateItem } from "@/lib/types";
 import { PACKING_CATEGORIES } from "@/lib/packing";
-import HomeButton from "@/components/HomeButton";
+import SubpageHeader from "@/components/SubpageHeader";
 
 interface TemplateData {
   name: string;
@@ -70,15 +70,10 @@ export default function PackingTemplateEditor() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: 20, paddingBottom: 60 }}>
-      <Stack.Screen options={{
-        title: "Edit Template",
-        headerRight: () => (
-          <View style={{ marginRight: 14 }}>
-            <HomeButton />
-          </View>
-        ),
-      }} />
+    <View style={{ flex: 1, backgroundColor: colors.paper }}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <SubpageHeader title="Edit Template" />
+      <ScrollView style={styles.container} contentContainerStyle={{ padding: 20, paddingBottom: 60 }}>
 
       <Text style={styles.label}>Template name</Text>
       <TextInput style={styles.input} value={name} onChangeText={setName} onBlur={saveName} />
@@ -122,7 +117,8 @@ export default function PackingTemplateEditor() {
       <Pressable style={styles.deleteButton} onPress={deleteTemplate}>
         <Text style={styles.deleteButtonText}>Delete template</Text>
       </Pressable>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 

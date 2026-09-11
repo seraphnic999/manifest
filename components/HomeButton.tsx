@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
 import { colors } from "@/lib/theme";
+import Icon from "@/components/icons/Icon";
 import HeaderIconButton from "./HeaderIconButton";
 
 // Pops all the way back to the trip list, however many screens deep the
@@ -18,7 +18,7 @@ export default function HomeButton() {
   }
   return (
     <HeaderIconButton onPress={goHome} accessibilityLabel="Home">
-      <Ionicons name="home" size={16} color={colors.ink} />
+      <Icon name="home" size={20} color={colors.ink} />
     </HeaderIconButton>
   );
 }

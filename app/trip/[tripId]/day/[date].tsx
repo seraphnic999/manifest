@@ -10,10 +10,11 @@ import { Item, Day } from "@/lib/types";
 import { renumberedOrders } from "@/lib/reorder";
 import { categoryForDbType } from "@/lib/itemTypeMeta";
 import ItemTypePickerModal from "@/components/ItemTypePickerModal";
-import TripNavBar from "@/components/TripNavBar";
+import TripScreenHeader from "@/components/TripScreenHeader";
+import TripTabBar from "@/components/TripTabBar";
+import { useTripHamburgerMenu } from "@/components/useTripHamburgerMenu";
 import { formatDateDDMMYYYY, formatDateDDMM } from "@/lib/dateFormat";
 import { normalizeTimeHHMM } from "@/lib/timeFormat";
-import HomeButton from "@/components/HomeButton";
 import { useNetworkStatus } from "@/lib/useNetworkStatus";
 import OfflineBanner from "@/components/OfflineBanner";
 import { findOverlappingItemIds, isLastTripDay } from "@/lib/conflicts";
@@ -94,6 +95,7 @@ export default function DayView() {
   const [themeDraft, setThemeDraft] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
   const router = useRouter();
+  const { menuItems, shareModal } = useTripHamburgerMenu(tripId);
 
   const { data, dataUpdatedAt, refetch } = useQuery({
     queryKey: ["day", tripId, date],
@@ -224,16 +226,14 @@ export default function DayView() {
 
   return (
     <View style={styles.container}>
-      <Stack.Screen options={{
-        title: isProposals ? "Proposals" : formatDateDDMMYYYY(date),
-        headerRight: () => (
-          <View style={{ marginRight: 14 }}>
-            <HomeButton />
-          </View>
-        ),
-      }} />
-
-      <TripNavBar tripId={tripId} active="day" />
+      <Stack.Screen options={{ headerShown: false }} />
+      <TripScreenHeader
+        title={isProposals ? "Proposals" : formatDateDDMMYYYY(date)}
+        tripId={tripId}
+        menuItems={menuItems}
+        onBack={() => (router.canGoBack() ? router.back() : router.push(`/trip/${tripId}`))}
+      />
+      {shareModal}
       <OfflineBanner dataUpdatedAt={!isOnline ? dataUpdatedAt : undefined} />
 
       <View style={styles.dayStripOuter}>
@@ -343,6 +343,7 @@ export default function DayView() {
           </Pressable>
         </Pressable>
       </Modal>
+      <TripTabBar tripId={tripId} active="overview" />
     </View>
   );
 }
@@ -360,7 +361,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.line, minWidth: 56, alignItems: "center",
   },
   dayPillActive: { backgroundColor: colors.ink, borderColor: colors.ink },
-  dayPillText: { fontFamily: "IBMPlexMono_500Medium", fontSize: 11, fontWeight: "600", color: colors.inkSoft },
+  dayPillText: { fontFamily: "JetBrainsMono_600SemiBold", fontSize: 11, fontWeight: "600", color: colors.inkSoft },
   dayPillTheme: { fontSize: 8, color: colors.teal, marginTop: 1, maxWidth: 60 },
   dayPillTextActive: { color: colors.paper },
   themeRow: {
@@ -369,7 +370,7 @@ const styles = StyleSheet.create({
   },
   themeText: { color: colors.teal, fontWeight: "700", fontSize: 14 },
   themePlaceholder: { color: colors.inkSoft, fontStyle: "italic", fontSize: 13 },
-  themeEdit: { color: colors.amber, fontSize: 12, fontWeight: "600" },
+  themeEdit: { color: colors.blue, fontSize: 12, fontWeight: "600" },
   gapWarning: {
     flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(193,84,63,0.1)",
     marginHorizontal: 16, marginTop: 10, padding: 10, borderRadius: radius.md,
@@ -380,22 +381,22 @@ const styles = StyleSheet.create({
     flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.amberSoft,
     marginHorizontal: 16, marginTop: 10, padding: 10, borderRadius: radius.md,
   },
-  stayBannerLabel: { fontFamily: "IBMPlexMono_500Medium", fontSize: 10, fontWeight: "700", color: "#7A521A" },
+  stayBannerLabel: { fontFamily: "JetBrainsMono_600SemiBold", fontSize: 10, fontWeight: "700", color: "#7A521A" },
   stayBannerTitle: { color: colors.ink, fontWeight: "600", fontSize: 13 },
   row: {
     flexDirection: "row", backgroundColor: colors.paperRaised, alignItems: "stretch",
     borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, marginBottom: 8, overflow: "hidden",
   },
   rowMain: { flex: 1, flexDirection: "row", alignItems: "stretch" },
-  rowActive: { opacity: 0.85, borderColor: colors.amber, shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 6 },
+  rowActive: { opacity: 0.85, borderColor: colors.blue, shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 6 },
   timeCol: { width: 60, backgroundColor: colors.ink, alignItems: "center", justifyContent: "center", padding: 6 },
   timeColMuted: { backgroundColor: "#C7BFA9" },
-  timeText: { fontFamily: "IBMPlexMono_500Medium", color: colors.paper, fontSize: 11, fontWeight: "600" },
+  timeText: { fontFamily: "JetBrainsMono_600SemiBold", color: colors.paper, fontSize: 11, fontWeight: "600" },
   timeArrowSmall: { color: colors.amberSoft, fontSize: 8, marginVertical: 1 },
-  timeTextSecondary: { fontFamily: "IBMPlexMono_500Medium", color: colors.amberSoft, fontSize: 9, fontWeight: "600" },
+  timeTextSecondary: { fontFamily: "JetBrainsMono_600SemiBold", color: colors.amberSoft, fontSize: 9, fontWeight: "600" },
   body: { flex: 1, padding: 10 },
   row1: { flexDirection: "row", alignItems: "center", gap: 6 },
-  typeTag: { fontFamily: "IBMPlexMono_500Medium", fontSize: 9, color: colors.teal, fontWeight: "600" },
+  typeTag: { fontFamily: "JetBrainsMono_600SemiBold", fontSize: 9, color: colors.teal, fontWeight: "600" },
   statusBadge: { fontSize: 9, color: colors.inkSoft, marginLeft: "auto" },
   itemTitle: { color: colors.ink, fontWeight: "600", fontSize: 14, marginTop: 2 },
   empty: { textAlign: "center", color: colors.inkSoft, marginTop: 40 },
@@ -406,7 +407,7 @@ const styles = StyleSheet.create({
   reorderBtnDisabled: { opacity: 0.25 },
   reorderBtnText: { color: colors.inkSoft, fontSize: 13, fontWeight: "700" },
   fab: {
-    position: "absolute", bottom: 20, alignSelf: "center",
+    position: "absolute", bottom: 74, alignSelf: "center",
     backgroundColor: colors.ink, borderRadius: 24, paddingVertical: 14, paddingHorizontal: 24,
     shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4,
   },

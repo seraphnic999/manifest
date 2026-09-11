@@ -498,7 +498,7 @@ const styles = StyleSheet.create({
     borderRadius: 14, paddingVertical: 4, paddingHorizontal: 10,
   },
   dayChipWarning: { borderColor: colors.coral, backgroundColor: "rgba(224,98,60,0.1)" },
-  dayChipText: { color: colors.ink, fontSize: 11, fontFamily: "IBMPlexMono_500Medium" },
+  dayChipText: { color: colors.ink, fontSize: 11, fontFamily: "JetBrainsMono_600SemiBold" },
   dayChipWarningText: { color: colors.coral, fontWeight: "700" },
   button: {
     position: "absolute", left: 20, right: 20, bottom: 20,

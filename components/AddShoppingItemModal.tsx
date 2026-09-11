@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.paper, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: "88%",
     width: "100%", maxWidth: 480, alignSelf: "center",
   },
-  sheetTitle: { fontFamily: "Archivo_700Bold" as any, fontWeight: "800", fontSize: 18, color: colors.ink, marginBottom: 12 },
+  sheetTitle: { fontFamily: "Poppins_700Bold" as any, fontWeight: "800", fontSize: 18, color: colors.ink, marginBottom: 12 },
   label: { color: colors.inkSoft, fontSize: 12, fontWeight: "600", marginTop: 14, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 },
   input: {
     backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,

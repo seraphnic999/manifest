@@ -27,8 +27,8 @@ export default function TripTabBar({ tripId, active }: { tripId: string; active:
             style={styles.tab}
             onPress={() => !isActive && router.push(t.path(tripId))}
           >
-            <Icon name={t.icon} size={21} color={isActive ? colors.blue : colors.inkSoft} />
-            <Text style={[styles.label, isActive && styles.labelActive]}>{t.label}</Text>
+            <Icon name={t.icon} size={29} color={isActive ? colors.blue : colors.inkSoft} />
+            <Text style={[styles.label, isActive && styles.labelActive]} numberOfLines={1}>{t.label}</Text>
           </Pressable>
         );
       })}
@@ -38,11 +38,11 @@ export default function TripTabBar({ tripId, active }: { tripId: string; active:
 
 const styles = StyleSheet.create({
   bar: {
-    flexDirection: "row", justifyContent: "center", gap: 16,
-    paddingTop: 8, paddingBottom: 10, paddingHorizontal: 14,
+    flexDirection: "row", justifyContent: "center", gap: 4,
+    paddingTop: 8, paddingBottom: 10, paddingHorizontal: 4,
     backgroundColor: colors.paperRaised, borderTopWidth: 1, borderTopColor: colors.line,
   },
-  tab: { width: 48, alignItems: "center", gap: 3 },
-  label: { fontFamily: fonts.bodySemi, fontSize: 9.5, color: colors.inkSoft },
+  tab: { flex: 1, alignItems: "center", gap: 4, minWidth: 0 },
+  label: { fontFamily: fonts.bodySemi, fontSize: 9, color: colors.inkSoft, textAlign: "center" },
   labelActive: { color: colors.blue },
 });

@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView, Modal } from "react-native";
-import { useLocalSearchParams, Stack, useFocusEffect } from "expo-router";
+import { useLocalSearchParams, Stack, useFocusEffect, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
@@ -8,8 +8,9 @@ import { TripCurrency, TripParty, Expense, Allocation, ExpenseType } from "@/lib
 import { EXPENSE_TYPES, EXPENSE_TYPE_LABELS } from "@/lib/expenseType";
 import { classifyExpenseTiming, ExpenseTiming } from "@/lib/expenseTiming";
 import { formatDateDDMMYYYY } from "@/lib/dateFormat";
-import TripNavBar from "@/components/TripNavBar";
-import HomeButton from "@/components/HomeButton";
+import TripScreenHeader from "@/components/TripScreenHeader";
+import TripTabBar from "@/components/TripTabBar";
+import { useTripHamburgerMenu } from "@/components/useTripHamburgerMenu";
 import { useNetworkStatus } from "@/lib/useNetworkStatus";
 import OfflineBanner from "@/components/OfflineBanner";
 
@@ -41,7 +42,7 @@ const barStyles = StyleSheet.create({
   row: { marginBottom: 12 },
   labelRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 4 },
   label: { color: colors.ink, fontWeight: "600", fontSize: 13 },
-  value: { fontFamily: "IBMPlexMono_500Medium", color: colors.inkSoft, fontSize: 12 },
+  value: { fontFamily: "JetBrainsMono_600SemiBold", color: colors.inkSoft, fontSize: 12 },
   track: { height: 10, borderRadius: 5, backgroundColor: colors.paperRaised, overflow: "hidden" },
   fill: { height: "100%", borderRadius: 5 },
 });
@@ -78,6 +79,8 @@ async function fetchReportData(tripId: string): Promise<ReportData> {
 
 export default function ExpenseReport() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
+  const router = useRouter();
+  const { menuItems, shareModal } = useTripHamburgerMenu(tripId);
   const isOnline = useNetworkStatus();
   const [openPartyId, setOpenPartyId] = useState<string | null>(null);
 
@@ -146,17 +149,16 @@ export default function ExpenseReport() {
 
   return (
     <View style={styles.container}>
-      <Stack.Screen options={{
-        title: "Expense report",
-        headerRight: () => (
-          <View style={{ marginRight: 14 }}>
-            <HomeButton />
-          </View>
-        ),
-      }} />
-      <TripNavBar tripId={tripId} active="money" />
+      <Stack.Screen options={{ headerShown: false }} />
+      <TripScreenHeader
+        title="Expense report"
+        tripId={tripId}
+        menuItems={menuItems}
+        onBack={() => (router.canGoBack() ? router.back() : router.push(`/trip/${tripId}/money`))}
+      />
+      {shareModal}
       <OfflineBanner dataUpdatedAt={!isOnline ? dataUpdatedAt : undefined} />
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 90 }}>
         <View style={styles.summaryCard}>
           <Text style={styles.totalLabel}>Total spent (NIS)</Text>
           <Text style={styles.totalAmt}>{"₪"} {totalNis.toFixed(0)}</Text>
@@ -227,6 +229,7 @@ export default function ExpenseReport() {
           </Pressable>
         </Pressable>
       </Modal>
+      <TripTabBar tripId={tripId} active="expenses" />
     </View>
   );
 }
@@ -234,8 +237,8 @@ export default function ExpenseReport() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   summaryCard: { backgroundColor: colors.ink, borderRadius: radius.lg, padding: 18, marginBottom: 14 },
-  totalLabel: { fontFamily: "IBMPlexMono_500Medium", fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: colors.amberSoft },
-  totalAmt: { fontFamily: "Archivo_700Bold" as any, fontWeight: "800", fontSize: 32, color: colors.paper, marginVertical: 4 },
+  totalLabel: { fontFamily: "JetBrainsMono_600SemiBold", fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: colors.amberSoft },
+  totalAmt: { fontFamily: "Poppins_700Bold" as any, fontWeight: "800", fontSize: 32, color: colors.paper, marginVertical: 4 },
   sectionLabel: { color: colors.inkSoft, fontWeight: "700", fontSize: 12, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8, marginTop: 4 },
   card: {
     backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,
@@ -248,7 +251,7 @@ const styles = StyleSheet.create({
     marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: colors.line,
   },
   netLabel: { color: colors.ink, fontWeight: "700", fontSize: 13 },
-  netAmt: { fontFamily: "IBMPlexMono_500Medium", color: colors.ink, fontWeight: "800", fontSize: 16 },
+  netAmt: { fontFamily: "JetBrainsMono_600SemiBold", color: colors.ink, fontWeight: "800", fontSize: 16 },
   modalBackdrop: { flex: 1, backgroundColor: "rgba(33,47,61,0.5)", justifyContent: "center", padding: 24 },
   modalCard: {
     backgroundColor: colors.paper, borderRadius: radius.lg, padding: 20,
@@ -261,7 +264,7 @@ const styles = StyleSheet.create({
   },
   itemNote: { color: colors.ink, fontWeight: "600", fontSize: 13 },
   itemDate: { color: colors.inkSoft, fontSize: 11, marginTop: 2 },
-  itemAmt: { fontFamily: "IBMPlexMono_500Medium", color: colors.ink, fontWeight: "600", fontSize: 13 },
+  itemAmt: { fontFamily: "JetBrainsMono_600SemiBold", color: colors.ink, fontWeight: "600", fontSize: 13 },
   modalCloseBtn: { alignItems: "center", padding: 12, marginTop: 10 },
   modalCloseBtnText: { color: colors.teal, fontWeight: "700", fontSize: 13 },
 });

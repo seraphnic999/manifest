@@ -12,9 +12,10 @@ import {
   fetchTripRoutes, NEUTRAL_DAY_COLOR,
 } from "@/lib/mapData";
 import TripMap from "@/components/TripMap";
-import TripNavBar from "@/components/TripNavBar";
+import TripScreenHeader from "@/components/TripScreenHeader";
+import TripTabBar from "@/components/TripTabBar";
+import { useTripHamburgerMenu } from "@/components/useTripHamburgerMenu";
 import ItemTypePickerModal from "@/components/ItemTypePickerModal";
-import HomeButton from "@/components/HomeButton";
 import { formatDateDDMM } from "@/lib/dateFormat";
 import { useNetworkStatus } from "@/lib/useNetworkStatus";
 import OfflineBanner from "@/components/OfflineBanner";
@@ -60,6 +61,7 @@ export default function TripMapScreen() {
   const [nearMeOn, setNearMeOn] = useState(false);
   const [locating, setLocating] = useState(false);
   const [nearbyItems, setNearbyItems] = useState<NearbyItem[]>([]);
+  const { menuItems, shareModal } = useTripHamburgerMenu(tripId);
 
   const { data, dataUpdatedAt, refetch } = useQuery({
     queryKey: ["tripMap", tripId],
@@ -142,16 +144,9 @@ export default function TripMapScreen() {
 
   return (
     <View style={styles.container}>
-      <Stack.Screen options={{
-        title: "Map",
-        headerRight: () => (
-          <View style={{ marginRight: 14 }}>
-            <HomeButton />
-          </View>
-        ),
-      }} />
-
-      <TripNavBar tripId={tripId} active="map" />
+      <Stack.Screen options={{ headerShown: false }} />
+      <TripScreenHeader title="Map" tripId={tripId} menuItems={menuItems} />
+      {shareModal}
       <OfflineBanner dataUpdatedAt={!isOnline ? dataUpdatedAt : undefined} />
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow} style={styles.filterRowOuter}>
@@ -237,6 +232,7 @@ export default function TripMapScreen() {
       </Pressable>
 
       <ItemTypePickerModal visible={pickerOpen} onClose={() => setPickerOpen(false)} onSelect={handleSelectCategory} />
+      <TripTabBar tripId={tripId} active="map" />
     </View>
   );
 }
@@ -264,7 +260,7 @@ const styles = StyleSheet.create({
   },
   nearMeChipActive: { backgroundColor: colors.teal },
   nearMePanel: {
-    position: "absolute", left: 12, right: 12, bottom: 90,
+    position: "absolute", left: 12, right: 12, bottom: 140,
     backgroundColor: colors.paperRaised, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line,
     padding: 12, shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4,
   },
@@ -277,10 +273,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: colors.line,
   },
   nearMeRowTitle: { flex: 1, color: colors.ink, fontWeight: "600", fontSize: 13 },
-  nearMeRowDistance: { fontFamily: "IBMPlexMono_500Medium", color: colors.teal, fontSize: 11, fontWeight: "600" },
+  nearMeRowDistance: { fontFamily: "JetBrainsMono_600SemiBold", color: colors.teal, fontSize: 11, fontWeight: "600" },
   empty: { color: colors.inkSoft, fontSize: 12, fontStyle: "italic", paddingVertical: 8 },
   fab: {
-    position: "absolute", bottom: 20, alignSelf: "center",
+    position: "absolute", bottom: 74, alignSelf: "center",
     backgroundColor: colors.ink, borderRadius: 24, paddingVertical: 14, paddingHorizontal: 24,
     shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4,
   },

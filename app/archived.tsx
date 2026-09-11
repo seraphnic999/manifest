@@ -1,12 +1,13 @@
-import { View, Text, FlatList, StyleSheet, Pressable, RefreshControl } from "react-native";
+import { View, Text, FlatList, StyleSheet, Pressable, RefreshControl, ImageBackground } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Alert } from "@/lib/alert";
 import { supabase } from "@/lib/supabase";
-import { colors, radius } from "@/lib/theme";
+import { colors, radius, fonts } from "@/lib/theme";
 import { Trip } from "@/lib/types";
 import { formatDateDDMMYYYY } from "@/lib/dateFormat";
-import HomeButton from "@/components/HomeButton";
+import SubpageHeader from "@/components/SubpageHeader";
+import { coverPhotoSource } from "@/lib/destinationPhotos";
 
 async function fetchArchivedTrips(): Promise<Trip[]> {
   const { data, error } = await supabase
@@ -60,14 +61,8 @@ export default function ArchivedTrips() {
 
   return (
     <View style={styles.container}>
-      <Stack.Screen options={{
-        title: "Archived Trips",
-        headerRight: () => (
-          <View style={{ marginRight: 14 }}>
-            <HomeButton />
-          </View>
-        ),
-      }} />
+      <Stack.Screen options={{ headerShown: false }} />
+      <SubpageHeader title="Archived Trips" />
       <FlatList
         contentContainerStyle={{ padding: 16 }}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
@@ -76,8 +71,11 @@ export default function ArchivedTrips() {
         renderItem={({ item: trip }) => (
           <View style={styles.card}>
             <Pressable onPress={() => router.push(`/trip/${trip.id}`)}>
-              <Text style={styles.tag}>{trip.type.toUpperCase()}</Text>
-              <Text style={styles.cardTitle}>{trip.name}</Text>
+              <ImageBackground source={coverPhotoSource(trip.cover_photo_id)} style={styles.cardTop} imageStyle={{ borderRadius: radius.lg }}>
+                <View style={styles.cardScrim} />
+                <Text style={styles.cardTitle}>{trip.name}</Text>
+                <Text style={styles.tag}>{trip.type.toUpperCase()}</Text>
+              </ImageBackground>
               <Text style={styles.dates}>
                 {formatDateDDMMYYYY(trip.start_date)} – {formatDateDDMMYYYY(trip.end_date)}
               </Text>
@@ -105,21 +103,23 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.paperRaised,
     borderWidth: 1, borderColor: colors.line,
-    borderRadius: radius.lg, padding: 16, marginBottom: 10,
+    borderRadius: radius.lg, padding: 12, marginBottom: 12,
   },
-  tag: { color: colors.inkSoft, fontSize: 10, letterSpacing: 1, fontWeight: "600" },
-  cardTitle: { color: colors.ink, fontWeight: "700", fontSize: 18, marginTop: 4 },
+  cardTop: { height: 100, borderRadius: radius.lg, overflow: "hidden", justifyContent: "flex-end", padding: 10, marginBottom: 8 },
+  cardScrim: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(11,30,63,0.3)" },
+  tag: { color: "rgba(255,255,255,0.9)", fontSize: 9, letterSpacing: 1, fontFamily: fonts.bodyBold },
+  cardTitle: { color: "#fff", fontFamily: fonts.display, fontSize: 17 },
   dates: { color: colors.inkSoft, fontSize: 12, marginTop: 2 },
   actions: { flexDirection: "row", gap: 10, marginTop: 12 },
   restoreButton: {
     flex: 1, borderWidth: 1, borderColor: colors.teal, borderRadius: radius.md,
     paddingVertical: 10, alignItems: "center",
   },
-  restoreButtonText: { color: colors.teal, fontWeight: "700", fontSize: 13 },
+  restoreButtonText: { color: colors.teal, fontFamily: fonts.bodyBold, fontSize: 13 },
   deleteButton: {
     flex: 1, borderWidth: 1, borderColor: colors.coral, borderRadius: radius.md,
     paddingVertical: 10, alignItems: "center",
   },
-  deleteButtonText: { color: colors.coral, fontWeight: "700", fontSize: 13 },
+  deleteButtonText: { color: colors.coral, fontFamily: fonts.bodyBold, fontSize: 13 },
   empty: { textAlign: "center", color: colors.inkSoft, marginTop: 40 },
 });

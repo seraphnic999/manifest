@@ -45,7 +45,7 @@ const styles = StyleSheet.create({
     width: "100%", maxWidth: 480, alignSelf: "center",
   },
   title: {
-    color: colors.paper, fontFamily: "Archivo_700Bold" as any, fontWeight: "800",
+    color: colors.paper, fontFamily: "Poppins_700Bold" as any, fontWeight: "800",
     fontSize: 18, marginBottom: 16, textAlign: "center",
   },
   grid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", gap: 10 },
