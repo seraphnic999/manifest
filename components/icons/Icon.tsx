@@ -1,7 +1,10 @@
 // The user's generated travel-icon set (travel-icons-svg.zip), inlined as
 // React Native SVG components — 64x64 viewBox, 3.2 stroke width, matching
-// the source files exactly. Two names (overview, signOut) aren't in that
-// set and are hand-drawn to match its weight/rounding.
+// the source files exactly: flight, lodging, budget, packing, the 7
+// weather icons, countdown, map, currency, shopping, search, archive,
+// menu, add, home, export, edit, share. Every other name in IconName below
+// is hand-drawn (not from that set) to approximate its weight/rounding —
+// a placeholder until a matching icon is generated for it.
 import Svg, { Path, Circle, Rect } from "react-native-svg";
 import { ViewStyle } from "react-native";
 
