@@ -63,7 +63,7 @@ export default function TripMap(props: TripMapProps) {
       annotationRefs.current.forEach((ref) => ref?.refresh());
     }, 350);
     return () => clearTimeout(t);
-  }, [visibleItems]);
+  }, [visibleItems, props.dayColors]);
 
   // Declarative camera props (not an imperative ref call) so the very
   // first render already has the right view — no waiting on a native ref

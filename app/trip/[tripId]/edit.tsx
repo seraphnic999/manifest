@@ -13,6 +13,7 @@ import { DateField } from "@/components/DateTimeFields";
 import HomeButton from "@/components/HomeButton";
 import CoverPhotoPicker from "@/components/CoverPhotoPicker";
 import SubpageHeader from "@/components/SubpageHeader";
+import NumberStepper from "@/components/NumberStepper";
 
 const TYPES: TripType[] = ["pleasure", "business", "mixed"];
 
@@ -250,10 +251,7 @@ export default function EditTrip() {
       <TextInput style={styles.input} value={destinations} onChangeText={setDestinations} placeholder="Barcelona, Palma, Rome, Naples" />
 
       <Text style={styles.label}>Planned budget (NIS, optional)</Text>
-      <TextInput
-        style={styles.input} value={budgetAmount} onChangeText={setBudgetAmount}
-        placeholder="e.g. 8000" keyboardType="decimal-pad"
-      />
+      <NumberStepper value={budgetAmount} onChange={setBudgetAmount} step={100} placeholder="e.g. 8000" />
       <Text style={styles.hint}>Shows a spend-progress bar on the Money screen. Leave blank to hide it.</Text>
 
       {/* --- Timezone --- */}

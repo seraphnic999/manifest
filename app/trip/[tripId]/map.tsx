@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { View, Text, Pressable, StyleSheet, ScrollView } from "react-native";
 import { useLocalSearchParams, useRouter, Stack, useFocusEffect } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
@@ -90,7 +90,10 @@ export default function TripMapScreen() {
     }
   }, [data, focusItemId]);
 
-  const dayColors = buildDayColorMap(days);
+  // Memoized so its identity only changes when `days` itself does (e.g.
+  // after a color edit refetches) — TripMap's marker-refresh effect keys
+  // off this reference to know when it needs to re-snapshot marker bitmaps.
+  const dayColors = useMemo(() => buildDayColorMap(days), [days]);
   const proposalsDayId = days.find((d) => d.date === null)?.id;
 
   function toggleDay(id: string) {

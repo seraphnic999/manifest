@@ -9,6 +9,7 @@ import { EXPENSE_TYPES, EXPENSE_TYPE_LABELS } from "@/lib/expenseType";
 import { classifyExpenseTiming } from "@/lib/expenseTiming";
 import { computeBudgetProgress } from "@/lib/budget";
 import BudgetProgressBar from "@/components/BudgetProgressBar";
+import SetBudgetModal from "@/components/SetBudgetModal";
 import AddExpenseModal from "@/components/AddExpenseModal";
 import AddShoppingItemModal from "@/components/AddShoppingItemModal";
 import TripScreenHeader from "@/components/TripScreenHeader";
@@ -99,6 +100,7 @@ export default function MoneyShoppingScreen() {
   const [editRowId, setEditRowId] = useState<string | null>(null);
   const [expenseTarget, setExpenseTarget] = useState<ShoppingRow | null>(null);
   const [relatedExpensesTarget, setRelatedExpensesTarget] = useState<ShoppingRow | null>(null);
+  const [budgetOpen, setBudgetOpen] = useState(false);
 
   const { data, dataUpdatedAt, refetch } = useQuery({
     queryKey: ["money", tripId],
@@ -126,6 +128,12 @@ export default function MoneyShoppingScreen() {
 
   function rateFor(code: string) {
     return currencies.find((c) => c.code === code)?.rate_to_nis ?? 1;
+  }
+
+  async function saveBudget(amount: number) {
+    await supabase.from("trips").update({ budget_amount: amount }).eq("id", tripId);
+    setBudgetOpen(false);
+    refetch();
   }
   function toNis(amount: number, code: string) {
     return amount * rateFor(code);
@@ -243,7 +251,13 @@ export default function MoneyShoppingScreen() {
             ))}
           </View>
 
-          {budgetProgress && <BudgetProgressBar progress={budgetProgress} />}
+          {budgetProgress ? (
+            <BudgetProgressBar progress={budgetProgress} />
+          ) : (
+            <Pressable style={styles.noBudgetCard} onPress={() => { if (requireOnline()) setBudgetOpen(true); }}>
+              <Text style={styles.noBudgetText}>No budget defined — tap to set one</Text>
+            </Pressable>
+          )}
 
           <Pressable style={styles.reportRow} onPress={() => router.push(`/trip/${tripId}/report`)}>
             <Text style={styles.reportLabel}>View expense report</Text>
@@ -403,6 +417,13 @@ export default function MoneyShoppingScreen() {
         </Pressable>
       </Modal>
 
+      <SetBudgetModal
+        visible={budgetOpen}
+        onClose={() => setBudgetOpen(false)}
+        onSave={saveBudget}
+        initialAmount={trip?.budget_amount ?? null}
+      />
+
       <TripTabBar tripId={tripId} active="expenses" />
     </View>
   );
@@ -423,6 +444,11 @@ const styles = StyleSheet.create({
   owedLabel: { color: colors.paper, fontSize: 12 },
   owedAmt: { color: colors.goldSoft, fontFamily: fonts.bodyBold, fontSize: 12 },
   sectionLabel: { color: colors.ink, fontFamily: fonts.display, fontSize: 16, marginBottom: 8 },
+  noBudgetCard: {
+    backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line, borderStyle: "dashed",
+    borderRadius: radius.md, padding: 14, marginBottom: 14, alignItems: "center",
+  },
+  noBudgetText: { color: colors.blue, fontWeight: "700", fontSize: 13 },
   reportRow: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",
     backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,

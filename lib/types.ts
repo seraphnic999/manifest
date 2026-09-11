@@ -32,6 +32,7 @@ export interface Day {
   date: string | null; // null only for the trip's one special "Proposals" day
   theme: string | null;
   sort_order: number;
+  color: string | null; // map color override; null falls back to the index-based/Proposals default
 }
 
 export interface Item {

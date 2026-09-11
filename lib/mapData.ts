@@ -1,37 +1,29 @@
 import { supabase } from "./supabase";
 import { Item, Day, MapRoute } from "./types";
+import { autoColorForDayIndex } from "./dayColors";
+import { colors } from "./theme";
 
 export type MapItem = Item & { latitude: number; longitude: number };
-
-// Cycles per real (dated) day, by sort_order position, independent of trip
-// length. Includes the four colours from the original Google My Maps layers
-// (dark red, green, amber, purple) so this trip's map looks the same as
-// before, extended with a few more distinct hues for longer trips.
-const DAY_COLOR_PALETTE = [
-  "#A52714", "#0F9D58", "#F9A825", "#9C27B0",
-  "#1565C0", "#00838F", "#AD1457", "#5D4037",
-];
 
 // day_id IS NULL items (e.g. a lodging stay span itself, if it ever gets
 // coordinates) — neutral, not tied to any single day.
 export const NEUTRAL_DAY_COLOR = "#8C8577";
 
-// Fixed colour for the "Proposals" day (the old map's blue "spares" layer) —
-// deliberately not part of the cycling palette so it can never collide with
-// a real day's colour on longer trips.
-export const PROPOSALS_COLOR = "#0288D1";
+// Fallback for a Proposals day with no persisted color yet (trips created
+// before per-day colors existed) — new trips get this written directly
+// onto the row by the generate_trip_days() trigger instead.
+export const PROPOSALS_COLOR = colors.lightBlue;
 
-export function dayColorForIndex(index: number): string {
-  return DAY_COLOR_PALETTE[index % DAY_COLOR_PALETTE.length];
-}
-
-/** trip_id -> day.id -> hex colour, keyed by each real day's position in sort_order. */
+/** trip_id -> day.id -> hex colour. Each day's own `color` wins if set
+ * (either assigned automatically at trip creation, or picked by the user
+ * on the Day screen); otherwise falls back to the old index-based/
+ * Proposals default, for trips/days that predate per-day colors. */
 export function buildDayColorMap(days: Day[]): Map<string, string> {
   const dated = days.filter((d) => d.date !== null).sort((a, b) => a.sort_order - b.sort_order);
   const map = new Map<string, string>();
-  dated.forEach((d, i) => map.set(d.id, dayColorForIndex(i)));
+  dated.forEach((d, i) => map.set(d.id, d.color ?? autoColorForDayIndex(i)));
   for (const d of days) {
-    if (d.date === null) map.set(d.id, PROPOSALS_COLOR);
+    if (d.date === null) map.set(d.id, d.color ?? PROPOSALS_COLOR);
   }
   return map;
 }

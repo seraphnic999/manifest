@@ -19,6 +19,8 @@ import { useNetworkStatus } from "@/lib/useNetworkStatus";
 import OfflineBanner from "@/components/OfflineBanner";
 import { findOverlappingItemIds, isLastTripDay } from "@/lib/conflicts";
 import { Alert } from "@/lib/alert";
+import { buildDayColorMap } from "@/lib/mapData";
+import DayColorPickerModal from "@/components/DayColorPickerModal";
 
 const STATUS_LABEL: Record<string, string> = {
   booked: "Booked", optional: "Optional", planned: "Planned",
@@ -37,6 +39,7 @@ interface DayData {
   allDays: Day[];
   dayId: string | null;
   theme: string | null;
+  color: string | null;
   orderable: Item[];
   stayBanners: Item[];
 }
@@ -48,7 +51,7 @@ async function fetchDayData(tripId: string, date: string, isProposals: boolean):
   const allDays = (days ?? []) as Day[];
 
   const day = isProposals ? allDays.find((d) => d.date === null) : allDays.find((d) => d.date === date);
-  if (!day) return { allDays, dayId: null, theme: null, orderable: [], stayBanners: [] };
+  if (!day) return { allDays, dayId: null, theme: null, color: null, orderable: [], stayBanners: [] };
 
   const { data: dayItems, error: itemsError } = await supabase
     .from("items").select("*")
@@ -79,7 +82,7 @@ async function fetchDayData(tripId: string, date: string, isProposals: boolean):
     stayBanners = (spanningLodging ?? []) as Item[];
   }
 
-  return { allDays, dayId: day.id, theme: day.theme, orderable: (dayItems ?? []) as Item[], stayBanners };
+  return { allDays, dayId: day.id, theme: day.theme, color: day.color, orderable: (dayItems ?? []) as Item[], stayBanners };
 }
 
 export default function DayView() {
@@ -93,6 +96,8 @@ export default function DayView() {
   const [theme, setTheme] = useState<string | null>(null);
   const [themeModalOpen, setThemeModalOpen] = useState(false);
   const [themeDraft, setThemeDraft] = useState("");
+  const [dayColor, setDayColor] = useState<string | null>(null);
+  const [colorPickerOpen, setColorPickerOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const router = useRouter();
   const { menuItems, shareModal } = useTripHamburgerMenu(tripId);
@@ -110,6 +115,7 @@ export default function DayView() {
     setAllDays(data.allDays);
     setDayId(data.dayId);
     setTheme(data.theme);
+    setDayColor(data.color);
     setOrderable(data.orderable);
     setStayBanners(data.stayBanners);
   }, [data]);
@@ -134,6 +140,14 @@ export default function DayView() {
     setTheme(themeDraft || null);
     setThemeModalOpen(false);
     setAllDays((prev) => prev.map((d) => (d.id === dayId ? { ...d, theme: themeDraft || null } : d)));
+  }
+
+  async function saveColor(hex: string) {
+    if (!dayId) return;
+    await supabase.from("days").update({ color: hex }).eq("id", dayId);
+    setDayColor(hex);
+    setColorPickerOpen(false);
+    setAllDays((prev) => prev.map((d) => (d.id === dayId ? { ...d, color: hex } : d)));
   }
 
   async function persistOrder(newOrder: Item[]) {
@@ -161,6 +175,9 @@ export default function DayView() {
 
   const overlappingIds = findOverlappingItemIds(orderable);
   const showLodgingGapWarning = !isProposals && stayBanners.length === 0 && !isLastTripDay(date, allDays);
+  // Same lookup the map itself uses, so the square shown here always
+  // matches what this day's items are colored on the map.
+  const effectiveDayColor = dayId ? buildDayColorMap(allDays).get(dayId) ?? colors.blue : colors.blue;
 
   function renderItem({ item, drag, isActive }: RenderItemParams<Item>) {
     const idx = orderable.findIndex((i) => i.id === item.id);
@@ -290,15 +307,22 @@ export default function DayView() {
           page without the outer scroll and the inner drag gesture fighting
           each other, which a plain DraggableFlatList here would do. */}
       <NestableScrollContainer contentContainerStyle={{ paddingBottom: 90 }}>
-        <Pressable
-          style={styles.themeRow}
-          onPress={() => { if (requireOnline()) { setThemeDraft(theme ?? ""); setThemeModalOpen(true); } }}
-        >
-          <Text style={theme ? styles.themeText : styles.themePlaceholder}>
-            {theme || "Add a day title\u2026"}
-          </Text>
-          <Text style={styles.themeEdit}>Edit</Text>
-        </Pressable>
+        <View style={styles.themeRow}>
+          <Pressable
+            style={styles.themeMain}
+            onPress={() => { if (requireOnline()) { setThemeDraft(theme ?? ""); setThemeModalOpen(true); } }}
+          >
+            <Text style={theme ? styles.themeText : styles.themePlaceholder}>
+              {theme || "Add a day title\u2026"}
+            </Text>
+            <Text style={styles.themeEdit}>Edit</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.colorSquare, { backgroundColor: effectiveDayColor }]}
+            onPress={() => { if (requireOnline()) setColorPickerOpen(true); }}
+            accessibilityLabel="Change this day's map color"
+          />
+        </View>
 
         {showLodgingGapWarning && (
           <View style={styles.gapWarning}>
@@ -347,6 +371,13 @@ export default function DayView() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <DayColorPickerModal
+        visible={colorPickerOpen}
+        onClose={() => setColorPickerOpen(false)}
+        onSelect={saveColor}
+        selected={effectiveDayColor}
+      />
       <TripTabBar tripId={tripId} active="overview" />
     </View>
   );
@@ -369,9 +400,11 @@ const styles = StyleSheet.create({
   dayPillTheme: { fontSize: 8, color: colors.lightBlue, marginTop: 1, maxWidth: 60 },
   dayPillTextActive: { color: colors.paper },
   themeRow: {
-    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+    flexDirection: "row", alignItems: "center", gap: 12,
     paddingHorizontal: 16, paddingVertical: 10, backgroundColor: colors.paperRaised, borderBottomWidth: 1, borderBottomColor: colors.line,
   },
+  themeMain: { flex: 1, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  colorSquare: { width: 28, height: 28, borderRadius: 8, borderWidth: 1, borderColor: colors.line },
   themeText: { color: colors.lightBlue, fontWeight: "700", fontSize: 14 },
   themePlaceholder: { color: colors.inkSoft, fontStyle: "italic", fontSize: 13 },
   themeEdit: { color: colors.blue, fontSize: 12, fontWeight: "600" },
