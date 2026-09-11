@@ -21,9 +21,33 @@ export interface Trip {
   custom_fields: Record<string, unknown>;
   budget_amount: number | null; // NIS — matches the app's existing NIS-normalized reporting
   cover_photo_id: string | null; // see lib/destinationPhotos.ts — id into the bundled photo set, or null for the fallback
+  latitude: number | null;  // map default-focus point, derived from the trip's primary picked city — see lib/cities.ts
+  longitude: number | null;
   deleted_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface City {
+  id: string;
+  name: string;
+  country: string;
+  country_code: string;
+  timezone: string;
+  currency_code: string;
+  latitude: number;
+  longitude: number;
+  cover_photo_id: string | null;
+  created_at: string;
+}
+
+export interface TripCity {
+  id: string;
+  trip_id: string;
+  city_id: string | null;
+  custom_name: string | null; // set only when city_id is null — a destination not in the cities dataset
+  sort_order: number; // lowest = the trip's primary city, drives cover/timezone/map-focus auto-fill
+  created_at: string;
 }
 
 export interface Day {

@@ -28,6 +28,7 @@ export interface TripMapProps {
   visibleDayIds: Set<string>;
   visibleTypes: Set<ItemType>;
   focusItemId?: string;
+  tripFocus: { latitude: number; longitude: number } | null;
   onItemPress: (item: MapItem) => void;
 }
 
@@ -87,10 +88,13 @@ export default function TripMap(props: TripMapProps) {
 
   useEffect(() => {
     if (!maplibregl || !containerRef.current || mapRef.current) return;
+    // Last-resort fallback (Paris) only applies when the trip has no
+    // primary city picked yet — see TripMap.tsx for the same rule on native.
+    const focus = propsRef.current.tripFocus;
     const map = new maplibregl.Map({
       container: containerRef.current,
       style: STYLE_URL,
-      center: [2.3488, 48.8534],
+      center: focus ? [focus.longitude, focus.latitude] : [2.3488, 48.8534],
       zoom: 11,
     });
     map.addControl(new maplibregl.NavigationControl(), "top-right");

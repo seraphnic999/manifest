@@ -8,10 +8,13 @@ import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
 import { TripType } from "@/lib/types";
 import { tzOffsetLabel, sortedByOffsetDesc, COMMON_TIMEZONES, COMMON_CURRENCIES } from "@/lib/timezone";
+import { fetchLiveRateToNis } from "@/lib/currencyRates";
+import { fetchAllCities, saveTripCities } from "@/lib/cities";
 import { mergePackingItems, fetchTemplateItems, fetchTripPackingAsSource } from "@/lib/packing";
 import { DateField } from "@/components/DateTimeFields";
 import HomeButton from "@/components/HomeButton";
 import CoverPhotoPicker from "@/components/CoverPhotoPicker";
+import CityPickerModal, { CityPick } from "@/components/CityPickerModal";
 import SubpageHeader from "@/components/SubpageHeader";
 
 type PackingSource = "empty" | "template" | "trip";
@@ -29,7 +32,9 @@ export default function NewTrip() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [type, setType] = useState<TripType>("pleasure");
-  const [destinations, setDestinations] = useState("");
+  const [cityPicks, setCityPicks] = useState<CityPick[]>([]);
+  const [cityPickerOpen, setCityPickerOpen] = useState(false);
+  const [syncingCities, setSyncingCities] = useState(false);
   const [coverPhotoId, setCoverPhotoId] = useState<string | null>(null);
   const [timezone, setTimezone] = useState("Asia/Jerusalem");
   const [tzPickerOpen, setTzPickerOpen] = useState(false);
@@ -69,12 +74,51 @@ export default function NewTrip() {
     setCurrencies(currencies.filter((c) => c.code !== code));
   }
 
+  // Adds any currency implied by the picked cities that isn't already in
+  // the list — never removes one, so a manually added or since-unpicked
+  // currency is left alone. Runs after every city-picker change.
+  async function syncCurrenciesToCities(picks: CityPick[], currentCurrencies: CurrencyRow[]) {
+    const cities = await fetchAllCities();
+    const activeCodes = new Set(
+      picks.map((p) => (p.cityId ? cities.find((c) => c.id === p.cityId)?.currency_code : undefined)).filter((c): c is string => !!c)
+    );
+    const missing = [...activeCodes].filter((code) => code !== "NIS" && !currentCurrencies.some((c) => c.code === code));
+    if (missing.length === 0) return;
+    setSyncingCities(true);
+    const additions: CurrencyRow[] = [];
+    for (const code of missing) {
+      const rate = await fetchLiveRateToNis(code);
+      additions.push({ code, rate: rate !== null ? rate.toFixed(4) : "1" });
+    }
+    setCurrencies((prev) => [...prev, ...additions]);
+    setSyncingCities(false);
+  }
+
+  async function handleCityPicksChange(next: CityPick[]) {
+    const firstAdded = next.length > 0 && cityPicks.length === 0;
+    setCityPicks(next);
+
+    if (firstAdded && next[0].cityId) {
+      const cities = await fetchAllCities();
+      const first = cities.find((c) => c.id === next[0].cityId);
+      if (first) {
+        if (coverPhotoId === null) setCoverPhotoId(first.cover_photo_id);
+        if (timezone === "Asia/Jerusalem") setTimezone(first.timezone);
+      }
+    }
+
+    await syncCurrenciesToCities(next, currencies);
+  }
+
   async function save() {
     if (!name || !startDate || !endDate) {
       Alert.alert("Missing info", "Name, start date, and end date are required.");
       return;
     }
     setSaving(true);
+
+    const cities = await fetchAllCities();
+    const primary = cityPicks[0]?.cityId ? cities.find((c) => c.id === cityPicks[0].cityId) : null;
 
     const { data: trip, error } = await supabase
       .from("trips")
@@ -83,9 +127,11 @@ export default function NewTrip() {
         start_date: startDate,
         end_date: endDate,
         type,
-        destinations: destinations.split(",").map((d) => d.trim()).filter(Boolean),
+        destinations: cityPicks.map((p) => p.label),
         default_timezone: timezone,
         cover_photo_id: coverPhotoId,
+        latitude: primary?.latitude ?? null,
+        longitude: primary?.longitude ?? null,
       })
       .select()
       .single();
@@ -104,6 +150,10 @@ export default function NewTrip() {
       })),
     ];
     await supabase.from("trip_currencies").insert(currencyRows);
+
+    if (cityPicks.length > 0) {
+      await saveTripCities(trip.id, cityPicks.map((p) => ({ cityId: p.cityId, customName: p.customName })));
+    }
 
     // "Work" party is auto-added only for business/mixed trips.
     if (type === "business" || type === "mixed") {
@@ -159,8 +209,29 @@ export default function NewTrip() {
         <Text style={styles.hint}>A "Work" party will be added automatically for expense tracking.</Text>
       )}
 
-      <Text style={styles.label}>Destinations (comma-separated)</Text>
-      <TextInput style={styles.input} value={destinations} onChangeText={setDestinations} placeholder="Barcelona, Palma, Rome, Naples" />
+      <Text style={styles.label}>Destinations</Text>
+      <Pressable style={styles.input} onPress={() => setCityPickerOpen(true)}>
+        <Text style={{ color: cityPicks.length ? colors.ink : colors.inkSoft }}>
+          {cityPicks.length ? cityPicks.map((p) => p.label).join(", ") : "Choose cities…"}
+        </Text>
+      </Pressable>
+      {cityPicks.map((p, i) => (
+        <View key={p.cityId ?? `custom-${i}`} style={styles.currencyRow}>
+          <Text style={styles.currencyRate}>{p.label}{i === 0 ? " (primary)" : ""}</Text>
+          <Pressable onPress={() => handleCityPicksChange(cityPicks.filter((_, j) => j !== i))}>
+            <Text style={styles.removeText}>Remove</Text>
+          </Pressable>
+        </View>
+      ))}
+      {syncingCities && <Text style={styles.hint}>Updating currencies…</Text>}
+      <Text style={styles.hint}>The first city picked sets the cover photo, timezone, and map focus.</Text>
+
+      <CityPickerModal
+        visible={cityPickerOpen}
+        onClose={() => setCityPickerOpen(false)}
+        selected={cityPicks}
+        onChange={handleCityPicksChange}
+      />
 
       {/* --- Timezone --- */}
       <Text style={styles.label}>Default timezone</Text>

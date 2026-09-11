@@ -39,15 +39,19 @@ interface TripMapData {
   items: MapItem[];
   routes: MapRoute[];
   tripType: TripType | null;
+  tripFocus: { latitude: number; longitude: number } | null;
 }
 
 async function fetchTripMapData(tripId: string): Promise<TripMapData> {
   const [days, items, routes, tripRes] = await Promise.all([
     fetchTripDays(tripId), fetchTripMapItems(tripId), fetchTripRoutes(tripId),
-    supabase.from("trips").select("type").eq("id", tripId).single(),
+    supabase.from("trips").select("type, latitude, longitude").eq("id", tripId).single(),
   ]);
   if (tripRes.error) throw tripRes.error;
-  return { days, items, routes, tripType: (tripRes.data?.type as TripType) ?? null };
+  const tripFocus = tripRes.data?.latitude != null && tripRes.data?.longitude != null
+    ? { latitude: tripRes.data.latitude, longitude: tripRes.data.longitude }
+    : null;
+  return { days, items, routes, tripType: (tripRes.data?.type as TripType) ?? null, tripFocus };
 }
 
 export default function TripMapScreen() {
@@ -205,6 +209,7 @@ export default function TripMapScreen() {
           visibleDayIds={visibleDayIds}
           visibleTypes={visibleTypes}
           focusItemId={focusItemId}
+          tripFocus={data?.tripFocus ?? null}
           onItemPress={(item: Item) => router.push(`/item/${item.id}`)}
         />
 

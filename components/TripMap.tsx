@@ -19,6 +19,7 @@ export interface TripMapProps {
   visibleDayIds: Set<string>;
   visibleTypes: Set<ItemType>;
   focusItemId?: string;
+  tripFocus: { latitude: number; longitude: number } | null;
   onItemPress: (item: MapItem) => void;
 }
 
@@ -85,8 +86,13 @@ export default function TripMap(props: TripMapProps) {
         animationDuration: 0,
       };
     }
+    if (props.tripFocus) {
+      return { centerCoordinate: [props.tripFocus.longitude, props.tripFocus.latitude], zoomLevel: 11 };
+    }
+    // Last-resort fallback for a trip with no cities picked and no
+    // geocoded items yet (e.g. a very old trip predating both features).
     return { centerCoordinate: [2.3488, 48.8534], zoomLevel: 11 };
-  }, [visibleItems, focusedItem]);
+  }, [visibleItems, focusedItem, props.tripFocus]);
 
   return (
     <View style={styles.container}>
