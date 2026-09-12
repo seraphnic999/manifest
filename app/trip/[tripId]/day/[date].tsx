@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, Modal, Platform } from "react-native";
 import { useLocalSearchParams, useRouter, Stack, useFocusEffect } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
@@ -21,6 +21,10 @@ import { findOverlappingItemIds, isLastTripDay } from "@/lib/conflicts";
 import { Alert } from "@/lib/alert";
 import { buildDayColorMap } from "@/lib/mapData";
 import DayColorPickerModal from "@/components/DayColorPickerModal";
+import DayCityPickerModal from "@/components/DayCityPickerModal";
+import { CityPick } from "@/components/CityPickerModal";
+import { fetchTripCities, fetchAllCities, dayCityLabel, setDayCity, TripCityRow } from "@/lib/cities";
+import { DAY_COLOR_SWATCHES } from "@/lib/dayColors";
 
 const STATUS_LABEL: Record<string, string> = {
   booked: "Booked", optional: "Optional", planned: "Planned",
@@ -37,21 +41,32 @@ const PROPOSALS_SEGMENT = "proposals";
 
 interface DayData {
   allDays: Day[];
+  tripCities: TripCityRow[];
   dayId: string | null;
   theme: string | null;
   color: string | null;
+  cityId: string | null;
+  customCityName: string | null;
   orderable: Item[];
   stayBanners: Item[];
 }
 
 async function fetchDayData(tripId: string, date: string, isProposals: boolean): Promise<DayData> {
-  const { data: days, error: daysError } = await supabase
-    .from("days").select("*").eq("trip_id", tripId).order("sort_order");
+  const [{ data: days, error: daysError }, tripCities] = await Promise.all([
+    supabase.from("days").select("*").eq("trip_id", tripId).order("sort_order"),
+    fetchTripCities(tripId),
+    fetchAllCities(), // warms the cities cache dayCityLabel() falls back on
+  ]);
   if (daysError) throw daysError;
   const allDays = (days ?? []) as Day[];
 
   const day = isProposals ? allDays.find((d) => d.date === null) : allDays.find((d) => d.date === date);
-  if (!day) return { allDays, dayId: null, theme: null, color: null, orderable: [], stayBanners: [] };
+  if (!day) {
+    return {
+      allDays, tripCities, dayId: null, theme: null, color: null,
+      cityId: null, customCityName: null, orderable: [], stayBanners: [],
+    };
+  }
 
   const { data: dayItems, error: itemsError } = await supabase
     .from("items").select("*")
@@ -82,7 +97,11 @@ async function fetchDayData(tripId: string, date: string, isProposals: boolean):
     stayBanners = (spanningLodging ?? []) as Item[];
   }
 
-  return { allDays, dayId: day.id, theme: day.theme, color: day.color, orderable: (dayItems ?? []) as Item[], stayBanners };
+  return {
+    allDays, tripCities, dayId: day.id, theme: day.theme, color: day.color,
+    cityId: day.city_id, customCityName: day.custom_city_name,
+    orderable: (dayItems ?? []) as Item[], stayBanners,
+  };
 }
 
 export default function DayView() {
@@ -92,13 +111,23 @@ export default function DayView() {
   const [stayBanners, setStayBanners] = useState<Item[]>([]);
   const [orderable, setOrderable] = useState<Item[]>([]);
   const [allDays, setAllDays] = useState<Day[]>([]);
+  const [tripCities, setTripCities] = useState<TripCityRow[]>([]);
   const [dayId, setDayId] = useState<string | null>(null);
   const [theme, setTheme] = useState<string | null>(null);
-  const [themeModalOpen, setThemeModalOpen] = useState(false);
-  const [themeDraft, setThemeDraft] = useState("");
+  const [dayCityId, setDayCityId] = useState<string | null>(null);
+  const [dayCustomCityName, setDayCustomCityName] = useState<string | null>(null);
   const [dayColor, setDayColor] = useState<string | null>(null);
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+
+  // Unified day-edit modal (city + title + color), opened by tapping the
+  // title block.
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editThemeDraft, setEditThemeDraft] = useState("");
+  const [editCityPick, setEditCityPick] = useState<CityPick | null>(null);
+  const [editColorDraft, setEditColorDraft] = useState<string>(colors.blue);
+  const [cityPickerOpen, setCityPickerOpen] = useState(false);
+
   const router = useRouter();
   const { menuItems, shareModal } = useTripHamburgerMenu(tripId);
 
@@ -108,19 +137,40 @@ export default function DayView() {
   });
 
   // Query data feeds these as the source of truth on every fetch; mutations
-  // below (reorder, theme edit) still update them directly for instant
+  // below (reorder, day edit) still update them directly for instant
   // feedback, same as before this screen read through TanStack Query.
   useEffect(() => {
     if (!data) return;
     setAllDays(data.allDays);
+    setTripCities(data.tripCities);
     setDayId(data.dayId);
     setTheme(data.theme);
+    setDayCityId(data.cityId);
+    setDayCustomCityName(data.customCityName);
     setDayColor(data.color);
     setOrderable(data.orderable);
     setStayBanners(data.stayBanners);
   }, [data]);
 
   useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
+
+  // Day-pill strip: auto-scroll to bring the current day into view instead
+  // of leaving the user to scroll a long trip's strip by hand every time
+  // they land here from elsewhere.
+  const stripScrollRef = useRef<ScrollView>(null);
+  const pillOffsets = useRef<Record<string, number>>({});
+  const scrolledForKey = useRef<string | null>(null);
+
+  function maybeScrollToActive() {
+    const key = `${tripId}:${date}`;
+    if (scrolledForKey.current === key) return;
+    const activeId = isProposals ? allDays.find((d) => d.date === null)?.id : allDays.find((d) => d.date === date)?.id;
+    if (!activeId) return;
+    const x = pillOffsets.current[activeId];
+    if (x == null || !stripScrollRef.current) return;
+    stripScrollRef.current.scrollTo({ x: Math.max(0, x - 80), animated: false });
+    scrolledForKey.current = key;
+  }
 
   function requireOnline(): boolean {
     if (isOnline) return true;
@@ -134,12 +184,16 @@ export default function DayView() {
     router.push(`/item/new?tripId=${tripId}&dayId=${dayId}&date=${dateParam}&category=${categoryKey}`);
   }
 
-  async function saveTheme() {
-    if (!dayId) return;
-    await supabase.from("days").update({ theme: themeDraft || null }).eq("id", dayId);
-    setTheme(themeDraft || null);
-    setThemeModalOpen(false);
-    setAllDays((prev) => prev.map((d) => (d.id === dayId ? { ...d, theme: themeDraft || null } : d)));
+  function openEditModal() {
+    if (!requireOnline()) return;
+    setEditThemeDraft(theme ?? "");
+    setEditCityPick(
+      dayCityId || dayCustomCityName
+        ? { cityId: dayCityId, customName: dayCustomCityName, label: dayCityLabel({ city_id: dayCityId, custom_city_name: dayCustomCityName }, tripCities) ?? "" }
+        : null
+    );
+    setEditColorDraft(effectiveDayColor);
+    setEditModalOpen(true);
   }
 
   async function saveColor(hex: string) {
@@ -148,6 +202,25 @@ export default function DayView() {
     setDayColor(hex);
     setColorPickerOpen(false);
     setAllDays((prev) => prev.map((d) => (d.id === dayId ? { ...d, color: hex } : d)));
+  }
+
+  // Persists all three day-edit fields together (single Save action for the
+  // unified city + title + color modal).
+  async function saveDayEdits() {
+    if (!dayId) return;
+    await setDayCity(dayId, tripId, { cityId: editCityPick?.cityId ?? null, customName: editCityPick?.customName ?? null });
+    await supabase.from("days").update({ theme: editThemeDraft || null, color: editColorDraft }).eq("id", dayId);
+    setTheme(editThemeDraft || null);
+    setDayCityId(editCityPick?.cityId ?? null);
+    setDayCustomCityName(editCityPick?.customName ?? null);
+    setDayColor(editColorDraft);
+    setAllDays((prev) => prev.map((d) => (d.id === dayId
+      ? { ...d, theme: editThemeDraft || null, color: editColorDraft, city_id: editCityPick?.cityId ?? null, custom_city_name: editCityPick?.customName ?? null }
+      : d)));
+    if (editCityPick && !tripCities.some((r) => r.city_id === editCityPick.cityId && r.custom_name === editCityPick.customName)) {
+      setTripCities(await fetchTripCities(tripId));
+    }
+    setEditModalOpen(false);
   }
 
   async function persistOrder(newOrder: Item[]) {
@@ -178,6 +251,14 @@ export default function DayView() {
   // Same lookup the map itself uses, so the square shown here always
   // matches what this day's items are colored on the map.
   const effectiveDayColor = dayId ? buildDayColorMap(allDays).get(dayId) ?? colors.blue : colors.blue;
+  const effectiveCityLabel = dayCityLabel({ city_id: dayCityId, custom_city_name: dayCustomCityName }, tripCities);
+
+  // Prev/next day navigation is scoped to dated days only — Proposals has
+  // no chronological place among them.
+  const datedDays = allDays.filter((d) => d.date !== null).sort((a, b) => (a.date! < b.date! ? -1 : 1));
+  const datedIdx = isProposals ? -1 : datedDays.findIndex((d) => d.date === date);
+  const prevDay = datedIdx > 0 ? datedDays[datedIdx - 1] : null;
+  const nextDay = datedIdx >= 0 && datedIdx < datedDays.length - 1 ? datedDays[datedIdx + 1] : null;
 
   function renderItem({ item, drag, isActive }: RenderItemParams<Item>) {
     const idx = orderable.findIndex((i) => i.id === item.id);
@@ -258,7 +339,16 @@ export default function DayView() {
       <OfflineBanner dataUpdatedAt={!isOnline ? dataUpdatedAt : undefined} />
 
       <View style={styles.dayStripOuter}>
+        <Pressable
+          style={[styles.navArrow, !prevDay && styles.navArrowDisabled]}
+          disabled={!prevDay}
+          onPress={() => prevDay && router.replace(`/trip/${tripId}/day/${prevDay.date}`)}
+          accessibilityLabel="Previous day"
+        >
+          <Icon name="back" size={16} color={prevDay ? colors.ink : colors.line} />
+        </Pressable>
         <ScrollView
+          ref={stripScrollRef}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.dayStripContent}
@@ -285,6 +375,7 @@ export default function DayView() {
                 key={d.id}
                 style={[styles.dayPill, active && styles.dayPillActive]}
                 onPress={() => router.replace(href)}
+                onLayout={(e) => { pillOffsets.current[d.id] = e.nativeEvent.layout.x; maybeScrollToActive(); }}
               >
                 <Text style={[styles.dayPillText, active && styles.dayPillTextActive]}>
                   {d.date === null ? "Proposals" : formatDateDDMM(d.date)}
@@ -298,6 +389,14 @@ export default function DayView() {
             );
           })}
         </ScrollView>
+        <Pressable
+          style={[styles.navArrow, !nextDay && styles.navArrowDisabled]}
+          disabled={!nextDay}
+          onPress={() => nextDay && router.replace(`/trip/${tripId}/day/${nextDay.date}`)}
+          accessibilityLabel="Next day"
+        >
+          <Icon name="forward" size={16} color={nextDay ? colors.ink : colors.line} />
+        </Pressable>
       </View>
 
       {/* The theme row, stay banner, and item list are all one scrollable
@@ -308,14 +407,13 @@ export default function DayView() {
           each other, which a plain DraggableFlatList here would do. */}
       <NestableScrollContainer contentContainerStyle={{ paddingBottom: 90 }}>
         <View style={styles.themeRow}>
-          <Pressable
-            style={styles.themeMain}
-            onPress={() => { if (requireOnline()) { setThemeDraft(theme ?? ""); setThemeModalOpen(true); } }}
-          >
-            <Text style={theme ? styles.themeText : styles.themePlaceholder}>
-              {theme || "Add a day title\u2026"}
+          <Pressable style={styles.themeMain} onPress={openEditModal}>
+            <Text style={effectiveCityLabel ? styles.themeText : styles.themePlaceholder}>
+              {effectiveCityLabel || "Add a destination\u2026"}
             </Text>
-            <Text style={styles.themeEdit}>Edit</Text>
+            {theme && (
+              <Text style={styles.dayTitleSecondary} numberOfLines={1}>{theme}</Text>
+            )}
           </Pressable>
           <Pressable
             style={[styles.colorSquare, { backgroundColor: effectiveDayColor }]}
@@ -354,23 +452,56 @@ export default function DayView() {
 
       <ItemTypePickerModal visible={pickerOpen} onClose={() => setPickerOpen(false)} onSelect={handleSelectCategory} />
 
-      <Modal visible={themeModalOpen} transparent animationType="fade">
-        <Pressable style={styles.modalBackdrop} onPress={() => setThemeModalOpen(false)}>
+      <Modal visible={editModalOpen} transparent animationType="fade">
+        <Pressable style={styles.modalBackdrop} onPress={() => setEditModalOpen(false)}>
           <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
-            <Text style={styles.modalLabel}>Day title</Text>
+            <Text style={styles.modalLabel}>City</Text>
+            <Pressable style={styles.editCityRow} onPress={() => setCityPickerOpen(true)}>
+              <Text style={styles.editCityRowText}>
+                {editCityPick?.label || dayCityLabel({ city_id: null, custom_city_name: null }, tripCities) || "Pick a city\u2026"}
+              </Text>
+              <Icon name="edit" size={14} color={colors.blue} />
+            </Pressable>
+
+            <Text style={[styles.modalLabel, { marginTop: 16 }]}>Day title</Text>
             <TextInput
               style={styles.modalInput}
-              value={themeDraft}
-              onChangeText={setThemeDraft}
+              value={editThemeDraft}
+              onChangeText={setEditThemeDraft}
               placeholder={"e.g. At sea, Working half day\u2026"}
-              autoFocus
             />
-            <Pressable style={styles.modalSaveBtn} onPress={saveTheme}>
+
+            <Text style={[styles.modalLabel, { marginTop: 16 }]}>Day color</Text>
+            <View style={styles.editColorGrid}>
+              {DAY_COLOR_SWATCHES.map((swatch) => {
+                const isSelected = swatch.hex.toLowerCase() === editColorDraft.toLowerCase();
+                return (
+                  <Pressable
+                    key={swatch.hex}
+                    style={[styles.editColorSwatch, { backgroundColor: swatch.hex }, isSelected && styles.editColorSwatchActive]}
+                    onPress={() => setEditColorDraft(swatch.hex)}
+                    accessibilityLabel={swatch.label}
+                  >
+                    {isSelected && <Icon name="check" size={14} color="#fff" />}
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <Pressable style={styles.modalSaveBtn} onPress={saveDayEdits}>
               <Text style={styles.modalSaveText}>Save</Text>
             </Pressable>
           </Pressable>
         </Pressable>
       </Modal>
+
+      <DayCityPickerModal
+        visible={cityPickerOpen}
+        onClose={() => setCityPickerOpen(false)}
+        tripCities={tripCities}
+        current={editCityPick}
+        onSelect={setEditCityPick}
+      />
 
       <DayColorPickerModal
         visible={colorPickerOpen}
@@ -403,11 +534,27 @@ const styles = StyleSheet.create({
     flexDirection: "row", alignItems: "center", gap: 12,
     paddingHorizontal: 16, paddingVertical: 10, backgroundColor: colors.paperRaised, borderBottomWidth: 1, borderBottomColor: colors.line,
   },
-  themeMain: { flex: 1, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  themeMain: { flex: 1, justifyContent: "center" },
   colorSquare: { width: 28, height: 28, borderRadius: 8, borderWidth: 1, borderColor: colors.line },
   themeText: { color: colors.lightBlue, fontWeight: "700", fontSize: 14 },
   themePlaceholder: { color: colors.inkSoft, fontStyle: "italic", fontSize: 13 },
-  themeEdit: { color: colors.blue, fontSize: 12, fontWeight: "600" },
+  dayTitleSecondary: { color: colors.inkSoft, fontSize: 12, marginTop: 2 },
+  navArrow: {
+    width: 32, alignItems: "center", justifyContent: "center", alignSelf: "stretch",
+  },
+  navArrowDisabled: { opacity: 0.4 },
+  editCityRow: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.line,
+    borderRadius: radius.md, padding: 12,
+  },
+  editCityRowText: { color: colors.ink, fontWeight: "600", fontSize: 14, flex: 1 },
+  editColorGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  editColorSwatch: {
+    width: 28, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center",
+    borderWidth: 1, borderColor: colors.line,
+  },
+  editColorSwatchActive: { borderWidth: 3, borderColor: colors.gold },
   gapWarning: {
     flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(193,84,63,0.1)",
     marginHorizontal: 16, marginTop: 10, padding: 10, borderRadius: radius.md,

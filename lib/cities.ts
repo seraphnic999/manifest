@@ -3,7 +3,7 @@
 // client-side substring search) but backed by Supabase since this dataset
 // is meant to grow over time without a client rebuild.
 import { supabase } from "./supabase";
-import { City, TripCity } from "./types";
+import { City, TripCity, Day } from "./types";
 
 let citiesCache: City[] | null = null;
 
@@ -50,4 +50,57 @@ export async function saveTripCities(
   await supabase.from("trip_cities").insert(
     picks.map((p, i) => ({ trip_id: tripId, city_id: p.cityId, custom_name: p.customName, sort_order: i }))
   );
+}
+
+/** The trip's primary destination (lowest sort_order) — null if none picked
+ * yet. `rows` must come from fetchTripCities, which already orders by
+ * sort_order. */
+export function primaryTripCity(rows: TripCityRow[]): TripCityRow | null {
+  return rows.length > 0 ? rows[0] : null;
+}
+
+/** A day's effective city name for display: its own override if set,
+ * otherwise the trip's primary city, otherwise null (trip has no
+ * destinations picked at all yet). */
+export function dayCityLabel(
+  day: Pick<Day, "city_id" | "custom_city_name">,
+  tripCities: TripCityRow[]
+): string | null {
+  if (day.city_id) {
+    // Falls back to the module-level cities cache (populated by any earlier
+    // fetchAllCities() call, e.g. opening a city picker) for the case where
+    // the day's city was since removed from the trip's own destination
+    // list — city_id references cities(id) directly, not trip_cities, so
+    // the override itself is still valid even though it's no longer among
+    // this trip's picked destinations.
+    return tripCities.find((r) => r.city_id === day.city_id)?.city?.name
+      ?? citiesCache?.find((c) => c.id === day.city_id)?.name
+      ?? null;
+  }
+  if (day.custom_city_name) return day.custom_city_name;
+  const primary = primaryTripCity(tripCities);
+  return primary ? (primary.city?.name ?? primary.custom_name) : null;
+}
+
+/** Sets (or clears, if both fields are null) a single day's city override.
+ * If the picked city/custom name isn't already one of the trip's
+ * destinations, adds it (appended after the current list — never as
+ * primary, since primary is always whichever destination is first). */
+export async function setDayCity(
+  dayId: string,
+  tripId: string,
+  pick: { cityId: string | null; customName: string | null }
+): Promise<void> {
+  if (pick.cityId || pick.customName) {
+    const existing = await fetchTripCities(tripId);
+    const alreadyPresent = pick.cityId
+      ? existing.some((r) => r.city_id === pick.cityId)
+      : existing.some((r) => r.custom_name === pick.customName);
+    if (!alreadyPresent) {
+      await supabase.from("trip_cities").insert({
+        trip_id: tripId, city_id: pick.cityId, custom_name: pick.customName, sort_order: existing.length,
+      });
+    }
+  }
+  await supabase.from("days").update({ city_id: pick.cityId, custom_city_name: pick.customName }).eq("id", dayId);
 }

@@ -57,6 +57,8 @@ export interface Day {
   theme: string | null;
   sort_order: number;
   color: string | null; // map color override; null falls back to the index-based/Proposals default
+  city_id: string | null; // this day's city override; both null falls back to the trip's primary city
+  custom_city_name: string | null; // set only when city_id is null and the day has a free-text city override
 }
 
 export interface Item {

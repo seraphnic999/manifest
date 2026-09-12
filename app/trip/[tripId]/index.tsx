@@ -24,10 +24,12 @@ import { computeBudgetProgress } from "@/lib/budget";
 import { coverPhotoSource } from "@/lib/destinationPhotos";
 import { fetchDestinationForecast } from "@/lib/weather";
 import { weatherIconName } from "@/lib/weather";
+import { fetchTripCities, fetchAllCities, dayCityLabel, TripCityRow } from "@/lib/cities";
 
 interface OverviewData {
   trip: Trip;
   days: Day[];
+  tripCities: TripCityRow[];
   flights: Item[];
   lodgings: Item[];
   currencies: TripCurrency[];
@@ -41,7 +43,11 @@ async function fetchOverviewData(tripId: string): Promise<OverviewData | null> {
   if (tripError) throw tripError;
   if (!trip) return null;
 
-  const { data: days, error: daysError } = await supabase.from("days").select("*").eq("trip_id", tripId).order("sort_order");
+  const [{ data: days, error: daysError }, tripCities] = await Promise.all([
+    supabase.from("days").select("*").eq("trip_id", tripId).order("sort_order"),
+    fetchTripCities(tripId),
+    fetchAllCities(), // warms the cities cache dayCityLabel() falls back on
+  ]);
   if (daysError) throw daysError;
   const { data: flights, error: flightsError } = await supabase
     .from("items").select("*").eq("trip_id", tripId).eq("type", "flight").is("deleted_at", null).order("start_date");
@@ -84,6 +90,7 @@ async function fetchOverviewData(tripId: string): Promise<OverviewData | null> {
   return {
     trip: trip as Trip,
     days: (days ?? []) as Day[],
+    tripCities,
     flights: (flights ?? []) as Item[],
     lodgings: (lodgings ?? []) as Item[],
     currencies: (currencies ?? []) as TripCurrency[],
@@ -110,6 +117,7 @@ export default function TripOverview() {
   // this query's shape) rehydrating as something other than an array and
   // crashing render before this screen's own refetch can correct it.
   const days = Array.isArray(data?.days) ? data.days : [];
+  const tripCities = Array.isArray(data?.tripCities) ? data.tripCities : [];
   const flights = Array.isArray(data?.flights) ? data.flights : [];
   const lodgings = Array.isArray(data?.lodgings) ? data.lodgings : [];
   const totalNis = data?.totalNis ?? null;
@@ -119,10 +127,19 @@ export default function TripOverview() {
   const lodgingGapDays = findLodgingGapDays(days, lodgings);
   const isCurrent = trip ? tripStatus(trip) === "current" : false;
 
+  // While the trip is under way, the hero should show the weather for
+  // wherever the trip actually is today — which may differ from the trip's
+  // primary city if today's day has its own city override — not always the
+  // primary destination.
+  const todayDay = isCurrent ? days.find((d) => d.date === localIsoDate()) ?? null : null;
+  const heroCityName = todayDay
+    ? dayCityLabel(todayDay, tripCities)
+    : (trip?.destinations?.[0] ?? null);
+
   const { data: heroWeather } = useQuery({
-    queryKey: ["overviewHeroWeather", trip?.destinations?.[0]],
-    queryFn: () => fetchDestinationForecast(trip!.destinations[0]),
-    enabled: !!trip && trip.destinations.length > 0,
+    queryKey: ["overviewHeroWeather", tripId, heroCityName],
+    queryFn: () => fetchDestinationForecast(heroCityName!),
+    enabled: !!heroCityName,
   });
 
   const budgetProgress = trip && data
@@ -296,7 +313,13 @@ export default function TripOverview() {
                   <Text style={styles.date}>{formatDateDDMMYYYY(item.date)}</Text>
                   {item.date === localIsoDate() && <View style={styles.todayDot} />}
                 </View>
-                {item.theme ? <Text style={styles.theme}>{item.theme}</Text> : <Text style={styles.themeEmpty}>No title</Text>}
+                {(() => {
+                  const city = dayCityLabel(item, tripCities);
+                  const label = [city, item.theme].filter(Boolean).join(" · ");
+                  return label
+                    ? <Text style={styles.theme}>{label}</Text>
+                    : <Text style={styles.themeEmpty}>No destination set</Text>;
+                })()}
               </>
             )}
           </Pressable>
