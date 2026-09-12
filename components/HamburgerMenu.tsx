@@ -12,15 +12,19 @@ export interface HamburgerMenuItem {
 
 /** The top-right hamburger button + its dropdown sheet. `solid` renders the
  * button on a plain surface (Home); the default (translucent-on-photo)
- * variant is for the trip cover-photo header. */
+ * variant is for the trip cover-photo header. `size` matches the button to
+ * whatever sits beside it (defaults to 40, the trip header's own buttons). */
 export default function HamburgerMenu({
-  items, solid, sheetTop = 66,
-}: { items: HamburgerMenuItem[]; solid?: boolean; sheetTop?: number }) {
+  items, solid, sheetTop = 66, size = 40,
+}: { items: HamburgerMenuItem[]; solid?: boolean; sheetTop?: number; size?: number }) {
   const [open, setOpen] = useState(false);
   return (
     <>
       <Pressable
-        style={[styles.btn, solid ? styles.btnSolid : styles.btnOnPhoto]}
+        style={[
+          styles.btn, solid ? styles.btnSolid : styles.btnOnPhoto,
+          { width: size, height: size, borderRadius: size / 2 },
+        ]}
         onPress={() => setOpen(true)}
         accessibilityLabel="Menu"
         hitSlop={6}

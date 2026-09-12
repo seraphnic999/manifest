@@ -256,11 +256,6 @@ export default function TripList() {
         <View style={styles.titleRow}>
           <Text style={styles.title}>Where next?</Text>
           <View style={styles.titleRowActions}>
-            <HamburgerMenu
-              items={[{ icon: "signOut", label: "Sign Out", danger: true, onPress: signOut }]}
-              solid
-              sheetTop={insets.top + 66}
-            />
             <Pressable
               style={styles.addBtn}
               onPress={() => {
@@ -274,6 +269,12 @@ export default function TripList() {
             >
               <Icon name="add" size={25} color="#fff" />
             </Pressable>
+            <HamburgerMenu
+              items={[{ icon: "signOut", label: "Sign Out", danger: true, onPress: signOut }]}
+              solid
+              size={42}
+              sheetTop={insets.top + 66}
+            />
           </View>
         </View>
 
