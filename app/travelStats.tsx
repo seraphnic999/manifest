@@ -1,9 +1,9 @@
-import { FlatList, View, Text, StyleSheet } from "react-native";
+import { FlatList, View, Text, StyleSheet, Pressable } from "react-native";
 import { useQuery } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import SubpageHeader from "@/components/SubpageHeader";
 import { colors, radius, fonts } from "@/lib/theme";
-import { fetchTravelStats, YearStats, TripStatsRow } from "@/lib/travelStats";
+import { fetchTravelStats, tripTimeStatus, YearStats, TripStatsRow } from "@/lib/travelStats";
 import { formatDateDDMMYYYY } from "@/lib/dateFormat";
 
 function StatTile({ label, value }: { label: string; value: string }) {
@@ -16,10 +16,24 @@ function StatTile({ label, value }: { label: string; value: string }) {
 }
 
 function TripRow({ trip }: { trip: TripStatsRow }) {
+  const router = useRouter();
+  const status = tripTimeStatus(trip);
   return (
-    <View style={styles.tripRow}>
+    <Pressable style={styles.tripRow} onPress={() => router.push(`/trip/${trip.id}`)}>
       <View style={{ flex: 1 }}>
-        <Text style={styles.tripName}>{trip.name}</Text>
+        <View style={styles.tripNameRow}>
+          <Text style={styles.tripName}>{trip.name}</Text>
+          {status === "future" && (
+            <View style={[styles.statusBadge, styles.statusBadgeFuture]}>
+              <Text style={[styles.statusBadgeText, styles.statusBadgeTextFuture]}>FUTURE</Text>
+            </View>
+          )}
+          {status === "current" && (
+            <View style={[styles.statusBadge, styles.statusBadgeCurrent]}>
+              <Text style={[styles.statusBadgeText, styles.statusBadgeTextCurrent]}>CURRENT</Text>
+            </View>
+          )}
+        </View>
         <Text style={styles.tripDates}>
           {formatDateDDMMYYYY(trip.startDate)} – {formatDateDDMMYYYY(trip.endDate)} · {trip.days} day{trip.days === 1 ? "" : "s"}
         </Text>
@@ -28,7 +42,7 @@ function TripRow({ trip }: { trip: TripStatsRow }) {
         )}
       </View>
       <Text style={styles.tripCost}>₪{Math.round(trip.costNis).toLocaleString()}</Text>
-    </View>
+    </Pressable>
   );
 }
 
@@ -83,7 +97,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,
     borderRadius: radius.md, padding: 12, marginBottom: 8,
   },
+  tripNameRow: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" },
   tripName: { color: colors.ink, fontFamily: fonts.bodyBold, fontSize: 14.5 },
+  statusBadge: { borderRadius: 999, paddingVertical: 2, paddingHorizontal: 8 },
+  statusBadgeFuture: { backgroundColor: colors.goldSoft },
+  statusBadgeCurrent: { backgroundColor: colors.coralSoft },
+  statusBadgeText: { fontSize: 10, fontWeight: "700", letterSpacing: 0.5 },
+  statusBadgeTextFuture: { color: colors.gold },
+  statusBadgeTextCurrent: { color: colors.coral },
   tripDates: { color: colors.inkSoft, fontSize: 12, marginTop: 2 },
   tripDestinations: { color: colors.inkSoft, fontSize: 11.5, marginTop: 2, fontStyle: "italic" },
   tripCost: { color: colors.blue, fontFamily: fonts.mono, fontSize: 14 },

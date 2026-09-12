@@ -14,6 +14,7 @@ export const colors = {
   lightBlue: "#3E82D6",
   lightBlueSoft: "#DCEAFA",
   coral: "#D8503A",
+  coralSoft: "#FBE2DC",
   line: "#E3E8F2",
 
   // Old names kept as aliases during the v19 migration so screens not yet

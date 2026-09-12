@@ -4,7 +4,9 @@ import { colors, radius, fonts } from "@/lib/theme";
 import Icon from "@/components/icons/Icon";
 import Checkbox from "@/components/Checkbox";
 import { Companion } from "@/lib/types";
-import { fetchCompanions, companionFullName, relationshipLabel, fetchCompanionProfileUrl } from "@/lib/companions";
+import { fetchCompanions, companionFullName, relationshipLabel, relationshipGroup, fetchCompanionProfileUrl } from "@/lib/companions";
+
+const GROUP_ORDER = { family: 0, friends: 1, others: 2 } as const;
 
 interface Props {
   visible: boolean;
@@ -21,8 +23,12 @@ export default function CompanionPickerModal({ visible, onClose, selectedIds, on
     if (!visible) return;
     setSelected(new Set(selectedIds));
     fetchCompanions().then(async (list) => {
-      // "Traveling with" means everyone but the trip owner themself.
-      const others = list.filter((c) => !c.is_self);
+      // "Traveling with" means everyone but the trip owner themself, grouped
+      // the same way Doc Tracker orders its own list: family, then friends,
+      // then everyone else.
+      const others = list
+        .filter((c) => !c.is_self)
+        .sort((a, b) => GROUP_ORDER[relationshipGroup(a)] - GROUP_ORDER[relationshipGroup(b)]);
       const withUrls = await Promise.all(others.map(async (c) => ({ ...c, url: await fetchCompanionProfileUrl(c.profile_photo_path) })));
       setCompanions(withUrls);
     });

@@ -12,6 +12,18 @@ function daysBetweenInclusive(startIso: string, endIso: string): number {
   return Math.round((b - a) / 86400000) + 1;
 }
 
+export type TripTimeStatus = "past" | "current" | "future";
+
+/** Compares a trip's date range (YYYY-MM-DD strings) against today, as
+ * plain ISO string comparisons — no timezone math needed since both sides
+ * are calendar dates, not instants. */
+export function tripTimeStatus(trip: { startDate: string; endDate: string }, today: Date = new Date()): TripTimeStatus {
+  const todayIso = today.toISOString().slice(0, 10);
+  if (todayIso < trip.startDate) return "future";
+  if (todayIso > trip.endDate) return "past";
+  return "current";
+}
+
 export interface TripStatsRow {
   id: string;
   name: string;

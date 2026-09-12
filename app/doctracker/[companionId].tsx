@@ -61,6 +61,7 @@ export default function CompanionDetail() {
   const [editingDoc, setEditingDoc] = useState<TravelDocument | null>(null);
   const [exportMode, setExportMode] = useState(false);
   const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set());
+  const [infoSelected, setInfoSelected] = useState(false);
   const [lightbox, setLightbox] = useState<{ urls: string[]; index: number } | null>(null);
 
   useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
@@ -99,27 +100,36 @@ export default function CompanionDetail() {
     );
   }
 
+  function resetExportSelection() {
+    setSelectedDocIds(new Set());
+    setInfoSelected(false);
+  }
+
   async function doExport() {
-    // Zero documents selected is a valid export — just the companion's own
-    // info (name, birth date, Israeli ID#, etc.), no document blocks.
     const selected = documents.filter((d) => selectedDocIds.has(d.id));
-    const text = buildCompanionExportText(companion, selected);
+    if (!infoSelected && selected.length === 0) {
+      Alert.alert("Nothing selected", "Choose at least one section to export.");
+      return;
+    }
+    const text = buildCompanionExportText(companion, infoSelected, selected);
     await shareCompanionText(text);
     setExportMode(false);
-    setSelectedDocIds(new Set());
+    resetExportSelection();
   }
+
+  const exportCount = selectedDocIds.size + (infoSelected ? 1 : 0);
 
   const headerRight = exportMode ? (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
-      <Pressable onPress={() => { setExportMode(false); setSelectedDocIds(new Set()); }}>
+      <Pressable onPress={() => { setExportMode(false); resetExportSelection(); }}>
         <Text style={styles.headerActionMuted}>Cancel</Text>
       </Pressable>
       <Pressable onPress={doExport}>
-        <Text style={styles.headerAction}>Share ({selectedDocIds.size})</Text>
+        <Text style={styles.headerAction}>Share ({exportCount})</Text>
       </Pressable>
     </View>
   ) : (
-    <Pressable onPress={() => { if (documents.length > 0) setExportMode(true); else doExport(); }}>
+    <Pressable onPress={() => setExportMode(true)}>
       <Text style={styles.headerAction}>Export</Text>
     </Pressable>
   );
@@ -130,7 +140,15 @@ export default function CompanionDetail() {
       <SubpageHeader title={companionFullName(companion)} right={headerRight} />
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
-        <Pressable style={styles.card} onPress={() => setEditOpen(true)}>
+        <Pressable
+          style={[styles.card, exportMode && infoSelected && styles.docCardSelected]}
+          onPress={() => { if (exportMode) setInfoSelected((s) => !s); else setEditOpen(true); }}
+        >
+          {exportMode && (
+            <View style={styles.cardCheckboxRow}>
+              <Checkbox checked={infoSelected} />
+            </View>
+          )}
           <Pressable
             style={styles.profileRow}
             onPress={() => galleryUrls.length > 0 && setLightbox({ urls: galleryUrls, index: 0 })}
@@ -148,10 +166,6 @@ export default function CompanionDetail() {
           <CopyRow label="Birth date" value={companion.birth_date ? formatDateDDMMYYYY(companion.birth_date) : null} />
           <CopyRow label="Israeli ID#" value={companion.israeli_id} />
           <CopyRow label="Notes" value={companion.notes} />
-          <View style={styles.editHint}>
-            <Icon name="edit" size={14} color={colors.blue} />
-            <Text style={styles.editHintText}>Tap to edit</Text>
-          </View>
         </Pressable>
 
         {photos.length > 0 && (
@@ -234,8 +248,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,
     borderRadius: radius.lg, padding: 14,
   },
-  editHint: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8 },
-  editHintText: { color: colors.blue, fontSize: 12, fontWeight: "600" },
+  cardCheckboxRow: { alignItems: "flex-start", marginBottom: 8 },
   fieldRow: { flexDirection: "row", alignItems: "center", paddingVertical: 6 },
   fieldLabel: { color: colors.inkSoft, fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
   fieldValue: { color: colors.ink, fontSize: 15, marginTop: 2 },

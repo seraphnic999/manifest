@@ -33,6 +33,7 @@ export default function CompanionEditModal({ visible, onClose, companion, onSave
   const [photos, setPhotos] = useState<(CompanionPhoto & { url: string })[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [cropAsset, setCropAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [photoSourceFor, setPhotoSourceFor] = useState<"profile" | "additional" | null>(null);
 
   useEffect(() => {
     if (!visible) return;
@@ -46,25 +47,53 @@ export default function CompanionEditModal({ visible, onClose, companion, onSave
     fetchCompanionPhotosWithUrls(companion.id).then(setPhotos);
   }, [visible, companion]);
 
-  async function pickAndUpload(onPicked: (asset: ImagePicker.ImagePickerAsset) => Promise<void>) {
+  async function pickAndUpload(
+    source: "camera" | "library",
+    onPicked: (asset: ImagePicker.ImagePickerAsset) => Promise<void>
+  ) {
     try {
-      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!perm.granted) {
-        Alert.alert("Permission needed", "Allow photo library access to pick a photo.");
-        return;
+      if (source === "camera") {
+        const perm = await ImagePicker.requestCameraPermissionsAsync();
+        if (!perm.granted) {
+          Alert.alert("Permission needed", "Allow camera access to take a photo.");
+          return;
+        }
+        const result = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
+        if (result.canceled || result.assets.length === 0) return;
+        await onPicked(result.assets[0]);
+      } else {
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!perm.granted) {
+          Alert.alert("Permission needed", "Allow photo library access to pick a photo.");
+          return;
+        }
+        const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
+        if (result.canceled || result.assets.length === 0) return;
+        await onPicked(result.assets[0]);
       }
-      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
-      if (result.canceled || result.assets.length === 0) return;
-      await onPicked(result.assets[0]);
     } catch (e: any) {
       Alert.alert("Couldn't add photo", e.message ?? "Unknown error");
     }
   }
 
-  async function changeProfilePhoto() {
-    // Opens the crop step first — the actual upload happens once the user
-    // confirms the framed section in AvatarCropModal (see onCropConfirm).
-    await pickAndUpload(async (asset) => { setCropAsset(asset); });
+  function changeProfilePhoto() {
+    setPhotoSourceFor("profile");
+  }
+
+  async function pickFrom(source: "camera" | "library") {
+    const target = photoSourceFor;
+    setPhotoSourceFor(null);
+    if (!target) return;
+    if (target === "profile") {
+      // Opens the crop step first — the actual upload happens once the user
+      // confirms the framed section in AvatarCropModal (see onCropConfirm).
+      await pickAndUpload(source, async (asset) => { setCropAsset(asset); });
+    } else {
+      await pickAndUpload(source, async (asset) => {
+        await addCompanionPhoto(companion.id, asset);
+        setPhotos(await fetchCompanionPhotosWithUrls(companion.id));
+      });
+    }
   }
 
   async function onCropConfirm(croppedUri: string) {
@@ -80,11 +109,8 @@ export default function CompanionEditModal({ visible, onClose, companion, onSave
     }
   }
 
-  async function addPhoto() {
-    await pickAndUpload(async (asset) => {
-      await addCompanionPhoto(companion.id, asset);
-      setPhotos(await fetchCompanionPhotosWithUrls(companion.id));
-    });
+  function addPhoto() {
+    setPhotoSourceFor("additional");
   }
 
   async function removePhoto(photo: CompanionPhoto) {
@@ -211,6 +237,22 @@ export default function CompanionEditModal({ visible, onClose, companion, onSave
           onConfirm={onCropConfirm}
         />
       )}
+
+      <Modal visible={photoSourceFor !== null} transparent animationType="fade" onRequestClose={() => setPhotoSourceFor(null)}>
+        <Pressable style={styles.photoSourceBackdrop} onPress={() => setPhotoSourceFor(null)}>
+          <Pressable style={styles.photoSourceSheet} onPress={(e) => e.stopPropagation()}>
+            <Pressable style={styles.photoSourceOption} onPress={() => pickFrom("camera")}>
+              <Icon name="camera" size={20} color={colors.blue} />
+              <Text style={styles.photoSourceOptionText}>Take Photo</Text>
+            </Pressable>
+            <View style={styles.photoSourceDivider} />
+            <Pressable style={styles.photoSourceOption} onPress={() => pickFrom("library")}>
+              <Icon name="gallery" size={20} color={colors.blue} />
+              <Text style={styles.photoSourceOptionText}>Choose from Library</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </Modal>
   );
 }
@@ -221,6 +263,14 @@ const styles = StyleSheet.create({
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",
     padding: 16, paddingTop: 54, borderBottomWidth: 1, borderBottomColor: colors.line, backgroundColor: colors.paperRaised,
   },
+  photoSourceBackdrop: { flex: 1, backgroundColor: "rgba(33,47,61,0.5)", justifyContent: "flex-end" },
+  photoSourceSheet: {
+    backgroundColor: colors.paperRaised, borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingTop: 8, paddingBottom: 24, width: "100%", maxWidth: 480, alignSelf: "center",
+  },
+  photoSourceOption: { flexDirection: "row", alignItems: "center", gap: 12, padding: 18 },
+  photoSourceOptionText: { color: colors.ink, fontWeight: "600", fontSize: 15 },
+  photoSourceDivider: { height: 1, backgroundColor: colors.line, marginHorizontal: 18 },
   headerTitle: { fontFamily: fonts.display, fontSize: 18, color: colors.ink },
   cancel: { color: colors.blue, fontFamily: fonts.bodySemi, fontSize: 15 },
   profileRow: { alignItems: "center", marginBottom: 12, gap: 8 },

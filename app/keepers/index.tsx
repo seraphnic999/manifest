@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { View, Text, FlatList, StyleSheet, Pressable } from "react-native";
-import { Stack } from "expo-router";
+import { Stack, useLocalSearchParams } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import SubpageHeader from "@/components/SubpageHeader";
 import Icon from "@/components/icons/Icon";
@@ -22,9 +22,18 @@ function StarRow({ rating }: { rating: number | null }) {
 }
 
 export default function Keepers() {
+  const { openKeeperId } = useLocalSearchParams<{ openKeeperId?: string }>();
   const { data, refetch } = useQuery({ queryKey: ["keepers"], queryFn: fetchKeepers });
   const groups: KeeperCityGroup[] = groupKeepersByCity(data ?? []);
   const [selected, setSelected] = useState<Keeper | null>(null);
+
+  // Arriving from an item's "Keeper" badge — jump straight to its detail
+  // once the list has loaded, instead of making the user find it again.
+  useEffect(() => {
+    if (!openKeeperId || !data) return;
+    const match = data.find((k) => k.id === openKeeperId);
+    if (match) setSelected(match);
+  }, [openKeeperId, data]);
 
   return (
     <View style={styles.container}>

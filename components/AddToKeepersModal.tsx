@@ -12,9 +12,10 @@ interface Props {
   visible: boolean;
   onClose: () => void;
   item: Item;
+  onSaved?: () => void;
 }
 
-export default function AddToKeepersModal({ visible, onClose, item }: Props) {
+export default function AddToKeepersModal({ visible, onClose, item, onSaved }: Props) {
   const [rating, setRating] = useState(0);
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
@@ -36,6 +37,7 @@ export default function AddToKeepersModal({ visible, onClose, item }: Props) {
       const city = resolveDayCityPick(day ?? { city_id: null, custom_city_name: null }, tripCities);
       const fields = keeperFieldsFromItem(item, city, trip?.name ?? null, rating || null, notes.trim() || null);
       await addKeeper(fields);
+      onSaved?.();
       onClose();
     } catch (e: any) {
       Alert.alert("Couldn't save to Keepers", e.message ?? "Unknown error");

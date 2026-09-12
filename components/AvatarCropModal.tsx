@@ -8,7 +8,6 @@ import { colors, radius, fonts } from "@/lib/theme";
 // the circular avatar — this doesn't touch the original photo, it just
 // crops+resizes a copy of it to whatever the user framed in the box.
 const BOX = 280;
-const MIN_SCALE = 1;
 const MAX_SCALE = 3.5;
 
 interface Props {
@@ -19,27 +18,54 @@ interface Props {
 }
 
 export default function AvatarCropModal({ visible, imageUri, onCancel, onConfirm }: Props) {
-  // Deliberately not trusting ImagePicker's own asset.width/height here —
-  // on some Android devices those are reported pre-EXIF-rotation, which
-  // silently mismatched this component's earlier width/height props against
-  // what Image actually renders and produced a wrongly-framed crop. Image.getSize
-  // reads the real, orientation-resolved pixel dimensions RN itself will draw.
+  // The picked photo is run through an identity ImageManipulator pass before
+  // anything else. Some photos (notably front-camera selfies) carry an EXIF
+  // rotation tag rather than pre-rotated pixels; RN's Image/Image.getSize
+  // resolve that tag, but ImageManipulator's crop step has historically
+  // operated on the raw, unrotated buffer. Framing against getSize's
+  // dimensions and then cropping the original file could silently crop the
+  // wrong region entirely. Normalizing first means getSize, the on-screen
+  // preview, and the final crop all read the same already-rotated file, so
+  // there's nothing left to disagree about.
+  const [workingUri, setWorkingUri] = useState<string | null>(null);
   const [naturalSize, setNaturalSize] = useState<{ width: number; height: number } | null>(null);
   useEffect(() => {
-    if (!visible) { setNaturalSize(null); return; }
-    Image.getSize(imageUri, (width, height) => setNaturalSize({ width, height }));
+    if (!visible) { setWorkingUri(null); setNaturalSize(null); return; }
+    let cancelled = false;
+    (async () => {
+      const normalized = await ImageManipulator.manipulateAsync(imageUri, [], {
+        compress: 1, format: ImageManipulator.SaveFormat.JPEG,
+      });
+      if (cancelled) return;
+      setWorkingUri(normalized.uri);
+      Image.getSize(normalized.uri, (width, height) => { if (!cancelled) setNaturalSize({ width, height }); });
+    })();
+    return () => { cancelled = true; };
   }, [visible, imageUri]);
   const imageWidth = naturalSize?.width ?? 1;
   const imageHeight = naturalSize?.height ?? 1;
   const baseScale = BOX / Math.min(imageWidth, imageHeight);
+  // The smallest pinch scale that still shows the entire photo (the longer
+  // side exactly fits the box, the shorter side letterboxed) — previously
+  // this was fixed at 1 (the tightest possible fit, always pre-cropped to a
+  // square), so there was no way to pinch out and see the full picture.
+  const minScale = Math.min(imageWidth, imageHeight) / Math.max(imageWidth, imageHeight);
 
-  const [scale, setScale] = useState(MIN_SCALE);
+  const [scale, setScale] = useState(1);
   const [translateX, setTranslateX] = useState(0);
   const [translateY, setTranslateY] = useState(0);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (naturalSize) { setScale(MIN_SCALE); setTranslateX(0); setTranslateY(0); }
+    if (naturalSize) {
+      // Start zoomed all the way out — showing the whole picture — so the
+      // user pinches in to choose their crop rather than starting already
+      // cropped to a square they can't back out of.
+      const min = Math.min(naturalSize.width, naturalSize.height) / Math.max(naturalSize.width, naturalSize.height);
+      setScale(min);
+      setTranslateX(0);
+      setTranslateY(0);
+    }
   }, [naturalSize]);
 
   const startScale = useRef(1);
@@ -64,7 +90,7 @@ export default function AvatarCropModal({ visible, imageUri, onCancel, onConfirm
     .runOnJS(true)
     .onStart(() => { startScale.current = scale; })
     .onUpdate((e) => {
-      const next = Math.min(MAX_SCALE, Math.max(MIN_SCALE, startScale.current * e.scale));
+      const next = Math.min(MAX_SCALE, Math.max(minScale, startScale.current * e.scale));
       setScale(next);
       setTranslateX((x) => clamp(next, imageWidth, x));
       setTranslateY((y) => clamp(next, imageHeight, y));
@@ -76,14 +102,18 @@ export default function AvatarCropModal({ visible, imageUri, onCancel, onConfirm
     setSaving(true);
     try {
       const totalScale = baseScale * scale;
-      const cropSize = BOX / totalScale;
+      // A square crop can never be bigger than the image's shorter side —
+      // zoomed out past the natural fit (to see the whole picture), the
+      // *visible* box shows letterboxing, but the actual saved square is
+      // capped at the most picture a square can ever hold.
+      const cropSize = Math.min(BOX / totalScale, imageWidth, imageHeight);
       let originX = imageWidth / 2 - cropSize / 2 - translateX / totalScale;
       let originY = imageHeight / 2 - cropSize / 2 - translateY / totalScale;
       originX = Math.min(Math.max(originX, 0), Math.max(0, imageWidth - cropSize));
       originY = Math.min(Math.max(originY, 0), Math.max(0, imageHeight - cropSize));
 
       const result = await ImageManipulator.manipulateAsync(
-        imageUri,
+        workingUri!,
         [{ crop: { originX, originY, width: cropSize, height: cropSize } }, { resize: { width: 512, height: 512 } }],
         { compress: 0.85, format: ImageManipulator.SaveFormat.JPEG }
       );
@@ -104,10 +134,10 @@ export default function AvatarCropModal({ visible, imageUri, onCancel, onConfirm
       <View style={styles.backdrop}>
         <Text style={styles.title}>Position photo</Text>
         <Text style={styles.hint}>Drag and pinch to frame what shows in the circle</Text>
-        {naturalSize ? (
+        {naturalSize && workingUri ? (
           <GestureDetector gesture={gesture}>
             <View style={styles.box}>
-              <Image source={{ uri: imageUri }} style={imgStyle} />
+              <Image source={{ uri: workingUri }} style={imgStyle} />
               <View pointerEvents="none" style={styles.ringOverlay} />
             </View>
           </GestureDetector>

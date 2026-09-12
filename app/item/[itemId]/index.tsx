@@ -9,7 +9,8 @@ import * as DocumentPicker from "expo-document-picker";
 import { supabase } from "@/lib/supabase";
 import Icon from "@/components/icons/Icon";
 import { colors, radius } from "@/lib/theme";
-import { Item, ItemPhoto, Expense, TripCurrency, TripParty } from "@/lib/types";
+import { Item, ItemPhoto, Expense, TripCurrency, TripParty, Keeper } from "@/lib/types";
+import { fetchKeeperForItem } from "@/lib/keepers";
 import { uploadItemPhoto, uploadItemDocument, fetchItemPhotosWithUrls, deleteItemPhoto, isImageAttachment } from "@/lib/photos";
 import { downloadAttachment } from "@/lib/downloadAttachment";
 import { fetchLinkedItems, LinkedItemSummary } from "@/lib/itemLinks";
@@ -40,6 +41,7 @@ interface ItemDetailData {
   expenses: Expense[];
   linkedShoppingItems: LinkedShoppingItem[];
   linkedItems: LinkedItemSummary[];
+  keeper: Keeper | null;
 }
 
 async function fetchItemDetail(itemId: string): Promise<ItemDetailData | null> {
@@ -47,11 +49,12 @@ async function fetchItemDetail(itemId: string): Promise<ItemDetailData | null> {
   if (error) throw error;
   if (!item) return null;
 
-  const [photos, expensesRes, shoppingRes, linkedItems] = await Promise.all([
+  const [photos, expensesRes, shoppingRes, linkedItems, keeper] = await Promise.all([
     fetchItemPhotosWithUrls(itemId),
     supabase.from("expenses").select("*").eq("item_id", itemId).order("expense_date", { ascending: false }),
     supabase.from("shopping_list_items").select("id, name, quantity, allocations(id)").eq("item_id", itemId),
     fetchLinkedItems(itemId),
+    fetchKeeperForItem(itemId),
   ]);
   if (expensesRes.error) throw expensesRes.error;
   if (shoppingRes.error) throw shoppingRes.error;
@@ -62,6 +65,7 @@ async function fetchItemDetail(itemId: string): Promise<ItemDetailData | null> {
     expenses: (expensesRes.data ?? []) as Expense[],
     linkedShoppingItems: (shoppingRes.data ?? []) as unknown as LinkedShoppingItem[],
     linkedItems,
+    keeper,
   };
 }
 
@@ -108,6 +112,7 @@ export default function ItemDetails() {
   const expenses = data?.expenses ?? [];
   const linkedShoppingItems = data?.linkedShoppingItems ?? [];
   const linkedItems = data?.linkedItems ?? [];
+  const keeper = data?.keeper ?? null;
 
   const { data: tripExtras } = useQuery({
     queryKey: ["itemTripExtras", item?.trip_id],
@@ -367,10 +372,22 @@ export default function ItemDetails() {
         </Pressable>
       ) : null}
 
-      <Pressable style={styles.mapLinkButton} onPress={() => setKeepersModalOpen(true)}>
-        <Icon name="star" size={20} color={colors.blue} />
-        <Text style={styles.mapLinkButtonText}>Add to Keepers</Text>
-      </Pressable>
+      {keeper ? (
+        <Pressable style={styles.keeperButton} onPress={() => router.push(`/keepers?openKeeperId=${keeper.id}`)}>
+          <Icon name="star" size={20} color={colors.gold} />
+          <Text style={styles.keeperButtonText}>Keeper</Text>
+          <View style={styles.keeperStars}>
+            {[1, 2, 3, 4, 5].map((n) => (
+              <Icon key={n} name="star" size={13} color={n <= (keeper.rating ?? 0) ? colors.gold : "rgba(201,150,46,0.35)"} />
+            ))}
+          </View>
+        </Pressable>
+      ) : (
+        <Pressable style={styles.mapLinkButton} onPress={() => setKeepersModalOpen(true)}>
+          <Icon name="star" size={20} color={colors.blue} />
+          <Text style={styles.mapLinkButtonText}>Add to Keepers</Text>
+        </Pressable>
+      )}
 
       {itemResearchEligible(item.type) && !readyResearchJob && (
         <Pressable style={styles.mapLinkButton} onPress={() => setIdentifyOpen(true)}>
@@ -539,6 +556,7 @@ export default function ItemDetails() {
             visible={keepersModalOpen}
             onClose={() => setKeepersModalOpen(false)}
             item={item}
+            onSaved={refetch}
           />
           <IdentifyCandidatesModal
             visible={identifyOpen}
@@ -610,6 +628,13 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.lightBlue, borderRadius: radius.md, padding: 12, marginTop: 10,
   },
   mapLinkButtonText: { color: colors.lightBlue, fontWeight: "700" },
+  keeperButton: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+    borderWidth: 1, borderColor: colors.gold, backgroundColor: colors.goldSoft,
+    borderRadius: radius.md, padding: 12, marginTop: 10,
+  },
+  keeperButtonText: { color: colors.gold, fontWeight: "700" },
+  keeperStars: { flexDirection: "row", gap: 1, marginLeft: 4 },
   flightStatusCard: {
     backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,
     borderRadius: radius.md, padding: 12, marginTop: 16,

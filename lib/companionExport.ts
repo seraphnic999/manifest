@@ -12,14 +12,16 @@ function line(label: string, value: string | null | undefined): string | null {
   return value ? `${label}: ${value}` : null;
 }
 
-export function buildCompanionExportText(companion: Companion, documents: TravelDocument[]): string {
-  const header = [
-    line("First Name", companion.first_name),
-    line("Last Name", companion.last_name),
-    !companion.is_self ? line("Relationship", relationshipLabel(companion.relationship)) : null,
-    line("Born", companion.birth_date ? formatDateDDMMYYYY(companion.birth_date) : null),
-    line("Israeli ID#", companion.israeli_id),
-  ].filter(Boolean).join("\n");
+export function buildCompanionExportText(companion: Companion, includeInfo: boolean, documents: TravelDocument[]): string {
+  const header = includeInfo
+    ? [
+        line("First Name", companion.first_name),
+        line("Last Name", companion.last_name),
+        !companion.is_self ? line("Relationship", relationshipLabel(companion.relationship)) : null,
+        line("Born", companion.birth_date ? formatDateDDMMYYYY(companion.birth_date) : null),
+        line("Israeli ID#", companion.israeli_id),
+      ].filter(Boolean).join("\n")
+    : null;
 
   const docBlocks = documents.map((d) => {
     const fields = [
@@ -32,7 +34,7 @@ export function buildCompanionExportText(companion: Companion, documents: Travel
     return `${documentTypeLabel(d.type).toUpperCase()}\n${fields}`;
   });
 
-  return [header, ...docBlocks].join("\n\n");
+  return [header, ...docBlocks].filter((b): b is string => !!b).join("\n\n");
 }
 
 export async function shareCompanionText(text: string): Promise<void> {

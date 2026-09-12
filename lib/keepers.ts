@@ -6,7 +6,7 @@ export type NewKeeperFields = Pick<Keeper,
   | "city_id" | "custom_city_name" | "city_label" | "item_type" | "title"
   | "start_date" | "end_date" | "time_start" | "time_end" | "timezone_start" | "timezone_end"
   | "notes" | "confirmation_code" | "booking_source" | "address" | "phone" | "vendor"
-  | "link" | "google_maps_link" | "latitude" | "longitude" | "map_icon" | "source_trip_name"
+  | "link" | "google_maps_link" | "latitude" | "longitude" | "map_icon" | "source_trip_name" | "source_item_id"
 > & { rating: number | null; personal_notes: string | null };
 
 /** Builds the keeper snapshot from a live item — expenses, shopping list,
@@ -43,9 +43,20 @@ export function keeperFieldsFromItem(
     longitude: item.longitude,
     map_icon: item.map_icon,
     source_trip_name: sourceTripName,
+    source_item_id: item.id,
     rating,
     personal_notes: personalNotes,
   };
+}
+
+/** Is this item already a keeper? Used to swap "Add to Keepers" for a
+ * "Keeper" badge on the item detail screen. Deliberately not a live
+ * reference elsewhere in the app — see migration_031 — so this is the one
+ * place that reads the link. */
+export async function fetchKeeperForItem(itemId: string): Promise<Keeper | null> {
+  const { data, error } = await supabase.from("keepers").select("*").eq("source_item_id", itemId).maybeSingle();
+  if (error) throw error;
+  return (data as Keeper) ?? null;
 }
 
 export async function addKeeper(fields: NewKeeperFields): Promise<void> {

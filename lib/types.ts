@@ -271,6 +271,7 @@ export interface Keeper {
   longitude: number | null;
   map_icon: string | null;
   source_trip_name: string | null;
+  source_item_id: string | null;
   rating: number | null;
   personal_notes: string | null;
   created_at: string;
