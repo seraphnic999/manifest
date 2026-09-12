@@ -150,7 +150,7 @@ export default function TripOverview() {
           <>
             <ImageBackground
               source={coverPhotoSource(trip.cover_photo_id)}
-              style={[styles.hero, { height: isCurrent ? 210 : 230 }]}
+              style={[styles.hero, { minHeight: isCurrent ? 210 : 230 }]}
             >
               <View style={styles.heroScrim} />
               <View style={[styles.headerRow, { top: insets.top + 10 }]}>
@@ -166,7 +166,7 @@ export default function TripOverview() {
                   <Text style={styles.weatherDate}>{formatDateDDMMYYYY(localIsoDate()).slice(0, 5)}</Text>
                 </View>
               )}
-              <Text style={styles.tripName}>{trip.destinations[0] ?? trip.name}</Text>
+              <Text style={styles.tripName}>{trip.name}</Text>
               {!isCurrent && <TripCountdown tripId={tripId} fallbackDateIso={trip.start_date} />}
             </ImageBackground>
 

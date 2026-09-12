@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   View, Text, TextInput, Pressable, StyleSheet, ScrollView, Modal,
 } from "react-native";
@@ -6,10 +6,12 @@ import { Alert } from "@/lib/alert";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
-import { Trip, TripType, TripCurrency } from "@/lib/types";
+import { Trip, TripType, TripCurrency, Day } from "@/lib/types";
 import { tzOffsetLabel, sortedByOffsetDesc, COMMON_TIMEZONES, COMMON_CURRENCIES } from "@/lib/timezone";
 import { fetchLiveRateToNis } from "@/lib/currencyRates";
 import { fetchAllCities, fetchTripCities, saveTripCities } from "@/lib/cities";
+import { formatDateDDMMYYYY } from "@/lib/dateFormat";
+import { useUnsavedChangesGuard } from "@/lib/useUnsavedChangesGuard";
 import { DateField } from "@/components/DateTimeFields";
 import HomeButton from "@/components/HomeButton";
 import CoverPhotoPicker from "@/components/CoverPhotoPicker";
@@ -29,6 +31,8 @@ export default function EditTrip() {
   const [name, setName] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [origStartDate, setOrigStartDate] = useState("");
+  const [origEndDate, setOrigEndDate] = useState("");
   const [type, setType] = useState<TripType>("pleasure");
   const [origType, setOrigType] = useState<TripType>("pleasure");
   const [cityPicks, setCityPicks] = useState<CityPick[]>([]);
@@ -54,6 +58,36 @@ export default function EditTrip() {
   const [currencyPickerOpen, setCurrencyPickerOpen] = useState(false);
   const [customCurrencyInput, setCustomCurrencyInput] = useState("");
 
+  // Shrinking the trip's date range can leave existing `days` rows (and
+  // their items) outside the new [startDate, endDate] window — the
+  // generate_trip_days() trigger only ever fills gaps, it never removes a
+  // day that's fallen out of range. This prompts for what to do with those
+  // items before the trip update (and the day cleanup) is committed.
+  const [orphanedDays, setOrphanedDays] = useState<{ day: Day; itemCount: number }[] | null>(null);
+  const orphanResolverRef = useRef<((choice: "delete" | "move" | "cancel") => void) | null>(null);
+  function resolveOrphanedDays(choice: "delete" | "move" | "cancel") {
+    orphanResolverRef.current?.(choice);
+    orphanResolverRef.current = null;
+    setOrphanedDays(null);
+  }
+
+  // Unsaved-changes guard — same beforeRemove-based mechanism as the item
+  // edit screen (lib/useUnsavedChangesGuard.ts). Currency add/remove/live-rate
+  // writes are excluded since those already save immediately, not on this
+  // screen's own Save button; only fields staged in local state until Save
+  // count as "unsaved".
+  const originalSnapshotRef = useRef("");
+  const latestSnapshotRef = useRef("");
+  function currentSnapshot() {
+    return JSON.stringify({
+      name, startDate, endDate, type, budgetAmount, coverPhotoId, timezone, cityPicks, rateEdits,
+    });
+  }
+  useEffect(() => { latestSnapshotRef.current = currentSnapshot(); });
+  const { promptVisible, proceed, cancel } = useUnsavedChangesGuard(
+    () => latestSnapshotRef.current !== originalSnapshotRef.current
+  );
+
   async function lookUpNewRate() {
     if (!newCode) return;
     setLookingUpRate(true);
@@ -73,12 +107,20 @@ export default function EditTrip() {
   }
 
   useEffect(() => {
-    supabase.from("trips").select("*").eq("id", tripId).single().then(({ data }) => {
+    Promise.all([
+      supabase.from("trips").select("*").eq("id", tripId).single(),
+      fetchTripCities(tripId),
+    ]).then(([{ data }, cityRows]) => {
       if (!data) return;
       const trip = data as Trip;
+      const picks: CityPick[] = cityRows.map((r) => ({
+        cityId: r.city_id, customName: r.custom_name, label: r.city?.name ?? r.custom_name ?? "",
+      }));
       setName(trip.name);
       setStartDate(trip.start_date);
       setEndDate(trip.end_date);
+      setOrigStartDate(trip.start_date);
+      setOrigEndDate(trip.end_date);
       setType(trip.type);
       setOrigType(trip.type);
       setOrigDestinations(trip.destinations);
@@ -89,13 +131,18 @@ export default function EditTrip() {
       setInitialTimezone(trip.default_timezone);
       setCustomTz(!COMMON_TIMEZONES.includes(trip.default_timezone));
       setBudgetAmount(trip.budget_amount != null ? String(trip.budget_amount) : "");
+      setCityPicks(picks);
+      setHadCitiesOnLoad(cityRows.length > 0);
+      // Key order must match currentSnapshot()'s object exactly, since
+      // JSON.stringify preserves insertion order and the dirty check is a
+      // plain string comparison.
+      originalSnapshotRef.current = JSON.stringify({
+        name: trip.name, startDate: trip.start_date, endDate: trip.end_date, type: trip.type,
+        budgetAmount: trip.budget_amount != null ? String(trip.budget_amount) : "",
+        coverPhotoId: trip.cover_photo_id, timezone: trip.default_timezone,
+        cityPicks: picks, rateEdits: {},
+      });
       setLoaded(true);
-    });
-    fetchTripCities(tripId).then((rows) => {
-      setCityPicks(rows.map((r) => ({
-        cityId: r.city_id, customName: r.custom_name, label: r.city?.name ?? r.custom_name ?? "",
-      })));
-      setHadCitiesOnLoad(rows.length > 0);
     });
     loadCurrencies();
   }, [tripId]);
@@ -228,10 +275,10 @@ export default function EditTrip() {
     );
   }
 
-  async function save() {
+  async function save(): Promise<boolean> {
     if (!name || !startDate || !endDate) {
       Alert.alert("Missing info", "Name, start date, and end date are required.");
-      return;
+      return false;
     }
 
     // Validate any pending currency-rate edits before saving anything.
@@ -243,9 +290,50 @@ export default function EditTrip() {
       const rate = parseFloat(raw);
       if (!rate || rate <= 0) {
         Alert.alert("Invalid rate", `Enter a valid rate to NIS for ${c.code}.`);
-        return;
+        return false;
       }
       if (rate !== c.rate_to_nis) rateUpdates.push({ id: c.id, rate });
+    }
+
+    // The date range shrank — check for now-out-of-range days before
+    // writing anything, since generate_trip_days() only ever fills gaps,
+    // never removes a day that's fallen outside the trip's own dates.
+    if (startDate !== origStartDate || endDate !== origEndDate) {
+      const { data: currentDays } = await supabase.from("days").select("*").eq("trip_id", tripId);
+      const orphaned = ((currentDays ?? []) as Day[]).filter(
+        (d) => d.date !== null && (d.date < startDate || d.date > endDate)
+      );
+      if (orphaned.length > 0) {
+        const withCounts = await Promise.all(orphaned.map(async (day) => {
+          const { count } = await supabase
+            .from("items").select("id", { count: "exact", head: true })
+            .eq("day_id", day.id).is("deleted_at", null);
+          return { day, itemCount: count ?? 0 };
+        }));
+        setOrphanedDays(withCounts);
+        const choice = await new Promise<"delete" | "move" | "cancel">((resolve) => {
+          orphanResolverRef.current = resolve;
+        });
+        if (choice === "cancel") return false;
+
+        const proposalsDayId = ((currentDays ?? []) as Day[]).find((d) => d.date === null)?.id;
+        if (choice === "move" && !proposalsDayId) {
+          // Every trip is guaranteed exactly one Proposals day by the
+          // generate_trip_days() trigger — this should never happen, but
+          // silently falling through to delete would be a real data-loss
+          // bug if it somehow did.
+          Alert.alert("Couldn't move items", "This trip has no Proposals day to move them to. Nothing was saved.");
+          return false;
+        }
+        for (const { day } of withCounts) {
+          if (choice === "move") {
+            await supabase.from("items").update({ day_id: proposalsDayId }).eq("day_id", day.id);
+          }
+          // "Delete": items.day_id references days(id) on delete cascade,
+          // so removing the day row deletes its remaining items too.
+          await supabase.from("days").delete().eq("id", day.id);
+        }
+      }
     }
 
     setSaving(true);
@@ -276,7 +364,7 @@ export default function EditTrip() {
     if (error) {
       setSaving(false);
       Alert.alert("Couldn't save", error.message);
-      return;
+      return false;
     }
 
     await saveTripCities(tripId, cityPicks.map((p) => ({ cityId: p.cityId, customName: p.customName })));
@@ -296,8 +384,25 @@ export default function EditTrip() {
       }
     }
 
+    // Mark the form clean relative to what was just saved — otherwise a
+    // subsequent navigation attempt would immediately re-trigger the
+    // unsaved-changes prompt against the (now stale) original snapshot.
+    originalSnapshotRef.current = currentSnapshot();
+
     setSaving(false);
-    router.back();
+    return true;
+  }
+
+  async function handleSavePress() {
+    if (await save()) router.back();
+  }
+
+  // Used by the unsaved-changes prompt: on success, resume whatever
+  // navigation was originally blocked (Home, back, etc.) instead of just
+  // going back one screen, so choosing "Save" ends up wherever the user was
+  // actually trying to go.
+  async function handlePromptSave() {
+    if (await save()) proceed();
   }
 
   if (!loaded) return null;
@@ -491,7 +596,7 @@ export default function EditTrip() {
         </Pressable>
       </Modal>
 
-      <Pressable style={styles.button} onPress={save} disabled={saving}>
+      <Pressable style={styles.button} onPress={handleSavePress} disabled={saving}>
         <Text style={styles.buttonText}>{saving ? "Saving…" : "Save changes"}</Text>
       </Pressable>
 
@@ -504,6 +609,48 @@ export default function EditTrip() {
       </Pressable>
       <Text style={[styles.hint, { marginBottom: 20 }]}>Archived trips can be restored, or permanently deleted, from Archived Trips on the home screen.</Text>
       </ScrollView>
+
+      <Modal visible={!!orphanedDays} transparent animationType="fade">
+        <View style={styles.promptBackdrop}>
+          <View style={styles.promptCard}>
+            <Text style={styles.promptTitle}>Some days fall outside the new dates</Text>
+            <Text style={styles.promptBody}>
+              {orphanedDays?.map((o) => `${formatDateDDMMYYYY(o.day.date)} — ${o.itemCount} item${o.itemCount === 1 ? "" : "s"}`).join("\n")}
+            </Text>
+            <Text style={styles.promptBody}>What should happen to their items?</Text>
+            <Pressable style={styles.promptSaveBtn} onPress={() => resolveOrphanedDays("move")}>
+              <Text style={styles.promptSaveBtnText}>Move items to Proposals</Text>
+            </Pressable>
+            <Pressable style={styles.promptDiscardBtn} onPress={() => resolveOrphanedDays("delete")}>
+              <Text style={styles.promptDiscardText}>Delete items</Text>
+            </Pressable>
+            <Pressable style={styles.promptCancelBtn} onPress={() => resolveOrphanedDays("cancel")}>
+              <Text style={styles.promptCancelText}>Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Suppressed while the orphaned-days prompt (below) is up — both are
+          full-screen Modals and would otherwise visibly stack if the user
+          has unsaved edits and shrinks the date range in the same session. */}
+      <Modal visible={promptVisible && !orphanedDays} transparent animationType="fade">
+        <View style={styles.promptBackdrop}>
+          <View style={styles.promptCard}>
+            <Text style={styles.promptTitle}>Unsaved changes</Text>
+            <Text style={styles.promptBody}>Save your changes before leaving, or discard them?</Text>
+            <Pressable style={styles.promptSaveBtn} onPress={handlePromptSave} disabled={saving}>
+              <Text style={styles.promptSaveBtnText}>{saving ? "Saving…" : "Save changes"}</Text>
+            </Pressable>
+            <Pressable style={styles.promptDiscardBtn} onPress={proceed}>
+              <Text style={styles.promptDiscardText}>Discard changes</Text>
+            </Pressable>
+            <Pressable style={styles.promptCancelBtn} onPress={cancel}>
+              <Text style={styles.promptCancelText}>Keep editing</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -564,4 +711,14 @@ const styles = StyleSheet.create({
   removeText: { color: colors.coral, fontSize: 12, fontWeight: "600" },
   addCurrencyButton: { backgroundColor: colors.lightBlue, borderRadius: radius.md, paddingVertical: 12, paddingHorizontal: 14 },
   currencyCustomRow: { flexDirection: "row", marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.line },
+  promptBackdrop: { flex: 1, backgroundColor: "rgba(33,47,61,0.5)", justifyContent: "center", padding: 30 },
+  promptCard: { backgroundColor: colors.paperRaised, borderRadius: radius.lg, padding: 20, width: "100%", maxWidth: 420, alignSelf: "center" },
+  promptTitle: { color: colors.ink, fontWeight: "800", fontSize: 17, marginBottom: 6 },
+  promptBody: { color: colors.inkSoft, fontSize: 13, marginBottom: 18, lineHeight: 18 },
+  promptSaveBtn: { backgroundColor: colors.ink, borderRadius: radius.md, padding: 14, alignItems: "center" },
+  promptSaveBtnText: { color: colors.paper, fontWeight: "700" },
+  promptDiscardBtn: { alignItems: "center", padding: 14, marginTop: 8 },
+  promptDiscardText: { color: colors.coral, fontWeight: "700", fontSize: 14 },
+  promptCancelBtn: { alignItems: "center", padding: 10, marginTop: 2 },
+  promptCancelText: { color: colors.inkSoft, fontWeight: "600", fontSize: 13 },
 });
