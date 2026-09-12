@@ -207,8 +207,6 @@ export default function CompanionEditModal({ visible, onClose, companion, onSave
         <AvatarCropModal
           visible
           imageUri={cropAsset.uri}
-          imageWidth={cropAsset.width}
-          imageHeight={cropAsset.height}
           onCancel={() => setCropAsset(null)}
           onConfirm={onCropConfirm}
         />

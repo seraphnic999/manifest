@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { View, Text, Pressable, StyleSheet, Modal, TextInput, ScrollView, Image } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { colors, radius, fonts } from "@/lib/theme";
@@ -35,6 +35,16 @@ export default function TravelDocumentEditModal({ visible, onClose, companionId,
   // before the user has pressed Save (create mode used to hard-block photo
   // picking until an explicit save; now it silently creates the row instead).
   const [docId, setDocId] = useState<string | null>(document?.id ?? null);
+  const [photoStoragePath, setPhotoStoragePath] = useState<string | null>(document?.photo_path ?? null);
+  // True only when THIS modal session created the row (vs. it already
+  // existing) — Cancel needs to know whether to undo that creation.
+  const [implicitlyCreated, setImplicitlyCreated] = useState(false);
+  const [photoChanged, setPhotoChanged] = useState(false);
+  const initialSnapshotRef = useRef("");
+
+  function fieldsSnapshot() {
+    return JSON.stringify({ type, documentNumber, issuingCountry, issueDate, expiryDate, notes });
+  }
 
   useEffect(() => {
     if (!visible) return;
@@ -45,8 +55,21 @@ export default function TravelDocumentEditModal({ visible, onClose, companionId,
     setExpiryDate(document?.expiry_date ?? "");
     setNotes(document?.notes ?? "");
     setDocId(document?.id ?? null);
+    setPhotoStoragePath(document?.photo_path ?? null);
+    setImplicitlyCreated(false);
+    setPhotoChanged(false);
     if (document?.photo_path) fetchDocumentPhotoUrl(document.photo_path).then(setPhotoUrl);
     else setPhotoUrl(null);
+    // Runs after the state above is queued, so it captures this document's
+    // own values, not whatever the modal last showed.
+    initialSnapshotRef.current = JSON.stringify({
+      type: document?.type ?? "passport",
+      documentNumber: document?.document_number ?? "",
+      issuingCountry: document?.issuing_country ?? "",
+      issueDate: document?.issue_date ?? "",
+      expiryDate: document?.expiry_date ?? "",
+      notes: document?.notes ?? "",
+    });
   }, [visible, document]);
 
   function currentFields(): DocumentFields {
@@ -58,6 +81,10 @@ export default function TravelDocumentEditModal({ visible, onClose, companionId,
       expiry_date: expiryDate || null,
       notes: notes.trim() || null,
     };
+  }
+
+  function isDirty(): boolean {
+    return fieldsSnapshot() !== initialSnapshotRef.current || photoChanged;
   }
 
   async function pickPhoto() {
@@ -75,9 +102,12 @@ export default function TravelDocumentEditModal({ visible, onClose, companionId,
         const created = await createDocument(companionId, currentFields());
         id = created.id;
         setDocId(id);
+        setImplicitlyCreated(true);
       }
-      await setDocumentPhoto({ id, photo_path: null }, result.assets[0]);
+      const path = await setDocumentPhoto({ id, photo_path: photoStoragePath }, result.assets[0]);
+      setPhotoStoragePath(path);
       setPhotoUrl(result.assets[0].uri);
+      setPhotoChanged(true);
       onSaved();
     } catch (e: any) {
       Alert.alert("Couldn't add photo", e.message ?? "Unknown error");
@@ -97,6 +127,33 @@ export default function TravelDocumentEditModal({ visible, onClose, companionId,
     setSaving(false);
   }
 
+  // Cancel (button or hardware back) — if this session implicitly created
+  // the document (picking a photo before ever pressing Save) or edited
+  // fields/replaced the photo, confirm before discarding rather than
+  // silently leaving that half-finished document behind.
+  function handleCancel() {
+    if (!isDirty()) { onClose(); return; }
+    Alert.alert(
+      "Discard changes?",
+      implicitlyCreated
+        ? "This document and its photo haven't been saved yet."
+        : "Your changes to this document haven't been saved.",
+      [
+        { text: "Keep editing", style: "cancel" },
+        {
+          text: "Discard", style: "destructive",
+          onPress: async () => {
+            if (implicitlyCreated && docId) {
+              await deleteDocument({ id: docId, photo_path: photoStoragePath });
+            }
+            onSaved();
+            onClose();
+          },
+        },
+      ]
+    );
+  }
+
   function confirmDelete() {
     if (!document) return;
     Alert.alert("Delete document", "Remove this document permanently?", [
@@ -112,11 +169,11 @@ export default function TravelDocumentEditModal({ visible, onClose, companionId,
   }
 
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" onRequestClose={handleCancel}>
       <View style={styles.root}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>{document ? "Edit document" : "Add document"}</Text>
-          <Pressable onPress={onClose} hitSlop={10}><Text style={styles.cancel}>Cancel</Text></Pressable>
+          <Pressable onPress={handleCancel} hitSlop={10}><Text style={styles.cancel}>Cancel</Text></Pressable>
         </View>
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
           <Text style={styles.label}>Type</Text>

@@ -245,6 +245,37 @@ export interface TravelDocument {
   updated_at: string;
 }
 
+export interface Keeper {
+  id: string;
+  user_id: string;
+  city_id: string | null;
+  custom_city_name: string | null;
+  city_label: string;
+  item_type: ItemType;
+  title: string;
+  start_date: string | null;
+  end_date: string | null;
+  time_start: string | null;
+  time_end: string | null;
+  timezone_start: string | null;
+  timezone_end: string | null;
+  notes: string | null;
+  confirmation_code: string | null;
+  booking_source: string | null;
+  address: string | null;
+  phone: string | null;
+  vendor: string | null;
+  link: string | null;
+  google_maps_link: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  map_icon: string | null;
+  source_trip_name: string | null;
+  rating: number | null;
+  personal_notes: string | null;
+  created_at: string;
+}
+
 export function tripStatus(trip: Pick<Trip, "start_date" | "end_date">): TripStatus {
   const today = localIsoDate();
   if (today < trip.start_date) return "future";

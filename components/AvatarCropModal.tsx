@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { View, Text, Pressable, StyleSheet, Modal, Image } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import * as ImageManipulator from "expo-image-manipulator";
@@ -14,19 +14,33 @@ const MAX_SCALE = 3.5;
 interface Props {
   visible: boolean;
   imageUri: string;
-  imageWidth: number;
-  imageHeight: number;
   onCancel: () => void;
   onConfirm: (croppedUri: string) => void;
 }
 
-export default function AvatarCropModal({ visible, imageUri, imageWidth, imageHeight, onCancel, onConfirm }: Props) {
+export default function AvatarCropModal({ visible, imageUri, onCancel, onConfirm }: Props) {
+  // Deliberately not trusting ImagePicker's own asset.width/height here —
+  // on some Android devices those are reported pre-EXIF-rotation, which
+  // silently mismatched this component's earlier width/height props against
+  // what Image actually renders and produced a wrongly-framed crop. Image.getSize
+  // reads the real, orientation-resolved pixel dimensions RN itself will draw.
+  const [naturalSize, setNaturalSize] = useState<{ width: number; height: number } | null>(null);
+  useEffect(() => {
+    if (!visible) { setNaturalSize(null); return; }
+    Image.getSize(imageUri, (width, height) => setNaturalSize({ width, height }));
+  }, [visible, imageUri]);
+  const imageWidth = naturalSize?.width ?? 1;
+  const imageHeight = naturalSize?.height ?? 1;
   const baseScale = BOX / Math.min(imageWidth, imageHeight);
 
   const [scale, setScale] = useState(MIN_SCALE);
   const [translateX, setTranslateX] = useState(0);
   const [translateY, setTranslateY] = useState(0);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (naturalSize) { setScale(MIN_SCALE); setTranslateX(0); setTranslateY(0); }
+  }, [naturalSize]);
 
   const startScale = useRef(1);
   const startX = useRef(0);
@@ -90,17 +104,21 @@ export default function AvatarCropModal({ visible, imageUri, imageWidth, imageHe
       <View style={styles.backdrop}>
         <Text style={styles.title}>Position photo</Text>
         <Text style={styles.hint}>Drag and pinch to frame what shows in the circle</Text>
-        <GestureDetector gesture={gesture}>
-          <View style={styles.box}>
-            <Image source={{ uri: imageUri }} style={imgStyle} />
-            <View pointerEvents="none" style={styles.ringOverlay} />
-          </View>
-        </GestureDetector>
+        {naturalSize ? (
+          <GestureDetector gesture={gesture}>
+            <View style={styles.box}>
+              <Image source={{ uri: imageUri }} style={imgStyle} />
+              <View pointerEvents="none" style={styles.ringOverlay} />
+            </View>
+          </GestureDetector>
+        ) : (
+          <View style={styles.box} />
+        )}
         <View style={styles.actions}>
           <Pressable style={styles.cancelBtn} onPress={onCancel} disabled={saving}>
             <Text style={styles.cancelText}>Cancel</Text>
           </Pressable>
-          <Pressable style={[styles.confirmBtn, saving && { opacity: 0.6 }]} onPress={confirm} disabled={saving}>
+          <Pressable style={[styles.confirmBtn, (saving || !naturalSize) && { opacity: 0.6 }]} onPress={confirm} disabled={saving || !naturalSize}>
             <Text style={styles.confirmText}>{saving ? "Saving…" : "Use photo"}</Text>
           </Pressable>
         </View>

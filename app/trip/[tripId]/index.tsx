@@ -207,13 +207,21 @@ export default function TripOverview() {
               {companions.length > 0 && (
                 <View style={styles.companionsRow}>
                   {companions.map((c) => (
-                    c.url ? (
-                      <Image key={c.id} source={{ uri: c.url }} style={styles.companionAvatar} accessibilityLabel={companionFullName(c)} />
-                    ) : (
-                      <View key={c.id} style={styles.companionAvatarPlaceholder}>
-                        <Icon name="user" size={16} color={colors.inkSoft} />
-                      </View>
-                    )
+                    <Pressable
+                      key={c.id}
+                      style={styles.companionChip}
+                      onPress={() => router.push(`/doctracker/${c.id}`)}
+                      accessibilityLabel={companionFullName(c)}
+                    >
+                      {c.url ? (
+                        <Image source={{ uri: c.url }} style={styles.companionAvatar} />
+                      ) : (
+                        <View style={styles.companionAvatarPlaceholder}>
+                          <Icon name="user" size={16} color={colors.inkSoft} />
+                        </View>
+                      )}
+                      <Text style={styles.companionName} numberOfLines={1}>{c.first_name}</Text>
+                    </Pressable>
                   ))}
                 </View>
               )}
@@ -383,7 +391,9 @@ const styles = StyleSheet.create({
   weatherDate: { color: "#fff", fontSize: 7, opacity: 0.85 },
   tripName: { color: "#fff", fontFamily: fonts.display, fontSize: 21, marginBottom: 4, paddingRight: 84 },
 
-  companionsRow: { flexDirection: "row", gap: 8, marginTop: 10 },
+  companionsRow: { flexDirection: "row", gap: 12, marginTop: 10 },
+  companionChip: { alignItems: "center", width: 48 },
+  companionName: { color: colors.inkSoft, fontSize: 11, marginTop: 4 },
   companionAvatar: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: colors.paper },
   companionAvatarPlaceholder: {
     width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: colors.paper,

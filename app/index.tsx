@@ -10,8 +10,7 @@ import { formatDateDDMMYYYY, localIsoDate } from "@/lib/dateFormat";
 import { normalizeTimeHHMM } from "@/lib/timeFormat";
 import { useNetworkStatus } from "@/lib/useNetworkStatus";
 import OfflineBanner from "@/components/OfflineBanner";
-import Icon from "@/components/icons/Icon";
-import HamburgerMenu from "@/components/HamburgerMenu";
+import Icon, { IconName } from "@/components/icons/Icon";
 import { searchEverything, SearchResult, SEARCH_KIND_LABEL } from "@/lib/search";
 import { TripCountdownInline } from "@/components/TripCountdown";
 import { coverPhotoSource } from "@/lib/destinationPhotos";
@@ -19,6 +18,26 @@ import { fetchDestinationForecast } from "@/lib/weather";
 import { weatherIconName } from "@/lib/weather";
 import { Alert } from "@/lib/alert";
 import { fetchTripCities, dayCityLabel } from "@/lib/cities";
+
+interface NavCtx {
+  router: ReturnType<typeof useRouter>;
+  setSearchOpen: (v: boolean) => void;
+  signOut: () => void;
+}
+
+// The home screen's one-tap navigation row — replaces both the old always-
+// visible search bar and the hamburger menu, since between this row and the
+// "+" button every option the hamburger used to hold is now one tap away
+// directly, without a menu layer in between.
+const NAV_ITEMS: { label: string; icon: IconName; danger?: boolean; onPress: (ctx: NavCtx) => void }[] = [
+  { label: "Search", icon: "search", onPress: ({ setSearchOpen }) => setSearchOpen(true) },
+  { label: "Doc Tracker", icon: "document", onPress: ({ router }) => router.push("/doctracker") },
+  { label: "Archived Trips", icon: "archive", onPress: ({ router }) => router.push("/archived") },
+  { label: "Packing Templates", icon: "packing", onPress: ({ router }) => router.push("/packingTemplates") },
+  { label: "Keepers", icon: "star", onPress: ({ router }) => router.push("/keepers") },
+  { label: "Travel Stats", icon: "overview", onPress: ({ router }) => router.push("/travelStats") },
+  { label: "Sign Out", icon: "signOut", danger: true, onPress: ({ signOut }) => signOut() },
+];
 
 // Set once a current-trip redirect has been attempted this app session, so
 // it only ever fires on the first load after launch — the Home button (the
@@ -144,6 +163,7 @@ export default function TripList() {
     enabled: !!currentTrip,
   });
 
+  const [searchOpen, setSearchOpen] = useState(false);
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   useEffect(() => {
@@ -199,6 +219,11 @@ export default function TripList() {
     ]);
   }
 
+  function closeSearch() {
+    setSearchOpen(false);
+    setSearchInput("");
+  }
+
   function signOut() {
     Alert.alert("Sign out", "Sign out of Manifest?", [
       { text: "Cancel", style: "cancel" },
@@ -229,49 +254,47 @@ export default function TripList() {
       <View style={[styles.topbar, { paddingTop: insets.top + 14 }]}>
         <View style={styles.titleRow}>
           <Text style={styles.title}>Where next?</Text>
-          <View style={styles.headerBtns}>
-            <Pressable
-              style={styles.addBtn}
-              onPress={() => {
-                if (!isOnline) {
-                  Alert.alert("You're offline", "Connect to the internet to create a new trip.");
-                  return;
-                }
-                router.push("/trip/new");
-              }}
-              accessibilityLabel="New trip"
-            >
-              <Icon name="add" size={25} color="#fff" />
-            </Pressable>
-            <HamburgerMenu
-              items={[
-                { icon: "document", label: "Doc Tracker", onPress: () => router.push("/doctracker") },
-                { icon: "archive", label: "Archived Trips", onPress: () => router.push("/archived") },
-                { icon: "packing", label: "Packing Templates", onPress: () => router.push("/packingTemplates") },
-                { icon: "signOut", label: "Sign Out", onPress: signOut, danger: true },
-              ]}
-              solid
-            />
-          </View>
+          <Pressable
+            style={styles.addBtn}
+            onPress={() => {
+              if (!isOnline) {
+                Alert.alert("You're offline", "Connect to the internet to create a new trip.");
+                return;
+              }
+              router.push("/trip/new");
+            }}
+            accessibilityLabel="New trip"
+          >
+            <Icon name="add" size={25} color="#fff" />
+          </Pressable>
         </View>
 
-        <View style={styles.searchRow}>
-          <Icon name="search" size={22} color={colors.blue} />
-          <TextInput
-            style={styles.searchInput}
-            value={searchInput}
-            onChangeText={setSearchInput}
-            placeholder="Search trips, items, expenses…"
-            placeholderTextColor={colors.inkSoft}
-          />
-          {searchInput.length > 0 && (
-            <Pressable onPress={() => setSearchInput("")} hitSlop={8}>
+        {searchOpen ? (
+          <View style={styles.searchRow}>
+            <Icon name="search" size={22} color={colors.blue} />
+            <TextInput
+              style={styles.searchInput}
+              value={searchInput}
+              onChangeText={setSearchInput}
+              placeholder="Search trips, items, expenses…"
+              placeholderTextColor={colors.inkSoft}
+              autoFocus
+            />
+            <Pressable onPress={closeSearch} hitSlop={8}>
               <View style={{ transform: [{ rotate: "45deg" }] }}>
                 <Icon name="add" size={18} color={colors.blue} />
               </View>
             </Pressable>
-          )}
-        </View>
+          </View>
+        ) : (
+          <View style={styles.navRow}>
+            {NAV_ITEMS.map((n) => (
+              <Pressable key={n.label} style={styles.navBtn} onPress={() => n.onPress({ router, setSearchOpen, signOut })} accessibilityLabel={n.label}>
+                <Icon name={n.icon} size={22} color={n.danger ? colors.coral : colors.blue} />
+              </Pressable>
+            ))}
+          </View>
+        )}
       </View>
       <OfflineBanner dataUpdatedAt={!isOnline ? dataUpdatedAt : undefined} />
 
@@ -368,10 +391,14 @@ const styles = StyleSheet.create({
   topbar: { padding: 20, paddingBottom: 8 },
   titleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   title: { fontFamily: fonts.display, fontSize: 22, color: colors.ink },
-  headerBtns: { flexDirection: "row", gap: 8 },
   addBtn: {
     width: 42, height: 42, borderRadius: 21, backgroundColor: colors.ink,
     alignItems: "center", justifyContent: "center",
+  },
+  navRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 14 },
+  navBtn: {
+    width: 40, height: 40, borderRadius: 20, backgroundColor: colors.paperRaised,
+    borderWidth: 1, borderColor: colors.line, alignItems: "center", justifyContent: "center",
   },
   searchRow: {
     flexDirection: "row", alignItems: "center", gap: 8,

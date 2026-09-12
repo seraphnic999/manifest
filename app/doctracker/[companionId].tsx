@@ -100,11 +100,9 @@ export default function CompanionDetail() {
   }
 
   async function doExport() {
+    // Zero documents selected is a valid export — just the companion's own
+    // info (name, birth date, Israeli ID#, etc.), no document blocks.
     const selected = documents.filter((d) => selectedDocIds.has(d.id));
-    if (selected.length === 0) {
-      Alert.alert("Nothing selected", "Select at least one document to export.");
-      return;
-    }
     const text = buildCompanionExportText(companion, selected);
     await shareCompanionText(text);
     setExportMode(false);
@@ -120,11 +118,11 @@ export default function CompanionDetail() {
         <Text style={styles.headerAction}>Share ({selectedDocIds.size})</Text>
       </Pressable>
     </View>
-  ) : documents.length > 0 ? (
-    <Pressable onPress={() => setExportMode(true)}>
+  ) : (
+    <Pressable onPress={() => { if (documents.length > 0) setExportMode(true); else doExport(); }}>
       <Text style={styles.headerAction}>Export</Text>
     </Pressable>
-  ) : null;
+  );
 
   return (
     <View style={styles.container}>
@@ -132,15 +130,18 @@ export default function CompanionDetail() {
       <SubpageHeader title={companionFullName(companion)} right={headerRight} />
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
-        <Pressable style={styles.profileRow} onPress={() => galleryUrls.length > 0 && setLightbox({ urls: galleryUrls, index: 0 })}>
-          {profileUrl ? (
-            <Image source={{ uri: profileUrl }} style={styles.profileImg} />
-          ) : (
-            <View style={styles.profilePlaceholder}><Icon name="user" size={30} color={colors.inkSoft} /></View>
-          )}
-        </Pressable>
-
         <Pressable style={styles.card} onPress={() => setEditOpen(true)}>
+          <Pressable
+            style={styles.profileRow}
+            onPress={() => galleryUrls.length > 0 && setLightbox({ urls: galleryUrls, index: 0 })}
+          >
+            {profileUrl ? (
+              <Image source={{ uri: profileUrl }} style={styles.profileImg} />
+            ) : (
+              <View style={styles.profilePlaceholder}><Icon name="user" size={30} color={colors.inkSoft} /></View>
+            )}
+          </Pressable>
+
           <CopyRow label="First name" value={companion.first_name} />
           <CopyRow label="Last name" value={companion.last_name} />
           {!companion.is_self && <CopyRow label="Relationship" value={relationshipLabel(companion.relationship)} />}

@@ -21,7 +21,9 @@ export default function CompanionPickerModal({ visible, onClose, selectedIds, on
     if (!visible) return;
     setSelected(new Set(selectedIds));
     fetchCompanions().then(async (list) => {
-      const withUrls = await Promise.all(list.map(async (c) => ({ ...c, url: await fetchCompanionProfileUrl(c.profile_photo_path) })));
+      // "Traveling with" means everyone but the trip owner themself.
+      const others = list.filter((c) => !c.is_self);
+      const withUrls = await Promise.all(others.map(async (c) => ({ ...c, url: await fetchCompanionProfileUrl(c.profile_photo_path) })));
       setCompanions(withUrls);
     });
   }, [visible]);

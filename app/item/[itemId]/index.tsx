@@ -26,6 +26,7 @@ import TripTabBar from "@/components/TripTabBar";
 import { useNetworkStatus } from "@/lib/useNetworkStatus";
 import OfflineBanner from "@/components/OfflineBanner";
 import { fetchFlightStatus, isFlightStatusConfigured, FlightStatus } from "@/lib/flightStatus";
+import AddToKeepersModal from "@/components/AddToKeepersModal";
 
 type PhotoWithUrl = ItemPhoto & { url: string };
 type LinkedShoppingItem = { id: string; name: string; quantity: number; allocations: { id: string }[] };
@@ -90,6 +91,7 @@ export default function ItemDetails() {
   const [flightStatusError, setFlightStatusError] = useState<string | null>(null);
   const [flightStatusLoading, setFlightStatusLoading] = useState(false);
   const [flightStatusCheckedAt, setFlightStatusCheckedAt] = useState<Date | null>(null);
+  const [keepersModalOpen, setKeepersModalOpen] = useState(false);
 
   const { data, dataUpdatedAt, refetch } = useQuery({
     queryKey: ["itemDetail", itemId],
@@ -351,6 +353,11 @@ export default function ItemDetails() {
         </Pressable>
       ) : null}
 
+      <Pressable style={styles.mapLinkButton} onPress={() => setKeepersModalOpen(true)}>
+        <Icon name="star" size={20} color={colors.blue} />
+        <Text style={styles.mapLinkButtonText}>Add to Keepers</Text>
+      </Pressable>
+
       {isFlight && flightNumber && isFlightStatusConfigured() ? (
         <View style={styles.flightStatusCard}>
           <View style={styles.flightStatusHeader}>
@@ -506,6 +513,11 @@ export default function ItemDetails() {
             onSaved={() => { setEditShoppingId(null); refetch(); }}
             tripId={item.trip_id}
             editId={editShoppingId ?? undefined}
+          />
+          <AddToKeepersModal
+            visible={keepersModalOpen}
+            onClose={() => setKeepersModalOpen(false)}
+            item={item}
           />
         </>
       )}

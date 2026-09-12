@@ -59,13 +59,14 @@ export function primaryTripCity(rows: TripCityRow[]): TripCityRow | null {
   return rows.length > 0 ? rows[0] : null;
 }
 
-/** A day's effective city name for display: its own override if set,
- * otherwise the trip's primary city, otherwise null (trip has no
- * destinations picked at all yet). */
-export function dayCityLabel(
+/** A day's effective city — its own override if set, otherwise the trip's
+ * primary city, otherwise nothing picked at all yet. Returns the underlying
+ * (cityId, customName) pair as well as the display label, since some
+ * callers (Keepers) need to persist the resolved city, not just show it. */
+export function resolveDayCityPick(
   day: Pick<Day, "city_id" | "custom_city_name">,
   tripCities: TripCityRow[]
-): string | null {
+): { cityId: string | null; customName: string | null; label: string | null } {
   if (day.city_id) {
     // Falls back to the module-level cities cache (populated by any earlier
     // fetchAllCities() call, e.g. opening a city picker) for the case where
@@ -73,13 +74,27 @@ export function dayCityLabel(
     // list — city_id references cities(id) directly, not trip_cities, so
     // the override itself is still valid even though it's no longer among
     // this trip's picked destinations.
-    return tripCities.find((r) => r.city_id === day.city_id)?.city?.name
+    const label = tripCities.find((r) => r.city_id === day.city_id)?.city?.name
       ?? citiesCache?.find((c) => c.id === day.city_id)?.name
       ?? null;
+    return { cityId: day.city_id, customName: null, label };
   }
-  if (day.custom_city_name) return day.custom_city_name;
+  if (day.custom_city_name) return { cityId: null, customName: day.custom_city_name, label: day.custom_city_name };
   const primary = primaryTripCity(tripCities);
-  return primary ? (primary.city?.name ?? primary.custom_name) : null;
+  if (!primary) return { cityId: null, customName: null, label: null };
+  return {
+    cityId: primary.city_id, customName: primary.custom_name,
+    label: primary.city?.name ?? primary.custom_name ?? null,
+  };
+}
+
+/** A day's effective city name for display only — see resolveDayCityPick
+ * for the underlying (cityId, customName) pair. */
+export function dayCityLabel(
+  day: Pick<Day, "city_id" | "custom_city_name">,
+  tripCities: TripCityRow[]
+): string | null {
+  return resolveDayCityPick(day, tripCities).label;
 }
 
 /** Sets (or clears, if both fields are null) a single day's city override.
