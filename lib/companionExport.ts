@@ -4,7 +4,7 @@
 // this shares a text message, not a file.
 import { Share } from "react-native";
 import { Companion, TravelDocument } from "./types";
-import { companionFullName, relationshipLabel } from "./companions";
+import { relationshipLabel } from "./companions";
 import { documentTypeLabel } from "./travelDocuments";
 import { formatDateDDMMYYYY } from "./dateFormat";
 
@@ -14,9 +14,11 @@ function line(label: string, value: string | null | undefined): string | null {
 
 export function buildCompanionExportText(companion: Companion, documents: TravelDocument[]): string {
   const header = [
-    companionFullName(companion),
+    line("First Name", companion.first_name),
+    line("Last Name", companion.last_name),
     !companion.is_self ? line("Relationship", relationshipLabel(companion.relationship)) : null,
     line("Born", companion.birth_date ? formatDateDDMMYYYY(companion.birth_date) : null),
+    line("Israeli ID#", companion.israeli_id),
   ].filter(Boolean).join("\n");
 
   const docBlocks = documents.map((d) => {

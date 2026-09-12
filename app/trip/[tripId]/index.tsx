@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { View, Text, FlatList, StyleSheet, Pressable, ImageBackground } from "react-native";
+import { View, Text, FlatList, StyleSheet, Pressable, ImageBackground, Image } from "react-native";
 import { useLocalSearchParams, useRouter, Stack, useFocusEffect } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { StatusBar } from "expo-status-bar";
@@ -25,6 +25,7 @@ import { coverPhotoSource } from "@/lib/destinationPhotos";
 import { fetchDestinationForecast } from "@/lib/weather";
 import { weatherIconName } from "@/lib/weather";
 import { fetchTripCities, fetchAllCities, dayCityLabel, TripCityRow } from "@/lib/cities";
+import { fetchTripCompanionsWithUrls, companionFullName } from "@/lib/companions";
 
 interface OverviewData {
   trip: Trip;
@@ -36,6 +37,7 @@ interface OverviewData {
   expenses: Pick<Expense, "amount" | "currency_code" | "expense_date">[];
   totalNis: number | null;
   todayItems: { id: string; title: string; time_start: string | null; type: ItemType }[];
+  companions: Awaited<ReturnType<typeof fetchTripCompanionsWithUrls>>;
 }
 
 async function fetchOverviewData(tripId: string): Promise<OverviewData | null> {
@@ -43,10 +45,11 @@ async function fetchOverviewData(tripId: string): Promise<OverviewData | null> {
   if (tripError) throw tripError;
   if (!trip) return null;
 
-  const [{ data: days, error: daysError }, tripCities] = await Promise.all([
+  const [{ data: days, error: daysError }, tripCities, , companions] = await Promise.all([
     supabase.from("days").select("*").eq("trip_id", tripId).order("sort_order"),
     fetchTripCities(tripId),
     fetchAllCities(), // warms the cities cache dayCityLabel() falls back on
+    fetchTripCompanionsWithUrls(tripId),
   ]);
   if (daysError) throw daysError;
   const { data: flights, error: flightsError } = await supabase
@@ -97,6 +100,7 @@ async function fetchOverviewData(tripId: string): Promise<OverviewData | null> {
     expenses: expenses ?? [],
     totalNis,
     todayItems,
+    companions,
   };
 }
 
@@ -124,6 +128,7 @@ export default function TripOverview() {
   const todayItems = Array.isArray(data?.todayItems) ? data.todayItems : [];
   const overviewExpenses = Array.isArray(data?.expenses) ? data.expenses : [];
   const overviewCurrencies = Array.isArray(data?.currencies) ? data.currencies : [];
+  const companions = Array.isArray(data?.companions) ? data.companions : [];
   const lodgingGapDays = findLodgingGapDays(days, lodgings);
   const isCurrent = trip ? tripStatus(trip) === "current" : false;
 
@@ -198,6 +203,20 @@ export default function TripOverview() {
 
             <View style={styles.body}>
               <OfflineBanner dataUpdatedAt={!isOnline ? dataUpdatedAt : undefined} />
+
+              {companions.length > 0 && (
+                <View style={styles.companionsRow}>
+                  {companions.map((c) => (
+                    c.url ? (
+                      <Image key={c.id} source={{ uri: c.url }} style={styles.companionAvatar} accessibilityLabel={companionFullName(c)} />
+                    ) : (
+                      <View key={c.id} style={styles.companionAvatarPlaceholder}>
+                        <Icon name="user" size={16} color={colors.inkSoft} />
+                      </View>
+                    )
+                  ))}
+                </View>
+              )}
 
               <WeatherCarousel tripId={tripId} destinations={weatherDestinations} />
 
@@ -364,6 +383,12 @@ const styles = StyleSheet.create({
   weatherDate: { color: "#fff", fontSize: 7, opacity: 0.85 },
   tripName: { color: "#fff", fontFamily: fonts.display, fontSize: 21, marginBottom: 4, paddingRight: 84 },
 
+  companionsRow: { flexDirection: "row", gap: 8, marginTop: 10 },
+  companionAvatar: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: colors.paper },
+  companionAvatarPlaceholder: {
+    width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: colors.paper,
+    backgroundColor: colors.paperRaised, alignItems: "center", justifyContent: "center",
+  },
   gapWarning: { backgroundColor: "rgba(216,80,58,0.1)", borderRadius: radius.md, padding: 10, marginTop: 10 },
   gapWarningText: { color: colors.coral, fontFamily: fonts.bodyBold, fontSize: 11.5 },
 

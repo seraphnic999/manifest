@@ -2,7 +2,8 @@
 // including the user themself via is_self) — mirrors lib/photos.ts's
 // private-bucket + signed-URL shape for profile/additional photos.
 import { supabase } from "./supabase";
-import { Companion, CompanionPhoto, Relationship } from "./types";
+import { Companion, CompanionPhoto, Relationship, TripCompanion } from "./types";
+import { readUriAsArrayBuffer } from "./fileBytes";
 
 const BUCKET = "companion-photos";
 const SIGNED_URL_TTL = 3600;
@@ -72,6 +73,7 @@ export async function ensureSelfCompanion(): Promise<void> {
 
 export async function createCompanion(fields: {
   first_name: string; last_name: string; relationship: Relationship;
+  birth_date?: string | null; notes?: string | null; israeli_id?: string | null;
 }): Promise<Companion> {
   const { data, error } = await supabase.from("companions").insert(fields).select().single();
   if (error) throw error;
@@ -79,7 +81,7 @@ export async function createCompanion(fields: {
 }
 
 export async function saveCompanion(id: string, fields: Partial<Pick<Companion,
-  "first_name" | "last_name" | "birth_date" | "relationship" | "notes"
+  "first_name" | "last_name" | "birth_date" | "relationship" | "notes" | "israeli_id"
 >>): Promise<void> {
   const { error } = await supabase.from("companions").update(fields).eq("id", id);
   if (error) throw error;
@@ -110,11 +112,10 @@ async function uploadToCompanionBucket(
 
   const ext = extensionFromAsset(asset);
   const path = `${userId}/${companionId}/${Date.now()}.${ext}`;
-  const response = await fetch(asset.uri);
-  const blob = await response.blob();
+  const bytes = await readUriAsArrayBuffer(asset.uri);
   const { error } = await supabase.storage
     .from(BUCKET)
-    .upload(path, blob, { contentType: asset.mimeType || blob.type || "application/octet-stream" });
+    .upload(path, bytes, { contentType: asset.mimeType || "application/octet-stream" });
   if (error) throw error;
   return path;
 }
@@ -169,4 +170,31 @@ export async function fetchCompanionPhotosWithUrls(companionId: string): Promise
     (data as CompanionPhoto[]).map(async (p) => ({ ...p, url: await signedUrl(p.storage_path) }))
   );
   return withUrls.filter((p) => p.url);
+}
+
+/** Trip <-> companion attachments ("who am I traveling with"), shown as
+ * avatar-only chips on the trip Overview page. */
+export async function fetchTripCompanions(tripId: string): Promise<Companion[]> {
+  const { data, error } = await supabase
+    .from("trip_companions")
+    .select("sort_order, companions(*)")
+    .eq("trip_id", tripId)
+    .order("sort_order");
+  if (error) throw error;
+  return ((data ?? []) as unknown as { companions: Companion }[]).map((r) => r.companions).filter(Boolean);
+}
+
+export async function fetchTripCompanionsWithUrls(tripId: string): Promise<(Companion & { url: string | null })[]> {
+  const companions = await fetchTripCompanions(tripId);
+  return Promise.all(companions.map(async (c) => ({ ...c, url: await fetchCompanionProfileUrl(c.profile_photo_path) })));
+}
+
+/** Replaces the full set of companions attached to a trip. */
+export async function setTripCompanions(tripId: string, companionIds: string[]): Promise<void> {
+  const { error: delError } = await supabase.from("trip_companions").delete().eq("trip_id", tripId);
+  if (delError) throw delError;
+  if (companionIds.length === 0) return;
+  const rows = companionIds.map((companion_id, i) => ({ trip_id: tripId, companion_id, sort_order: i }));
+  const { error } = await supabase.from("trip_companions").insert(rows);
+  if (error) throw error;
 }

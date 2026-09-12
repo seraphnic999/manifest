@@ -11,6 +11,7 @@ import {
 } from "@/lib/companions";
 import { DateField } from "@/components/DateTimeFields";
 import PhotoLightbox from "@/components/PhotoLightbox";
+import AvatarCropModal from "@/components/AvatarCropModal";
 
 interface Props {
   visible: boolean;
@@ -25,11 +26,13 @@ export default function CompanionEditModal({ visible, onClose, companion, onSave
   const [birthDate, setBirthDate] = useState(companion.birth_date ?? "");
   const [relationship, setRelationship] = useState<Relationship | null>(companion.relationship);
   const [notes, setNotes] = useState(companion.notes ?? "");
+  const [israeliId, setIsraeliId] = useState(companion.israeli_id ?? "");
   const [saving, setSaving] = useState(false);
 
   const [profileUrl, setProfileUrl] = useState<string | null>(null);
   const [photos, setPhotos] = useState<(CompanionPhoto & { url: string })[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [cropAsset, setCropAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
 
   useEffect(() => {
     if (!visible) return;
@@ -38,29 +41,43 @@ export default function CompanionEditModal({ visible, onClose, companion, onSave
     setBirthDate(companion.birth_date ?? "");
     setRelationship(companion.relationship);
     setNotes(companion.notes ?? "");
+    setIsraeliId(companion.israeli_id ?? "");
     fetchCompanionProfileUrl(companion.profile_photo_path).then(setProfileUrl);
     fetchCompanionPhotosWithUrls(companion.id).then(setPhotos);
   }, [visible, companion]);
 
   async function pickAndUpload(onPicked: (asset: ImagePicker.ImagePickerAsset) => Promise<void>) {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert("Permission needed", "Allow photo library access to pick a photo.");
-      return;
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert("Permission needed", "Allow photo library access to pick a photo.");
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
+      if (result.canceled || result.assets.length === 0) return;
+      await onPicked(result.assets[0]);
+    } catch (e: any) {
+      Alert.alert("Couldn't add photo", e.message ?? "Unknown error");
     }
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
-    if (result.canceled || result.assets.length === 0) return;
-    await onPicked(result.assets[0]);
   }
 
   async function changeProfilePhoto() {
-    await pickAndUpload(async (asset) => {
-      await setCompanionProfilePhoto(companion, asset);
+    // Opens the crop step first — the actual upload happens once the user
+    // confirms the framed section in AvatarCropModal (see onCropConfirm).
+    await pickAndUpload(async (asset) => { setCropAsset(asset); });
+  }
+
+  async function onCropConfirm(croppedUri: string) {
+    setCropAsset(null);
+    try {
+      await setCompanionProfilePhoto(companion, { uri: croppedUri, fileName: "avatar.jpg", mimeType: "image/jpeg" });
       // Local URI previews instantly; onSaved() triggers the parent's
       // refetch so the signed storage URL takes over on next load.
-      setProfileUrl(asset.uri);
+      setProfileUrl(croppedUri);
       onSaved();
-    });
+    } catch (e: any) {
+      Alert.alert("Couldn't save photo", e.message ?? "Unknown error");
+    }
   }
 
   async function addPhoto() {
@@ -71,8 +88,12 @@ export default function CompanionEditModal({ visible, onClose, companion, onSave
   }
 
   async function removePhoto(photo: CompanionPhoto) {
-    await deleteCompanionPhoto(photo);
-    setPhotos(await fetchCompanionPhotosWithUrls(companion.id));
+    try {
+      await deleteCompanionPhoto(photo);
+      setPhotos(await fetchCompanionPhotosWithUrls(companion.id));
+    } catch (e: any) {
+      Alert.alert("Couldn't remove photo", e.message ?? "Unknown error");
+    }
   }
 
   async function save() {
@@ -88,6 +109,7 @@ export default function CompanionEditModal({ visible, onClose, companion, onSave
         birth_date: birthDate || null,
         relationship: companion.is_self ? null : relationship,
         notes: notes.trim() || null,
+        israeli_id: israeliId.trim() || null,
       });
       onSaved();
       onClose();
@@ -141,6 +163,9 @@ export default function CompanionEditModal({ visible, onClose, companion, onSave
             </>
           )}
 
+          <Text style={styles.label}>Israeli ID#</Text>
+          <TextInput style={styles.input} value={israeliId} onChangeText={setIsraeliId} placeholder="Optional" keyboardType="numeric" />
+
           <Text style={styles.label}>Notes</Text>
           <TextInput
             style={[styles.input, { minHeight: 80, textAlignVertical: "top" }]}
@@ -177,6 +202,17 @@ export default function CompanionEditModal({ visible, onClose, companion, onSave
         visible={lightboxIndex !== null}
         onClose={() => setLightboxIndex(null)}
       />
+
+      {cropAsset && (
+        <AvatarCropModal
+          visible
+          imageUri={cropAsset.uri}
+          imageWidth={cropAsset.width}
+          imageHeight={cropAsset.height}
+          onCancel={() => setCropAsset(null)}
+          onConfirm={onCropConfirm}
+        />
+      )}
     </Modal>
   );
 }

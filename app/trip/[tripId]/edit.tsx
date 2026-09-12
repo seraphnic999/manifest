@@ -6,10 +6,12 @@ import { Alert } from "@/lib/alert";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
-import { Trip, TripType, TripCurrency, Day } from "@/lib/types";
+import { Companion, Trip, TripType, TripCurrency, Day } from "@/lib/types";
 import { tzOffsetLabel, sortedByOffsetDesc, COMMON_TIMEZONES, COMMON_CURRENCIES } from "@/lib/timezone";
 import { fetchLiveRateToNis } from "@/lib/currencyRates";
 import { fetchAllCities, fetchTripCities, saveTripCities } from "@/lib/cities";
+import { fetchTripCompanions, setTripCompanions, companionFullName } from "@/lib/companions";
+import CompanionPickerModal from "@/components/CompanionPickerModal";
 import { formatDateDDMMYYYY } from "@/lib/dateFormat";
 import { useUnsavedChangesGuard } from "@/lib/useUnsavedChangesGuard";
 import { DateField } from "@/components/DateTimeFields";
@@ -58,6 +60,9 @@ export default function EditTrip() {
   const [currencyPickerOpen, setCurrencyPickerOpen] = useState(false);
   const [customCurrencyInput, setCustomCurrencyInput] = useState("");
 
+  const [companions, setCompanions] = useState<Companion[]>([]);
+  const [companionPickerOpen, setCompanionPickerOpen] = useState(false);
+
   // Shrinking the trip's date range can leave existing `days` rows (and
   // their items) outside the new [startDate, endDate] window — the
   // generate_trip_days() trigger only ever fills gaps, it never removes a
@@ -81,6 +86,7 @@ export default function EditTrip() {
   function currentSnapshot() {
     return JSON.stringify({
       name, startDate, endDate, type, budgetAmount, coverPhotoId, timezone, cityPicks, rateEdits,
+      companionIds: companions.map((c) => c.id).sort(),
     });
   }
   useEffect(() => { latestSnapshotRef.current = currentSnapshot(); });
@@ -110,12 +116,14 @@ export default function EditTrip() {
     Promise.all([
       supabase.from("trips").select("*").eq("id", tripId).single(),
       fetchTripCities(tripId),
-    ]).then(([{ data }, cityRows]) => {
+      fetchTripCompanions(tripId),
+    ]).then(([{ data }, cityRows, tripCompanions]) => {
       if (!data) return;
       const trip = data as Trip;
       const picks: CityPick[] = cityRows.map((r) => ({
         cityId: r.city_id, customName: r.custom_name, label: r.city?.name ?? r.custom_name ?? "",
       }));
+      setCompanions(tripCompanions);
       setName(trip.name);
       setStartDate(trip.start_date);
       setEndDate(trip.end_date);
@@ -141,6 +149,7 @@ export default function EditTrip() {
         budgetAmount: trip.budget_amount != null ? String(trip.budget_amount) : "",
         coverPhotoId: trip.cover_photo_id, timezone: trip.default_timezone,
         cityPicks: picks, rateEdits: {},
+        companionIds: tripCompanions.map((c) => c.id).sort(),
       });
       setLoaded(true);
     });
@@ -368,6 +377,7 @@ export default function EditTrip() {
     }
 
     await saveTripCities(tripId, cityPicks.map((p) => ({ cityId: p.cityId, customName: p.customName })));
+    await setTripCompanions(tripId, companions.map((c) => c.id));
 
     for (const u of rateUpdates) {
       await supabase.from("trip_currencies").update({ rate_to_nis: u.rate }).eq("id", u.id);
@@ -595,6 +605,27 @@ export default function EditTrip() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* --- Traveling with --- */}
+      <Text style={styles.label}>Traveling with</Text>
+      <Pressable style={styles.addDestinationButton} onPress={() => setCompanionPickerOpen(true)}>
+        <Text style={styles.addDestinationButtonText}>+ Add companions</Text>
+      </Pressable>
+      {companions.map((c) => (
+        <View key={c.id} style={styles.currencyRow}>
+          <Text style={styles.currencyRate}>{companionFullName(c)}</Text>
+          <Pressable onPress={() => setCompanions(companions.filter((x) => x.id !== c.id))}>
+            <Text style={styles.removeText}>Remove</Text>
+          </Pressable>
+        </View>
+      ))}
+
+      <CompanionPickerModal
+        visible={companionPickerOpen}
+        onClose={() => setCompanionPickerOpen(false)}
+        selectedIds={companions.map((c) => c.id)}
+        onChange={(_, picked) => setCompanions(picked)}
+      />
 
       <Pressable style={styles.button} onPress={handleSavePress} disabled={saving}>
         <Text style={styles.buttonText}>{saving ? "Saving…" : "Save changes"}</Text>

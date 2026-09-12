@@ -6,7 +6,9 @@ import { Alert } from "@/lib/alert";
 import { useRouter, Stack } from "expo-router";
 import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
-import { TripType } from "@/lib/types";
+import { Companion, TripType } from "@/lib/types";
+import { setTripCompanions, companionFullName } from "@/lib/companions";
+import CompanionPickerModal from "@/components/CompanionPickerModal";
 import { tzOffsetLabel, sortedByOffsetDesc, COMMON_TIMEZONES, COMMON_CURRENCIES } from "@/lib/timezone";
 import { fetchLiveRateToNis } from "@/lib/currencyRates";
 import { fetchAllCities, saveTripCities } from "@/lib/cities";
@@ -45,6 +47,9 @@ export default function NewTrip() {
   const [currencyPickerOpen, setCurrencyPickerOpen] = useState(false);
   const [customCurrencyInput, setCustomCurrencyInput] = useState("");
   const [saving, setSaving] = useState(false);
+
+  const [companions, setCompanions] = useState<Companion[]>([]);
+  const [companionPickerOpen, setCompanionPickerOpen] = useState(false);
 
   const [packingSource, setPackingSource] = useState<PackingSource>("empty");
   const [packingSourceId, setPackingSourceId] = useState<string | null>(null);
@@ -175,6 +180,10 @@ export default function NewTrip() {
 
     if (cityPicks.length > 0) {
       await saveTripCities(trip.id, cityPicks.map((p) => ({ cityId: p.cityId, customName: p.customName })));
+    }
+
+    if (companions.length > 0) {
+      await setTripCompanions(trip.id, companions.map((c) => c.id));
     }
 
     // "Work" party is auto-added only for business/mixed trips.
@@ -359,6 +368,27 @@ export default function NewTrip() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* --- Traveling with --- */}
+      <Text style={styles.label}>Traveling with</Text>
+      <Pressable style={styles.addDestinationButton} onPress={() => setCompanionPickerOpen(true)}>
+        <Text style={styles.addDestinationButtonText}>+ Add companions</Text>
+      </Pressable>
+      {companions.map((c) => (
+        <View key={c.id} style={styles.currencyRow}>
+          <Text style={styles.currencyRate}>{companionFullName(c)}</Text>
+          <Pressable onPress={() => setCompanions(companions.filter((x) => x.id !== c.id))}>
+            <Text style={styles.removeText}>Remove</Text>
+          </Pressable>
+        </View>
+      ))}
+
+      <CompanionPickerModal
+        visible={companionPickerOpen}
+        onClose={() => setCompanionPickerOpen(false)}
+        selectedIds={companions.map((c) => c.id)}
+        onChange={(_, picked) => setCompanions(picked)}
+      />
 
       {/* --- Packing list --- */}
       <Text style={styles.label}>Packing list</Text>

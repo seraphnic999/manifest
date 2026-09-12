@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { View, Text, Pressable, StyleSheet, ScrollView, Image } from "react-native";
-import { Stack, useLocalSearchParams, useFocusEffect } from "expo-router";
+import { Stack, useLocalSearchParams, useFocusEffect, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import * as Clipboard from "expo-clipboard";
 import SubpageHeader from "@/components/SubpageHeader";
@@ -12,7 +12,7 @@ import { formatDateDDMMYYYY } from "@/lib/dateFormat";
 import { TravelDocument } from "@/lib/types";
 import {
   fetchCompanion, fetchCompanionProfileUrl, fetchCompanionPhotosWithUrls,
-  companionFullName, relationshipLabel,
+  companionFullName, relationshipLabel, deleteCompanion,
 } from "@/lib/companions";
 import { fetchDocumentsForCompanion, fetchDocumentPhotoUrl, documentTypeLabel, documentTypeIcon } from "@/lib/travelDocuments";
 import { buildCompanionExportText, shareCompanionText } from "@/lib/companionExport";
@@ -53,6 +53,7 @@ function CopyRow({ label, value }: { label: string; value: string | null }) {
 
 export default function CompanionDetail() {
   const { companionId } = useLocalSearchParams<{ companionId: string }>();
+  const router = useRouter();
   const { data, refetch } = useQuery({ queryKey: ["companionDetail", companionId], queryFn: () => fetchDetail(companionId) });
 
   const [editOpen, setEditOpen] = useState(false);
@@ -80,6 +81,22 @@ export default function CompanionDetail() {
     if (exportMode) { toggleDocSelected(doc.id); return; }
     setEditingDoc(doc);
     setDocModalOpen(true);
+  }
+
+  function confirmDeleteCompanion() {
+    Alert.alert(
+      "Delete companion",
+      `Remove ${companionFullName(companion)} and all of their documents permanently?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete", style: "destructive", onPress: async () => {
+            await deleteCompanion(companion.id);
+            router.back();
+          },
+        },
+      ]
+    );
   }
 
   async function doExport() {
@@ -124,8 +141,11 @@ export default function CompanionDetail() {
         </Pressable>
 
         <Pressable style={styles.card} onPress={() => setEditOpen(true)}>
+          <CopyRow label="First name" value={companion.first_name} />
+          <CopyRow label="Last name" value={companion.last_name} />
           {!companion.is_self && <CopyRow label="Relationship" value={relationshipLabel(companion.relationship)} />}
           <CopyRow label="Birth date" value={companion.birth_date ? formatDateDDMMYYYY(companion.birth_date) : null} />
+          <CopyRow label="Israeli ID#" value={companion.israeli_id} />
           <CopyRow label="Notes" value={companion.notes} />
           <View style={styles.editHint}>
             <Icon name="edit" size={14} color={colors.blue} />
@@ -175,6 +195,13 @@ export default function CompanionDetail() {
             </Pressable>
           );
         })}
+
+        {!companion.is_self && (
+          <Pressable style={styles.deleteBtn} onPress={confirmDeleteCompanion}>
+            <Icon name="trash" size={16} color={colors.coral} />
+            <Text style={styles.deleteBtnText}>Delete companion</Text>
+          </Pressable>
+        )}
       </ScrollView>
 
       <CompanionEditModal visible={editOpen} onClose={() => setEditOpen(false)} companion={companion} onSaved={refetch} />
@@ -225,4 +252,6 @@ const styles = StyleSheet.create({
   docHeaderRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 },
   docType: { color: colors.ink, fontFamily: fonts.bodyBold, fontSize: 14 },
   docThumb: { width: "100%", height: 140, borderRadius: radius.md, marginTop: 8, backgroundColor: colors.paper },
+  deleteBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, padding: 14, marginTop: 18 },
+  deleteBtnText: { color: colors.coral, fontWeight: "600", fontSize: 14.5 },
 });

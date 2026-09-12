@@ -4,6 +4,7 @@
 import { supabase } from "./supabase";
 import { DocumentType, TravelDocument } from "./types";
 import { IconName } from "@/components/icons/Icon";
+import { readUriAsArrayBuffer } from "./fileBytes";
 
 const BUCKET = "travel-documents";
 const SIGNED_URL_TTL = 3600;
@@ -78,10 +79,9 @@ export async function setDocumentPhoto(
 
   const ext = extensionFromAsset(asset);
   const path = `${userId}/${doc.id}/${Date.now()}.${ext}`;
-  const response = await fetch(asset.uri);
-  const blob = await response.blob();
+  const bytes = await readUriAsArrayBuffer(asset.uri);
   const { error: uploadError } = await supabase.storage
-    .from(BUCKET).upload(path, blob, { contentType: asset.mimeType || blob.type || "application/octet-stream" });
+    .from(BUCKET).upload(path, bytes, { contentType: asset.mimeType || "application/octet-stream" });
   if (uploadError) throw uploadError;
 
   if (doc.photo_path) await supabase.storage.from(BUCKET).remove([doc.photo_path]);

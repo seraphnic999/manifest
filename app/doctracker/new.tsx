@@ -6,12 +6,16 @@ import { colors, radius } from "@/lib/theme";
 import { Alert } from "@/lib/alert";
 import { Relationship } from "@/lib/types";
 import { RELATIONSHIP_OPTIONS, createCompanion } from "@/lib/companions";
+import { DateField } from "@/components/DateTimeFields";
 
 export default function NewCompanion() {
   const router = useRouter();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [birthDate, setBirthDate] = useState("");
   const [relationship, setRelationship] = useState<Relationship | null>(null);
+  const [israeliId, setIsraeliId] = useState("");
+  const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
 
   async function create() {
@@ -25,7 +29,14 @@ export default function NewCompanion() {
     }
     setSaving(true);
     try {
-      const companion = await createCompanion({ first_name: firstName.trim(), last_name: lastName.trim(), relationship });
+      const companion = await createCompanion({
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        relationship,
+        birth_date: birthDate || null,
+        israeli_id: israeliId.trim() || null,
+        notes: notes.trim() || null,
+      });
       router.replace(`/doctracker/${companion.id}`);
     } catch (e: any) {
       Alert.alert("Couldn't create companion", e.message ?? "Unknown error");
@@ -44,6 +55,10 @@ export default function NewCompanion() {
         <Text style={styles.label}>Last name</Text>
         <TextInput style={styles.input} value={lastName} onChangeText={setLastName} placeholder="Last name" />
 
+        <View style={{ marginTop: 4 }}>
+          <DateField label="Birth date" value={birthDate} onChange={setBirthDate} />
+        </View>
+
         <Text style={styles.label}>Relationship</Text>
         <View style={styles.chipRow}>
           {RELATIONSHIP_OPTIONS.map((opt) => (
@@ -56,6 +71,18 @@ export default function NewCompanion() {
             </Pressable>
           ))}
         </View>
+
+        <Text style={styles.label}>Israeli ID#</Text>
+        <TextInput style={styles.input} value={israeliId} onChangeText={setIsraeliId} placeholder="Optional" keyboardType="numeric" />
+
+        <Text style={styles.label}>Notes</Text>
+        <TextInput
+          style={[styles.input, { minHeight: 80, textAlignVertical: "top" }]}
+          value={notes}
+          onChangeText={setNotes}
+          placeholder="Optional notes…"
+          multiline
+        />
 
         <Pressable style={[styles.saveBtn, saving && { opacity: 0.6 }]} onPress={create} disabled={saving}>
           <Text style={styles.saveBtnText}>{saving ? "Creating…" : "Create"}</Text>

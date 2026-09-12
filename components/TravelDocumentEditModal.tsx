@@ -30,6 +30,11 @@ export default function TravelDocumentEditModal({ visible, onClose, companionId,
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  // Tracks the row backing this modal once one exists — either passed in
+  // (edit mode) or created implicitly the first time a photo is picked
+  // before the user has pressed Save (create mode used to hard-block photo
+  // picking until an explicit save; now it silently creates the row instead).
+  const [docId, setDocId] = useState<string | null>(document?.id ?? null);
 
   useEffect(() => {
     if (!visible) return;
@@ -39,29 +44,13 @@ export default function TravelDocumentEditModal({ visible, onClose, companionId,
     setIssueDate(document?.issue_date ?? "");
     setExpiryDate(document?.expiry_date ?? "");
     setNotes(document?.notes ?? "");
+    setDocId(document?.id ?? null);
     if (document?.photo_path) fetchDocumentPhotoUrl(document.photo_path).then(setPhotoUrl);
     else setPhotoUrl(null);
   }, [visible, document]);
 
-  async function pickPhoto() {
-    if (!document) {
-      Alert.alert("Save first", "Save the document once before adding a photo.");
-      return;
-    }
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert("Permission needed", "Allow photo library access to pick a photo.");
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.85 });
-    if (result.canceled || result.assets.length === 0) return;
-    await setDocumentPhoto(document, result.assets[0]);
-    setPhotoUrl(result.assets[0].uri);
-    onSaved();
-  }
-
-  async function save() {
-    const fields: DocumentFields = {
+  function currentFields(): DocumentFields {
+    return {
       type,
       document_number: documentNumber.trim() || null,
       issuing_country: issuingCountry.trim() || null,
@@ -69,10 +58,37 @@ export default function TravelDocumentEditModal({ visible, onClose, companionId,
       expiry_date: expiryDate || null,
       notes: notes.trim() || null,
     };
+  }
+
+  async function pickPhoto() {
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert("Permission needed", "Allow photo library access to pick a photo.");
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.85 });
+      if (result.canceled || result.assets.length === 0) return;
+
+      let id = docId;
+      if (!id) {
+        const created = await createDocument(companionId, currentFields());
+        id = created.id;
+        setDocId(id);
+      }
+      await setDocumentPhoto({ id, photo_path: null }, result.assets[0]);
+      setPhotoUrl(result.assets[0].uri);
+      onSaved();
+    } catch (e: any) {
+      Alert.alert("Couldn't add photo", e.message ?? "Unknown error");
+    }
+  }
+
+  async function save() {
     setSaving(true);
     try {
-      if (document) await saveDocument(document.id, fields);
-      else await createDocument(companionId, fields);
+      if (docId) await saveDocument(docId, currentFields());
+      else await createDocument(companionId, currentFields());
       onSaved();
       onClose();
     } catch (e: any) {

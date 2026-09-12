@@ -206,8 +206,17 @@ export interface Companion {
   relationship: Relationship | null; // null only for the self row
   profile_photo_path: string | null;
   notes: string | null;
+  israeli_id: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface TripCompanion {
+  id: string;
+  trip_id: string;
+  companion_id: string;
+  sort_order: number;
+  created_at: string;
 }
 
 export interface CompanionPhoto {
