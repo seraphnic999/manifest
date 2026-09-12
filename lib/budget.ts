@@ -33,7 +33,7 @@ export function computeBudgetProgress(
 
   let spentPreTrip = 0;
   let spentInTrip = 0;
-  for (const e of expenses) {
+  for (const e of expenses ?? []) {
     const nis = e.amount * rateFor(e.currency_code);
     if (e.expense_date && e.expense_date < trip.start_date) spentPreTrip += nis;
     else spentInTrip += nis;

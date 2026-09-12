@@ -105,11 +105,17 @@ export default function TripOverview() {
     queryFn: () => fetchOverviewData(tripId),
   });
   const trip = data?.trip ?? null;
-  const days = data?.days ?? [];
-  const flights = data?.flights ?? [];
-  const lodgings = data?.lodgings ?? [];
+  // Array.isArray, not just `?? []`: guards against a stale persisted
+  // react-query cache entry (from before one of these fields existed on
+  // this query's shape) rehydrating as something other than an array and
+  // crashing render before this screen's own refetch can correct it.
+  const days = Array.isArray(data?.days) ? data.days : [];
+  const flights = Array.isArray(data?.flights) ? data.flights : [];
+  const lodgings = Array.isArray(data?.lodgings) ? data.lodgings : [];
   const totalNis = data?.totalNis ?? null;
-  const todayItems = data?.todayItems ?? [];
+  const todayItems = Array.isArray(data?.todayItems) ? data.todayItems : [];
+  const overviewExpenses = Array.isArray(data?.expenses) ? data.expenses : [];
+  const overviewCurrencies = Array.isArray(data?.currencies) ? data.currencies : [];
   const lodgingGapDays = findLodgingGapDays(days, lodgings);
   const isCurrent = trip ? tripStatus(trip) === "current" : false;
 
@@ -120,7 +126,7 @@ export default function TripOverview() {
   });
 
   const budgetProgress = trip && data
-    ? computeBudgetProgress(trip, data.expenses, (code) => data.currencies.find((c) => c.code === code)?.rate_to_nis ?? 1)
+    ? computeBudgetProgress(trip, overviewExpenses, (code) => overviewCurrencies.find((c) => c.code === code)?.rate_to_nis ?? 1)
     : null;
 
   // Re-fetch every time this screen regains focus (e.g. navigating back

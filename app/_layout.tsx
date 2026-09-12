@@ -13,7 +13,7 @@ import { supabase } from "@/lib/supabase";
 import { claimPendingTripShares } from "@/lib/tripSharing";
 import { registerPushToken } from "@/lib/reminders";
 import { colors } from "@/lib/theme";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, QUERY_CACHE_SCHEMA_VERSION } from "@/lib/queryClient";
 import ErrorBoundary from "@/components/ErrorBoundary";
 
 const asyncStoragePersister = createAsyncStoragePersister({
@@ -84,7 +84,11 @@ export default function RootLayout() {
   return (
     <PersistQueryClientProvider
       client={queryClient}
-      persistOptions={{ persister: asyncStoragePersister, maxAge: 7 * 24 * 60 * 60 * 1000 }}
+      persistOptions={{
+        persister: asyncStoragePersister,
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+        buster: QUERY_CACHE_SCHEMA_VERSION,
+      }}
     >
       <GestureHandlerRootView style={styles.outer}>
         <View style={styles.inner}>

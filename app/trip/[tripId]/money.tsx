@@ -108,15 +108,19 @@ export default function MoneyShoppingScreen() {
   });
   const trip = data?.trip ?? null;
   const tripStartDate = trip?.start_date ?? null;
-  const currencies = data?.currencies ?? [];
-  const parties = data?.parties ?? [];
-  const expenses = data?.expenses ?? [];
+  // Array.isArray, not just `?? []`: guards against a stale persisted
+  // react-query cache entry (from before one of these fields existed on
+  // this query's shape) rehydrating as something other than an array and
+  // crashing render before this screen's own refetch can correct it.
+  const currencies = Array.isArray(data?.currencies) ? data.currencies : [];
+  const parties = Array.isArray(data?.parties) ? data.parties : [];
+  const expenses = Array.isArray(data?.expenses) ? data.expenses : [];
 
   const { data: shoppingRows, refetch: refetchShopping } = useQuery({
     queryKey: ["shopping", tripId],
     queryFn: () => fetchShoppingData(tripId),
   });
-  const rows = shoppingRows ?? [];
+  const rows = Array.isArray(shoppingRows) ? shoppingRows : [];
 
   useFocusEffect(useCallback(() => { refetch(); refetchShopping(); }, [refetch, refetchShopping]));
 
