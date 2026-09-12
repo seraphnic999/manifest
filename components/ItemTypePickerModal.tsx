@@ -4,11 +4,18 @@ import { ITEM_CATEGORIES } from "@/lib/itemTypeMeta";
 import Icon from "@/components/icons/Icon";
 
 export default function ItemTypePickerModal({
-  visible, onClose, onSelect,
+  visible, onClose, onSelect, onSelectKeeper,
 }: {
   visible: boolean;
   onClose: () => void;
   onSelect: (categoryKey: string) => void;
+  /** "Keeper" isn't a real item type (it has no dbTypes of its own — a
+   * keeper's underlying type is whatever place it snapshots), so it's kept
+   * out of ITEM_CATEGORIES and given its own callback: picking it opens a
+   * keeper picker instead of going straight to the new-item form. Omit
+   * this prop to leave the tile out entirely (e.g. the map's "add
+   * proposal" picker has no day/city to match keepers against). */
+  onSelectKeeper?: () => void;
 }) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -28,6 +35,14 @@ export default function ItemTypePickerModal({
                 <Text style={styles.tileLabel}>{cat.label}</Text>
               </Pressable>
             ))}
+            {onSelectKeeper && (
+              <Pressable style={styles.tile} onPress={onSelectKeeper}>
+                <View style={[styles.iconCircle, { backgroundColor: colors.gold }]}>
+                  <Icon name="star" size={26} color="#fff" />
+                </View>
+                <Text style={styles.tileLabel}>Keeper</Text>
+              </Pressable>
+            )}
           </ScrollView>
         </Pressable>
       </Pressable>

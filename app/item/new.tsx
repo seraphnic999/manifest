@@ -12,14 +12,17 @@ import { DateField, TimeField } from "@/components/DateTimeFields";
 import { computeDurationMinutes, formatDuration } from "@/lib/duration";
 import { Item, ItemStatus } from "@/lib/types";
 import { DEFAULT_REMINDER_MINUTES } from "@/lib/reminders";
+import { fetchKeeperById } from "@/lib/keepers";
+import { itemResearchEligible } from "@/lib/itemResearch";
+import IdentifyCandidatesModal from "@/components/IdentifyCandidatesModal";
 import HomeButton from "@/components/HomeButton";
 import SubpageHeader from "@/components/SubpageHeader";
 
 const STATUSES: ItemStatus[] = ["planned", "booked", "optional"];
 
 export default function NewItem() {
-  const { tripId, dayId, date, category, duplicateFrom } = useLocalSearchParams<{
-    tripId: string; dayId: string; date: string; category: string; duplicateFrom?: string;
+  const { tripId, dayId, date, category, duplicateFrom, fromKeeperId } = useLocalSearchParams<{
+    tripId: string; dayId: string; date: string; category: string; duplicateFrom?: string; fromKeeperId?: string;
   }>();
   const router = useRouter();
   const cat = categoryByKey(category ?? "other");
@@ -42,6 +45,7 @@ export default function NewItem() {
   const [longitude, setLongitude] = useState("");
   const [reminderMinutes, setReminderMinutes] = useState("");
   const [saving, setSaving] = useState(false);
+  const [pendingIdentify, setPendingIdentify] = useState<{ id: string; title: string; trip_id: string } | null>(null);
 
   // Lodging-specific
   const [checkInDate, setCheckInDate] = useState(date ?? "");
@@ -92,6 +96,26 @@ export default function NewItem() {
     });
   }, [duplicateFrom]);
 
+  // Adding a trip instance of a keeper: prefill the place's own descriptive
+  // fields only — never dates/time/booking source/confirmation, since
+  // those are exactly the trip-specific details a keeper deliberately
+  // doesn't store (see migration_032). The user picks this trip's own date.
+  useEffect(() => {
+    if (!fromKeeperId) return;
+    fetchKeeperById(fromKeeperId).then((keeper) => {
+      if (!keeper) return;
+      setTitle(keeper.title);
+      setSubtype(keeper.item_type);
+      setAddress(keeper.address ?? "");
+      setPhone(keeper.phone ?? "");
+      setVendor(keeper.vendor ?? "");
+      setLink(keeper.link ?? "");
+      setGoogleMapsLink(keeper.google_maps_link ?? "");
+      setLatitude(keeper.latitude != null ? String(keeper.latitude) : "");
+      setLongitude(keeper.longitude != null ? String(keeper.longitude) : "");
+    });
+  }, [fromKeeperId]);
+
   const durationMinutes = computeDurationMinutes(itemDate, time, arrivalDate, arrivalTime);
   const durationInvalid = durationMinutes !== null && durationMinutes < 0;
   const durationLabel = durationMinutes === null
@@ -100,25 +124,28 @@ export default function NewItem() {
       ? "Arrival must be after departure."
       : `Flight duration: ${formatDuration(durationMinutes)}`;
 
-  async function save() {
-    if (!title) { Alert.alert("Missing info", "Title is required."); return; }
+  // Shared by both "Add item" and "Research & add" — the only difference
+  // between them is what happens to the id this returns. Returns null (after
+  // showing whatever alert explains why) if the item wasn't created.
+  async function createItem(): Promise<string | null> {
+    if (!title) { Alert.alert("Missing info", "Title is required."); return null; }
     if (has("lodgingDates") && (!checkInDate || !checkOutDate)) {
       Alert.alert("Missing info", "Check-in and check-out dates are required for lodging.");
-      return;
+      return null;
     }
     if (has("flightTimes") && durationInvalid) {
       Alert.alert("Check the times", "Arrival must be after departure.");
-      return;
+      return null;
     }
     if ((latitude && !longitude) || (!latitude && longitude)) {
       Alert.alert("Missing coordinate", "Enter both latitude and longitude, or leave both blank.");
-      return;
+      return null;
     }
     const lat = latitude ? parseFloat(latitude) : null;
     const lon = longitude ? parseFloat(longitude) : null;
     if ((lat !== null && Number.isNaN(lat)) || (lon !== null && Number.isNaN(lon))) {
       Alert.alert("Invalid coordinate", "Latitude/longitude must be numbers.");
-      return;
+      return null;
     }
     setSaving(true);
 
@@ -138,6 +165,7 @@ export default function NewItem() {
       longitude: lon,
       reminder_minutes_before: reminderMinutes ? parseInt(reminderMinutes, 10) || null : null,
       custom_fields: flightNumber ? { flight_number: flightNumber } : {},
+      keeper_id: fromKeeperId || null,
     };
 
     async function siblingSortOrder(targetDayId: string, atTime: string | null) {
@@ -146,6 +174,8 @@ export default function NewItem() {
         .eq("day_id", targetDayId).is("deleted_at", null);
       return computeInsertSortOrder(siblings ?? [], atTime);
     }
+
+    let createdId: string | null = null;
 
     if (has("lodgingDates")) {
       // The stay itself: a trip-level span item, shown at a fixed spot on
@@ -164,8 +194,9 @@ export default function NewItem() {
       if (error || !span) {
         setSaving(false);
         Alert.alert("Couldn't create lodging", error?.message ?? "Unknown error");
-        return;
+        return null;
       }
+      createdId = span.id;
 
       if (autoCreateEvents) {
         // Check-in/check-out are ordinary, orderable day items linked back
@@ -200,11 +231,16 @@ export default function NewItem() {
         if (!targetDay) {
           setSaving(false);
           Alert.alert("No such day", "That date is outside the trip's date range.");
-          return;
+          return null;
         }
         targetDayId = targetDay.id;
       }
-      const { error } = await supabase.from("items").insert({
+      if (!targetDayId) {
+        setSaving(false);
+        Alert.alert("Pick a date", "Enter a date so this item lands on the right day of the trip.");
+        return null;
+      }
+      const { data: newItem, error } = await supabase.from("items").insert({
         ...base,
         day_id: targetDayId,
         start_date: itemDate || null,
@@ -212,22 +248,36 @@ export default function NewItem() {
         end_date: has("flightTimes") ? (arrivalDate || null) : null,
         time_end: has("flightTimes") ? (arrivalTime || null) : null,
         sort_order: await siblingSortOrder(targetDayId, time || null),
-      });
-      if (error) {
+      }).select().single();
+      if (error || !newItem) {
         setSaving(false);
-        Alert.alert("Couldn't create item", error.message);
-        return;
+        Alert.alert("Couldn't create item", error?.message ?? "Unknown error");
+        return null;
       }
+      createdId = newItem.id;
     }
 
     setSaving(false);
-    router.back();
+    return createdId;
+  }
+
+  async function save() {
+    const id = await createItem();
+    if (id) router.back();
+  }
+
+  async function saveAndResearch() {
+    const id = await createItem();
+    if (id) setPendingIdentify({ id, title, trip_id: tripId });
   }
 
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
-      <SubpageHeader title={duplicateFrom ? `Duplicate ${cat.label}` : `Add ${cat.label}`} right={<HomeButton />} />
+      <SubpageHeader
+        title={duplicateFrom ? `Duplicate ${cat.label}` : fromKeeperId ? `Add ${cat.label} from Keeper` : `Add ${cat.label}`}
+        right={<HomeButton />}
+      />
       <ScrollView contentContainerStyle={{ padding: 20 }}>
 
       <Text style={styles.label}>Title</Text>
@@ -353,7 +403,22 @@ export default function NewItem() {
       <Pressable style={styles.button} onPress={save} disabled={saving}>
         <Text style={styles.buttonText}>{saving ? "Saving…" : duplicateFrom ? "Save duplicate" : "Add item"}</Text>
       </Pressable>
+
+      {itemResearchEligible(subtype) && (
+        <Pressable style={styles.researchButton} onPress={saveAndResearch} disabled={saving}>
+          <Text style={styles.researchButtonText}>{saving ? "Saving…" : "Save & research this place"}</Text>
+        </Pressable>
+      )}
       </ScrollView>
+
+      {pendingIdentify && (
+        <IdentifyCandidatesModal
+          visible
+          item={pendingIdentify}
+          onClose={() => { setPendingIdentify(null); router.back(); }}
+          onQueued={() => { setPendingIdentify(null); router.back(); }}
+        />
+      )}
     </View>
   );
 }
@@ -377,4 +442,9 @@ const styles = StyleSheet.create({
   switchLabel: { color: colors.inkSoft, fontSize: 12, flex: 1 },
   button: { backgroundColor: colors.ink, borderRadius: radius.md, padding: 14, alignItems: "center", marginTop: 28 },
   buttonText: { color: colors.paper, fontWeight: "700" },
+  researchButton: {
+    borderWidth: 1, borderColor: colors.blue, borderRadius: radius.md,
+    padding: 14, alignItems: "center", marginTop: 10, marginBottom: 10,
+  },
+  researchButtonText: { color: colors.blue, fontWeight: "700" },
 });

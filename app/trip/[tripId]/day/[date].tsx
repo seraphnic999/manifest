@@ -7,11 +7,12 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { supabase } from "@/lib/supabase";
 import Icon from "@/components/icons/Icon";
 import { colors, radius } from "@/lib/theme";
-import { Item, Day } from "@/lib/types";
+import { Item, Day, Keeper } from "@/lib/types";
 import { renumberedOrders } from "@/lib/reorder";
-import { categoryForDbType } from "@/lib/itemTypeMeta";
+import { categoryForDbType, mapIconForItem } from "@/lib/itemTypeMeta";
 import { fetchReadyResearchItemIds } from "@/lib/itemResearch";
 import ItemTypePickerModal from "@/components/ItemTypePickerModal";
+import KeeperPickerModal from "@/components/KeeperPickerModal";
 import TripScreenHeader from "@/components/TripScreenHeader";
 import TripTabBar from "@/components/TripTabBar";
 import { useTripHamburgerMenu } from "@/components/useTripHamburgerMenu";
@@ -24,7 +25,7 @@ import { Alert } from "@/lib/alert";
 import { buildDayColorMap } from "@/lib/mapData";
 import DayCityPickerModal from "@/components/DayCityPickerModal";
 import { CityPick } from "@/components/CityPickerModal";
-import { fetchTripCities, fetchAllCities, dayCityLabel, setDayCity, TripCityRow } from "@/lib/cities";
+import { fetchTripCities, fetchAllCities, dayCityLabel, resolveDayCityPick, setDayCity, TripCityRow } from "@/lib/cities";
 import { DAY_COLOR_SWATCHES } from "@/lib/dayColors";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -119,6 +120,7 @@ export default function DayView() {
   const [dayCustomCityName, setDayCustomCityName] = useState<string | null>(null);
   const [dayColor, setDayColor] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [keeperPickerOpen, setKeeperPickerOpen] = useState(false);
 
   // Unified day-edit modal (city + title + color), opened by tapping the
   // title block.
@@ -192,6 +194,18 @@ export default function DayView() {
     router.push(`/item/new?tripId=${tripId}&dayId=${dayId}&date=${dateParam}&category=${categoryKey}`);
   }
 
+  function handleSelectKeeper() {
+    setPickerOpen(false);
+    setKeeperPickerOpen(true);
+  }
+
+  function handlePickedKeeper(keeper: Keeper) {
+    setKeeperPickerOpen(false);
+    const dateParam = isProposals ? "" : date;
+    const category = categoryForDbType(keeper.item_type).key;
+    router.push(`/item/new?tripId=${tripId}&dayId=${dayId}&date=${dateParam}&category=${category}&fromKeeperId=${keeper.id}`);
+  }
+
   function openEditModal() {
     if (!requireOnline()) return;
     setEditThemeDraft(theme ?? "");
@@ -252,6 +266,10 @@ export default function DayView() {
   // matches what this day's items are colored on the map.
   const effectiveDayColor = dayId ? buildDayColorMap(allDays).get(dayId) ?? colors.blue : colors.blue;
   const effectiveCityLabel = dayCityLabel({ city_id: dayCityId, custom_city_name: dayCustomCityName }, tripCities);
+  // Falls back to the trip's primary city the same way the label itself
+  // does, so "Keepers in {city}" filters by the city actually shown here
+  // even when this day has no explicit city override of its own.
+  const effectiveCityPick = resolveDayCityPick({ city_id: dayCityId, custom_city_name: dayCustomCityName }, tripCities);
 
   // Prev/next navigation treats Proposals as one more day at the end of
   // the sequence (reachable forward from the last real day, and back from
@@ -304,7 +322,7 @@ export default function DayView() {
           </View>
           <View style={styles.body}>
             <View style={styles.itemIconCol}>
-              <Icon name={categoryForDbType(item.type).icon} size={24} color={colors.blue} />
+              <Icon name={mapIconForItem(item)} size={24} color={colors.blue} />
             </View>
             <View style={styles.itemTextCol}>
               <View style={styles.row1}>
@@ -481,7 +499,18 @@ export default function DayView() {
         <Icon name="add" size={24} color="#fff" />
       </Pressable>
 
-      <ItemTypePickerModal visible={pickerOpen} onClose={() => setPickerOpen(false)} onSelect={handleSelectCategory} />
+      <ItemTypePickerModal
+        visible={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onSelect={handleSelectCategory}
+        onSelectKeeper={handleSelectKeeper}
+      />
+      <KeeperPickerModal
+        visible={keeperPickerOpen}
+        onClose={() => setKeeperPickerOpen(false)}
+        city={{ cityId: effectiveCityPick.cityId, customName: effectiveCityPick.customName, label: effectiveCityLabel }}
+        onSelect={handlePickedKeeper}
+      />
 
       <Modal visible={editModalOpen} transparent animationType="fade">
         <Pressable style={styles.modalBackdrop} onPress={() => setEditModalOpen(false)}>

@@ -5,7 +5,7 @@ export type TripStatus = "future" | "current" | "past"; // derived, not stored
 
 export type ItemType =
   | "flight" | "transfer" | "transport" | "lodging" | "activity"
-  | "meal" | "bar" | "sightseeing" | "attraction" | "shopping" | "work" | "other";
+  | "meal" | "bar" | "cafe" | "bakery" | "sightseeing" | "attraction" | "shopping" | "work" | "other";
 
 export type ItemStatus = "booked" | "optional" | "planned";
 
@@ -93,6 +93,7 @@ export interface Item {
   reminder_sent_at: string | null;
   custom_fields: Record<string, unknown>;
   deleted_at: string | null;
+  keeper_id: string | null;
 }
 
 export interface ItemPhoto {
@@ -253,15 +254,6 @@ export interface Keeper {
   city_label: string;
   item_type: ItemType;
   title: string;
-  start_date: string | null;
-  end_date: string | null;
-  time_start: string | null;
-  time_end: string | null;
-  timezone_start: string | null;
-  timezone_end: string | null;
-  notes: string | null;
-  confirmation_code: string | null;
-  booking_source: string | null;
   address: string | null;
   phone: string | null;
   vendor: string | null;
@@ -271,7 +263,6 @@ export interface Keeper {
   longitude: number | null;
   map_icon: string | null;
   source_trip_name: string | null;
-  source_item_id: string | null;
   rating: number | null;
   personal_notes: string | null;
   created_at: string;

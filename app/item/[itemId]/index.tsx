@@ -10,7 +10,7 @@ import { supabase } from "@/lib/supabase";
 import Icon from "@/components/icons/Icon";
 import { colors, radius } from "@/lib/theme";
 import { Item, ItemPhoto, Expense, TripCurrency, TripParty, Keeper } from "@/lib/types";
-import { fetchKeeperForItem } from "@/lib/keepers";
+import { fetchKeeperById } from "@/lib/keepers";
 import { uploadItemPhoto, uploadItemDocument, fetchItemPhotosWithUrls, deleteItemPhoto, isImageAttachment } from "@/lib/photos";
 import { downloadAttachment } from "@/lib/downloadAttachment";
 import { fetchLinkedItems, LinkedItemSummary } from "@/lib/itemLinks";
@@ -54,7 +54,7 @@ async function fetchItemDetail(itemId: string): Promise<ItemDetailData | null> {
     supabase.from("expenses").select("*").eq("item_id", itemId).order("expense_date", { ascending: false }),
     supabase.from("shopping_list_items").select("id, name, quantity, allocations(id)").eq("item_id", itemId),
     fetchLinkedItems(itemId),
-    fetchKeeperForItem(itemId),
+    item.keeper_id ? fetchKeeperById(item.keeper_id) : Promise.resolve(null),
   ]);
   if (expensesRes.error) throw expensesRes.error;
   if (shoppingRes.error) throw shoppingRes.error;

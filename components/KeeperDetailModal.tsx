@@ -1,13 +1,14 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { View, Text, Pressable, StyleSheet, Modal, TextInput, ScrollView, Linking } from "react-native";
+import { useRouter } from "expo-router";
 import { colors, radius, fonts } from "@/lib/theme";
 import Icon from "@/components/icons/Icon";
 import { Alert } from "@/lib/alert";
-import { Keeper } from "@/lib/types";
-import { updateKeeper, deleteKeeper } from "@/lib/keepers";
+import { Keeper, Trip } from "@/lib/types";
+import { updateKeeper, deleteKeeper, fetchTripsForKeeper, KeeperTripLink } from "@/lib/keepers";
 import { categoryForDbType } from "@/lib/itemTypeMeta";
 import { formatDateDDMMYYYY } from "@/lib/dateFormat";
-import { normalizeTimeHHMM } from "@/lib/timeFormat";
+import FutureTripPickerModal from "@/components/FutureTripPickerModal";
 
 interface Props {
   visible: boolean;
@@ -27,13 +28,24 @@ function Field({ label, value }: { label: string; value: string | null }) {
 }
 
 export default function KeeperDetailModal({ visible, onClose, keeper, onChanged }: Props) {
+  const router = useRouter();
   const [rating, setRating] = useState(keeper.rating ?? 0);
   const [notes, setNotes] = useState(keeper.personal_notes ?? "");
   const [saving, setSaving] = useState(false);
+  const [trips, setTrips] = useState<KeeperTripLink[]>([]);
+  const [tripPickerOpen, setTripPickerOpen] = useState(false);
+
+  const loadTrips = useCallback(() => {
+    fetchTripsForKeeper(keeper.id).then(setTrips).catch((e) => console.error("fetchTripsForKeeper failed", e));
+  }, [keeper.id]);
 
   useEffect(() => {
-    if (visible) { setRating(keeper.rating ?? 0); setNotes(keeper.personal_notes ?? ""); }
-  }, [visible, keeper]);
+    if (visible) {
+      setRating(keeper.rating ?? 0);
+      setNotes(keeper.personal_notes ?? "");
+      loadTrips();
+    }
+  }, [visible, keeper, loadTrips]);
 
   async function save() {
     setSaving(true);
@@ -61,6 +73,18 @@ export default function KeeperDetailModal({ visible, onClose, keeper, onChanged 
     ]);
   }
 
+  function openTripItem(link: KeeperTripLink) {
+    onClose();
+    router.push(`/item/${link.itemId}`);
+  }
+
+  function addToTrip(trip: Trip) {
+    setTripPickerOpen(false);
+    onClose();
+    const category = categoryForDbType(keeper.item_type).key;
+    router.push(`/item/new?tripId=${trip.id}&dayId=&date=&category=${category}&fromKeeperId=${keeper.id}`);
+  }
+
   const categoryIcon = categoryForDbType(keeper.item_type).icon;
 
   return (
@@ -75,17 +99,12 @@ export default function KeeperDetailModal({ visible, onClose, keeper, onChanged 
             <Icon name={categoryIcon} size={24} color={colors.blue} />
             <Text style={styles.itemTitle}>{keeper.title}</Text>
           </View>
-          <Text style={styles.citySub}>{keeper.city_label}{keeper.source_trip_name ? ` · ${keeper.source_trip_name}` : ""}</Text>
+          <Text style={styles.citySub}>{keeper.city_label}{keeper.source_trip_name ? ` · First seen in ${keeper.source_trip_name}` : ""}</Text>
 
           <View style={styles.card}>
-            <Field label="Dates" value={keeper.start_date ? `${formatDateDDMMYYYY(keeper.start_date)}${keeper.end_date && keeper.end_date !== keeper.start_date ? ` – ${formatDateDDMMYYYY(keeper.end_date)}` : ""}` : null} />
-            <Field label="Time" value={keeper.time_start ? `${normalizeTimeHHMM(keeper.time_start)}${keeper.time_end ? ` – ${normalizeTimeHHMM(keeper.time_end)}` : ""}` : null} />
             <Field label="Address" value={keeper.address} />
             <Field label="Phone" value={keeper.phone} />
             <Field label="Vendor" value={keeper.vendor} />
-            <Field label="Confirmation code" value={keeper.confirmation_code} />
-            <Field label="Booking source" value={keeper.booking_source} />
-            <Field label="Notes" value={keeper.notes} />
           </View>
 
           {keeper.link && (
@@ -99,6 +118,23 @@ export default function KeeperDetailModal({ visible, onClose, keeper, onChanged 
               <Text style={styles.linkBtnText}>Open in Google Maps</Text>
             </Pressable>
           )}
+
+          <Pressable style={styles.addToTripBtn} onPress={() => setTripPickerOpen(true)}>
+            <Icon name="add" size={18} color="#fff" />
+            <Text style={styles.addToTripBtnText}>Add to trip</Text>
+          </Pressable>
+
+          <Text style={styles.label}>Trips</Text>
+          {trips.length === 0 && <Text style={styles.empty}>Not on any trip yet.</Text>}
+          {trips.map((t) => (
+            <Pressable key={t.itemId} style={styles.tripRow} onPress={() => openTripItem(t)}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.tripRowName} numberOfLines={1}>{t.tripName}</Text>
+                {t.startDate && <Text style={styles.tripRowDate}>{formatDateDDMMYYYY(t.startDate)}</Text>}
+              </View>
+              <Icon name="forward" size={18} color={colors.blue} />
+            </Pressable>
+          ))}
 
           <Text style={styles.label}>My rating</Text>
           <View style={styles.starsRow}>
@@ -129,6 +165,12 @@ export default function KeeperDetailModal({ visible, onClose, keeper, onChanged 
           </Pressable>
         </ScrollView>
       </View>
+
+      <FutureTripPickerModal
+        visible={tripPickerOpen}
+        onClose={() => setTripPickerOpen(false)}
+        onSelect={addToTrip}
+      />
     </Modal>
   );
 }
@@ -137,7 +179,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.paper },
   header: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10,
-    padding: 16, paddingTop: 54, borderBottomWidth: 1, borderBottomColor: colors.line, backgroundColor: colors.paperRaised,
+    padding: 16, borderBottomWidth: 1, borderBottomColor: colors.line, backgroundColor: colors.paperRaised,
   },
   headerTitle: { fontFamily: fonts.display, fontSize: 18, color: colors.ink, flex: 1 },
   cancel: { color: colors.blue, fontFamily: fonts.bodySemi, fontSize: 15 },
@@ -157,10 +199,23 @@ const styles = StyleSheet.create({
     borderRadius: radius.md, padding: 12, marginBottom: 8,
   },
   linkBtnText: { color: colors.blue, fontWeight: "600", fontSize: 14 },
+  addToTripBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    backgroundColor: colors.ink, borderRadius: radius.md, padding: 12, marginTop: 6, marginBottom: 4,
+  },
+  addToTripBtnText: { color: colors.paper, fontWeight: "700", fontSize: 14.5 },
   label: {
     color: colors.inkSoft, fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5,
-    marginTop: 14, marginBottom: 8,
+    marginTop: 18, marginBottom: 8,
   },
+  empty: { color: colors.inkSoft, fontStyle: "italic", fontSize: 13 },
+  tripRow: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,
+    borderRadius: radius.md, padding: 12, marginBottom: 8,
+  },
+  tripRowName: { color: colors.ink, fontFamily: fonts.bodyBold, fontSize: 14.5 },
+  tripRowDate: { color: colors.inkSoft, fontSize: 12, marginTop: 2 },
   starsRow: { flexDirection: "row", gap: 10 },
   notesInput: {
     backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,

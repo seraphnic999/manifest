@@ -11,7 +11,7 @@ import { Item, ItemResearchJob, ItemResearchProposal, ItemResearchStatus, ItemTy
 // researching — a flight, transfer, transport leg, or personal work block
 // has no address to look up.
 const ELIGIBLE_TYPES: ItemType[] = [
-  "lodging", "activity", "meal", "bar", "sightseeing", "attraction", "shopping", "other",
+  "lodging", "activity", "meal", "bar", "cafe", "bakery", "sightseeing", "attraction", "shopping", "other",
 ];
 
 export function itemResearchEligible(type: ItemType): boolean {

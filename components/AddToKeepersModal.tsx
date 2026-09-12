@@ -36,7 +36,7 @@ export default function AddToKeepersModal({ visible, onClose, item, onSaved }: P
       ]);
       const city = resolveDayCityPick(day ?? { city_id: null, custom_city_name: null }, tripCities);
       const fields = keeperFieldsFromItem(item, city, trip?.name ?? null, rating || null, notes.trim() || null);
-      await addKeeper(fields);
+      await addKeeper(fields, item.id);
       onSaved?.();
       onClose();
     } catch (e: any) {

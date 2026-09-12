@@ -11,8 +11,11 @@ export interface ItemCategory {
   label: string;
   icon: IconName;
   tileColor: string;          // icon accent color on the dark tile
-  dbTypes: ItemType[];        // 1 entry = fixed type; 2 = user picks a subtype
+  dbTypes: ItemType[];        // 1 entry = fixed type; 2+ = user picks a subtype
   subtypeLabels?: Record<string, string>;
+  /** Per-subtype icon override for the day view/map (mapIconForItem) —
+   * subtypes not listed here just show the category's own icon. */
+  subtypeIcons?: Partial<Record<ItemType, IconName>>;
   fields: FieldKey[];
 }
 
@@ -39,7 +42,11 @@ export const ITEM_CATEGORIES: ItemCategory[] = [
   },
   {
     key: "dining", label: "Food & Drink", icon: "dining", tileColor: "#E07A3C",
-    dbTypes: ["meal", "bar"], subtypeLabels: { meal: "Restaurant", bar: "Bar" },
+    dbTypes: ["meal", "bar", "cafe", "bakery"],
+    subtypeLabels: { meal: "Restaurant", bar: "Bar", cafe: "Cafe", bakery: "Bakery" },
+    // Bakery has no icon of its own yet — reusing iceCream as a placeholder
+    // until a dedicated one is added.
+    subtypeIcons: { cafe: "cafe", bakery: "iceCream" },
     fields: ["time", "address", "phone", "bookingSource", "confirmationCode", "link", "notes"],
   },
   {
@@ -74,7 +81,11 @@ export function categoryForDbType(type: ItemType) {
   return ITEM_CATEGORIES.find((c) => c.dbTypes.includes(type)) ?? ITEM_CATEGORIES[ITEM_CATEGORIES.length - 1];
 }
 
-/** An item's effective map marker icon — its own override if it has one, else its category's default. */
+/** An item's effective icon (day view + map) — its own override if it has
+ * one, else its subtype's icon if its category defines one, else its
+ * category's shared default. */
 export function mapIconForItem(item: { type: ItemType; map_icon?: string | null }): IconName {
-  return (item.map_icon as IconName | null) ?? categoryForDbType(item.type).icon;
+  if (item.map_icon) return item.map_icon as IconName;
+  const cat = categoryForDbType(item.type);
+  return cat.subtypeIcons?.[item.type] ?? cat.icon;
 }
