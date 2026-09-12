@@ -11,6 +11,7 @@ import { normalizeTimeHHMM } from "@/lib/timeFormat";
 import { useNetworkStatus } from "@/lib/useNetworkStatus";
 import OfflineBanner from "@/components/OfflineBanner";
 import Icon, { IconName } from "@/components/icons/Icon";
+import HamburgerMenu from "@/components/HamburgerMenu";
 import { searchEverything, SearchResult, SEARCH_KIND_LABEL } from "@/lib/search";
 import { TripCountdownInline } from "@/components/TripCountdown";
 import { coverPhotoSource } from "@/lib/destinationPhotos";
@@ -25,10 +26,10 @@ interface NavCtx {
   signOut: () => void;
 }
 
-// The home screen's one-tap navigation row — replaces both the old always-
-// visible search bar and the hamburger menu, since between this row and the
-// "+" button every option the hamburger used to hold is now one tap away
-// directly, without a menu layer in between.
+// The home screen's one-tap navigation row — every option except Sign Out,
+// which moved back into the hamburger menu since the row was getting too
+// crowded. Sign Out is rare enough, and destructive enough, that it doesn't
+// need to be one tap away like the rest of these do.
 const NAV_ITEMS: { label: string; icon: IconName; danger?: boolean; onPress: (ctx: NavCtx) => void }[] = [
   { label: "Search", icon: "search", onPress: ({ setSearchOpen }) => setSearchOpen(true) },
   { label: "Doc Tracker", icon: "document", onPress: ({ router }) => router.push("/doctracker") },
@@ -37,7 +38,6 @@ const NAV_ITEMS: { label: string; icon: IconName; danger?: boolean; onPress: (ct
   { label: "Keepers", icon: "star", onPress: ({ router }) => router.push("/keepers") },
   { label: "Travel Stats", icon: "overview", onPress: ({ router }) => router.push("/travelStats") },
   { label: "Research Queue", icon: "flag", onPress: ({ router }) => router.push("/researchQueue") },
-  { label: "Sign Out", icon: "signOut", danger: true, onPress: ({ signOut }) => signOut() },
 ];
 
 // Set once a current-trip redirect has been attempted this app session, so
@@ -255,19 +255,26 @@ export default function TripList() {
       <View style={[styles.topbar, { paddingTop: insets.top + 14 }]}>
         <View style={styles.titleRow}>
           <Text style={styles.title}>Where next?</Text>
-          <Pressable
-            style={styles.addBtn}
-            onPress={() => {
-              if (!isOnline) {
-                Alert.alert("You're offline", "Connect to the internet to create a new trip.");
-                return;
-              }
-              router.push("/trip/new");
-            }}
-            accessibilityLabel="New trip"
-          >
-            <Icon name="add" size={25} color="#fff" />
-          </Pressable>
+          <View style={styles.titleRowActions}>
+            <HamburgerMenu
+              items={[{ icon: "signOut", label: "Sign Out", danger: true, onPress: signOut }]}
+              solid
+              sheetTop={insets.top + 66}
+            />
+            <Pressable
+              style={styles.addBtn}
+              onPress={() => {
+                if (!isOnline) {
+                  Alert.alert("You're offline", "Connect to the internet to create a new trip.");
+                  return;
+                }
+                router.push("/trip/new");
+              }}
+              accessibilityLabel="New trip"
+            >
+              <Icon name="add" size={25} color="#fff" />
+            </Pressable>
+          </View>
         </View>
 
         {searchOpen ? (
@@ -391,6 +398,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   topbar: { padding: 20, paddingBottom: 8 },
   titleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  titleRowActions: { flexDirection: "row", alignItems: "center", gap: 10 },
   title: { fontFamily: fonts.display, fontSize: 22, color: colors.ink },
   addBtn: {
     width: 42, height: 42, borderRadius: 21, backgroundColor: colors.ink,
