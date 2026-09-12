@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.paper },
   header: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-    padding: 16, paddingTop: 54, borderBottomWidth: 1, borderBottomColor: colors.line, backgroundColor: colors.paperRaised,
+    padding: 16, borderBottomWidth: 1, borderBottomColor: colors.line, backgroundColor: colors.paperRaised,
   },
   photoSourceBackdrop: { flex: 1, backgroundColor: "rgba(33,47,61,0.5)", justifyContent: "flex-end" },
   photoSourceSheet: {
