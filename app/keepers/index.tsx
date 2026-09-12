@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { View, Text, FlatList, StyleSheet, Pressable } from "react-native";
-import { Stack, useLocalSearchParams } from "expo-router";
+import { Stack, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import SubpageHeader from "@/components/SubpageHeader";
 import Icon from "@/components/icons/Icon";
@@ -26,6 +26,12 @@ export default function Keepers() {
   const { data, refetch } = useQuery({ queryKey: ["keepers"], queryFn: fetchKeepers });
   const groups: KeeperCityGroup[] = groupKeepersByCity(data ?? []);
   const [selected, setSelected] = useState<Keeper | null>(null);
+
+  // The list's 5-minute staleTime (lib/queryClient.ts) is fine for a screen
+  // you just browse, but a keeper added moments ago on another screen
+  // (item detail's "Add to Keepers") needs to show up the instant you get
+  // here, not up to 5 minutes later.
+  useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
 
   // Arriving from an item's "Keeper" badge — jump straight to its detail
   // once the list has loaded, instead of making the user find it again.

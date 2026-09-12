@@ -11,7 +11,6 @@ import {
 } from "@/lib/companions";
 import { DateField } from "@/components/DateTimeFields";
 import PhotoLightbox from "@/components/PhotoLightbox";
-import AvatarCropModal from "@/components/AvatarCropModal";
 
 interface Props {
   visible: boolean;
@@ -32,7 +31,6 @@ export default function CompanionEditModal({ visible, onClose, companion, onSave
   const [profileUrl, setProfileUrl] = useState<string | null>(null);
   const [photos, setPhotos] = useState<(CompanionPhoto & { url: string })[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-  const [cropAsset, setCropAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [photoSourceFor, setPhotoSourceFor] = useState<"profile" | "additional" | null>(null);
 
   useEffect(() => {
@@ -49,6 +47,7 @@ export default function CompanionEditModal({ visible, onClose, companion, onSave
 
   async function pickAndUpload(
     source: "camera" | "library",
+    options: ImagePicker.ImagePickerOptions,
     onPicked: (asset: ImagePicker.ImagePickerAsset) => Promise<void>
   ) {
     try {
@@ -58,7 +57,7 @@ export default function CompanionEditModal({ visible, onClose, companion, onSave
           Alert.alert("Permission needed", "Allow camera access to take a photo.");
           return;
         }
-        const result = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
+        const result = await ImagePicker.launchCameraAsync(options);
         if (result.canceled || result.assets.length === 0) return;
         await onPicked(result.assets[0]);
       } else {
@@ -67,7 +66,7 @@ export default function CompanionEditModal({ visible, onClose, companion, onSave
           Alert.alert("Permission needed", "Allow photo library access to pick a photo.");
           return;
         }
-        const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
+        const result = await ImagePicker.launchImageLibraryAsync(options);
         if (result.canceled || result.assets.length === 0) return;
         await onPicked(result.assets[0]);
       }
@@ -85,27 +84,36 @@ export default function CompanionEditModal({ visible, onClose, companion, onSave
     setPhotoSourceFor(null);
     if (!target) return;
     if (target === "profile") {
-      // Opens the crop step first — the actual upload happens once the user
-      // confirms the framed section in AvatarCropModal (see onCropConfirm).
-      await pickAndUpload(source, async (asset) => { setCropAsset(asset); });
+      // Cropping is handed straight to the OS's own picker/camera UI
+      // (allowsEditing + a fixed square aspect) rather than a hand-rolled
+      // pan/pinch modal — a previous custom crop step could show one region
+      // in its preview and save a different one entirely. The native
+      // cropper returns the already-cropped square directly, so there's no
+      // separate coordinate math left to get wrong.
+      await pickAndUpload(
+        source,
+        { mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [1, 1], quality: 0.8 },
+        async (asset) => {
+          try {
+            await setCompanionProfilePhoto(companion, { uri: asset.uri, fileName: "avatar.jpg", mimeType: asset.mimeType ?? "image/jpeg" });
+            // Local URI previews instantly; onSaved() triggers the parent's
+            // refetch so the signed storage URL takes over on next load.
+            setProfileUrl(asset.uri);
+            onSaved();
+          } catch (e: any) {
+            Alert.alert("Couldn't save photo", e.message ?? "Unknown error");
+          }
+        }
+      );
     } else {
-      await pickAndUpload(source, async (asset) => {
-        await addCompanionPhoto(companion.id, asset);
-        setPhotos(await fetchCompanionPhotosWithUrls(companion.id));
-      });
-    }
-  }
-
-  async function onCropConfirm(croppedUri: string) {
-    setCropAsset(null);
-    try {
-      await setCompanionProfilePhoto(companion, { uri: croppedUri, fileName: "avatar.jpg", mimeType: "image/jpeg" });
-      // Local URI previews instantly; onSaved() triggers the parent's
-      // refetch so the signed storage URL takes over on next load.
-      setProfileUrl(croppedUri);
-      onSaved();
-    } catch (e: any) {
-      Alert.alert("Couldn't save photo", e.message ?? "Unknown error");
+      await pickAndUpload(
+        source,
+        { mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 },
+        async (asset) => {
+          await addCompanionPhoto(companion.id, asset);
+          setPhotos(await fetchCompanionPhotosWithUrls(companion.id));
+        }
+      );
     }
   }
 
@@ -228,15 +236,6 @@ export default function CompanionEditModal({ visible, onClose, companion, onSave
         visible={lightboxIndex !== null}
         onClose={() => setLightboxIndex(null)}
       />
-
-      {cropAsset && (
-        <AvatarCropModal
-          visible
-          imageUri={cropAsset.uri}
-          onCancel={() => setCropAsset(null)}
-          onConfirm={onCropConfirm}
-        />
-      )}
 
       <Modal visible={photoSourceFor !== null} transparent animationType="fade" onRequestClose={() => setPhotoSourceFor(null)}>
         <Pressable style={styles.photoSourceBackdrop} onPress={() => setPhotoSourceFor(null)}>
