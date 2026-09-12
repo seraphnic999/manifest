@@ -244,12 +244,19 @@ export default function DayView() {
   const effectiveDayColor = dayId ? buildDayColorMap(allDays).get(dayId) ?? colors.blue : colors.blue;
   const effectiveCityLabel = dayCityLabel({ city_id: dayCityId, custom_city_name: dayCustomCityName }, tripCities);
 
-  // Prev/next day navigation is scoped to dated days only — Proposals has
-  // no chronological place among them.
+  // Prev/next navigation treats Proposals as one more day at the end of
+  // the sequence (reachable forward from the last real day, and back from
+  // Proposals to that last day), not chronologically among the dated days.
   const datedDays = allDays.filter((d) => d.date !== null).sort((a, b) => (a.date! < b.date! ? -1 : 1));
-  const datedIdx = isProposals ? -1 : datedDays.findIndex((d) => d.date === date);
-  const prevDay = datedIdx > 0 ? datedDays[datedIdx - 1] : null;
-  const nextDay = datedIdx >= 0 && datedIdx < datedDays.length - 1 ? datedDays[datedIdx + 1] : null;
+  const proposalsRow = allDays.find((d) => d.date === null) ?? null;
+  const navSequence = proposalsRow ? [...datedDays, proposalsRow] : datedDays;
+  const navIdx = navSequence.findIndex((d) => (isProposals ? d.date === null : d.date === date));
+  const prevNav = navIdx > 0 ? navSequence[navIdx - 1] : null;
+  const nextNav = navIdx >= 0 && navIdx < navSequence.length - 1 ? navSequence[navIdx + 1] : null;
+
+  function navHref(d: Day): string {
+    return d.date === null ? `/trip/${tripId}/day/${PROPOSALS_SEGMENT}` : `/trip/${tripId}/day/${d.date}`;
+  }
 
   // Swipe left/right over the item list to move a day — scoped to just
   // that section (not the whole page) via activeOffsetX/failOffsetY so an
@@ -260,8 +267,8 @@ export default function DayView() {
     .activeOffsetX([-20, 20])
     .failOffsetY([-15, 15])
     .onEnd((e) => {
-      if (e.translationX < -60 && nextDay) router.replace(`/trip/${tripId}/day/${nextDay.date}`);
-      else if (e.translationX > 60 && prevDay) router.replace(`/trip/${tripId}/day/${prevDay.date}`);
+      if (e.translationX < -60 && nextNav) router.replace(navHref(nextNav));
+      else if (e.translationX > 60 && prevNav) router.replace(navHref(prevNav));
     });
 
   function renderItem({ item, drag, isActive }: RenderItemParams<Item>) {
@@ -425,7 +432,7 @@ export default function DayView() {
         ))}
 
         <GestureDetector gesture={swipeGesture}>
-          <View>
+          <View style={{ minHeight: 400 }}>
             <NestableDraggableFlatList
               data={orderable}
               keyExtractor={(i) => i.id}
@@ -439,17 +446,17 @@ export default function DayView() {
       </NestableScrollContainer>
 
       <Pressable
-        style={[styles.floatingNavArrow, styles.floatingNavArrowLeft, !prevDay && styles.floatingNavArrowDisabled]}
-        disabled={!prevDay}
-        onPress={() => prevDay && router.replace(`/trip/${tripId}/day/${prevDay.date}`)}
+        style={[styles.floatingNavArrow, styles.floatingNavArrowLeft, !prevNav && styles.floatingNavArrowDisabled]}
+        disabled={!prevNav}
+        onPress={() => prevNav && router.replace(navHref(prevNav))}
         accessibilityLabel="Previous day"
       >
         <Icon name="back" size={20} color="#fff" />
       </Pressable>
       <Pressable
-        style={[styles.floatingNavArrow, styles.floatingNavArrowRight, !nextDay && styles.floatingNavArrowDisabled]}
-        disabled={!nextDay}
-        onPress={() => nextDay && router.replace(`/trip/${tripId}/day/${nextDay.date}`)}
+        style={[styles.floatingNavArrow, styles.floatingNavArrowRight, !nextNav && styles.floatingNavArrowDisabled]}
+        disabled={!nextNav}
+        onPress={() => nextNav && router.replace(navHref(nextNav))}
         accessibilityLabel="Next day"
       >
         <Icon name="forward" size={20} color="#fff" />

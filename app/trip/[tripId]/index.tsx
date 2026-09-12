@@ -142,6 +142,15 @@ export default function TripOverview() {
     enabled: !!heroCityName,
   });
 
+  // The detailed Weather section below is a per-destination carousel — put
+  // today's actual city first (adding it if a day override picked a city
+  // that isn't in the trip's own destinations list yet) so its card is the
+  // one visible by default, matching the hero badge above instead of
+  // always leading with the primary destination.
+  const weatherDestinations = trip
+    ? (heroCityName ? [heroCityName, ...trip.destinations.filter((d) => d !== heroCityName)] : trip.destinations)
+    : [];
+
   const budgetProgress = trip && data
     ? computeBudgetProgress(trip, overviewExpenses, (code) => overviewCurrencies.find((c) => c.code === code)?.rate_to_nis ?? 1)
     : null;
@@ -190,7 +199,7 @@ export default function TripOverview() {
             <View style={styles.body}>
               <OfflineBanner dataUpdatedAt={!isOnline ? dataUpdatedAt : undefined} />
 
-              <WeatherCarousel tripId={tripId} destinations={trip.destinations} />
+              <WeatherCarousel tripId={tripId} destinations={weatherDestinations} />
 
               {lodgingGapDays.length > 0 && (
                 <View style={styles.gapWarning}>
