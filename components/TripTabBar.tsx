@@ -14,8 +14,12 @@ const TABS: { key: TripTab; label: string; icon: IconName; path: (id: string) =>
 ];
 
 /** The persistent bottom nav for trip-scoped screens (not shown on Home or
- * account-level screens like Archived Trips / Packing Templates). */
-export default function TripTabBar({ tripId, active }: { tripId: string; active: TripTab }) {
+ * account-level screens like Archived Trips / Packing Templates). `active`
+ * is optional — screens that aren't literally one of these five tabs (e.g.
+ * a day page or an item's detail page) should omit it, so every tab still
+ * navigates on tap instead of the tab it happens to share a route prefix
+ * with silently no-op'ing. */
+export default function TripTabBar({ tripId, active }: { tripId: string; active?: TripTab }) {
   const router = useRouter();
   return (
     <View style={styles.bar}>

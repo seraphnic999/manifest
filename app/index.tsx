@@ -18,6 +18,7 @@ import { coverPhotoSource } from "@/lib/destinationPhotos";
 import { fetchDestinationForecast } from "@/lib/weather";
 import { weatherIconName } from "@/lib/weather";
 import { Alert } from "@/lib/alert";
+import { fetchTripCities, dayCityLabel } from "@/lib/cities";
 
 // Set once a current-trip redirect has been attempted this app session, so
 // it only ever fires on the first load after launch — the Home button (the
@@ -49,7 +50,7 @@ interface HeroExtra {
 // trimmed down since the hero only shows one line.
 async function fetchHeroExtra(tripId: string, destinations: string[]): Promise<HeroExtra> {
   const iso = localIsoDate();
-  const { data: days } = await supabase.from("days").select("id, date").eq("trip_id", tripId).order("sort_order");
+  const { data: days } = await supabase.from("days").select("id, date, city_id, custom_city_name").eq("trip_id", tripId).order("sort_order");
   const todayDay = (days ?? []).find((d) => d.date === iso);
 
   let nextItem: Pick<Item, "title" | "time_start"> | null = null;
@@ -72,10 +73,16 @@ async function fetchHeroExtra(tripId: string, destinations: string[]): Promise<H
     }
   }
 
+  // Weather follows today's actual day city (which may differ from the
+  // trip's primary destination) — same day-aware resolution as the trip
+  // overview screen's hero, so Home and Overview never disagree.
+  const tripCities = await fetchTripCities(tripId);
+  const heroCityName = todayDay ? dayCityLabel(todayDay, tripCities) : (destinations[0] ?? null);
+
   let weatherTemp: number | null = null;
   let weatherCode: number | null = null;
-  if (destinations.length > 0) {
-    const forecast = await fetchDestinationForecast(destinations[0]);
+  if (heroCityName) {
+    const forecast = await fetchDestinationForecast(heroCityName);
     if (forecast && forecast.days.length > 0) {
       weatherTemp = Math.round(forecast.days[0].tempMax);
       weatherCode = forecast.days[0].weatherCode;
@@ -319,7 +326,7 @@ export default function TripList() {
                         <Text style={styles.weatherTemp}>{heroExtra.weatherTemp}°</Text>
                       </View>
                     )}
-                    <Text style={styles.heroDest}>{trip.destinations[0] ?? trip.name}</Text>
+                    <Text style={styles.heroDest} numberOfLines={2}>{trip.name}</Text>
                     {heroExtra?.nextItemTitle ? (
                       <>
                         <Text style={styles.comingUpLabel}>Coming up</Text>

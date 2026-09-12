@@ -22,6 +22,7 @@ import AddShoppingItemModal from "@/components/AddShoppingItemModal";
 import QuickNotesList from "@/components/QuickNotesList";
 import HeaderIconButton from "@/components/HeaderIconButton";
 import HomeButton from "@/components/HomeButton";
+import TripTabBar from "@/components/TripTabBar";
 import { useNetworkStatus } from "@/lib/useNetworkStatus";
 import OfflineBanner from "@/components/OfflineBanner";
 import { fetchFlightStatus, isFlightStatusConfigured, FlightStatus } from "@/lib/flightStatus";
@@ -531,6 +532,7 @@ export default function ItemDetails() {
         </Pressable>
       </Modal>
       </ScrollView>
+      <TripTabBar tripId={item.trip_id} />
     </View>
   );
 }

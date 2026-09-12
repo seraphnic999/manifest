@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, Modal, Platfo
 import { useLocalSearchParams, useRouter, Stack, useFocusEffect } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { RenderItemParams, NestableScrollContainer, NestableDraggableFlatList } from "react-native-draggable-flatlist";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { supabase } from "@/lib/supabase";
 import Icon from "@/components/icons/Icon";
 import { colors, radius } from "@/lib/theme";
@@ -20,7 +21,6 @@ import OfflineBanner from "@/components/OfflineBanner";
 import { findOverlappingItemIds, isLastTripDay } from "@/lib/conflicts";
 import { Alert } from "@/lib/alert";
 import { buildDayColorMap } from "@/lib/mapData";
-import DayColorPickerModal from "@/components/DayColorPickerModal";
 import DayCityPickerModal from "@/components/DayCityPickerModal";
 import { CityPick } from "@/components/CityPickerModal";
 import { fetchTripCities, fetchAllCities, dayCityLabel, setDayCity, TripCityRow } from "@/lib/cities";
@@ -117,7 +117,6 @@ export default function DayView() {
   const [dayCityId, setDayCityId] = useState<string | null>(null);
   const [dayCustomCityName, setDayCustomCityName] = useState<string | null>(null);
   const [dayColor, setDayColor] = useState<string | null>(null);
-  const [colorPickerOpen, setColorPickerOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
 
   // Unified day-edit modal (city + title + color), opened by tapping the
@@ -196,14 +195,6 @@ export default function DayView() {
     setEditModalOpen(true);
   }
 
-  async function saveColor(hex: string) {
-    if (!dayId) return;
-    await supabase.from("days").update({ color: hex }).eq("id", dayId);
-    setDayColor(hex);
-    setColorPickerOpen(false);
-    setAllDays((prev) => prev.map((d) => (d.id === dayId ? { ...d, color: hex } : d)));
-  }
-
   // Persists all three day-edit fields together (single Save action for the
   // unified city + title + color modal).
   async function saveDayEdits() {
@@ -259,6 +250,19 @@ export default function DayView() {
   const datedIdx = isProposals ? -1 : datedDays.findIndex((d) => d.date === date);
   const prevDay = datedIdx > 0 ? datedDays[datedIdx - 1] : null;
   const nextDay = datedIdx >= 0 && datedIdx < datedDays.length - 1 ? datedDays[datedIdx + 1] : null;
+
+  // Swipe left/right over the item list to move a day — scoped to just
+  // that section (not the whole page) via activeOffsetX/failOffsetY so an
+  // ordinary vertical scroll or the drag-reorder handle still wins for any
+  // gesture that isn't a clearly horizontal swipe.
+  const swipeGesture = Gesture.Pan()
+    .runOnJS(true)
+    .activeOffsetX([-20, 20])
+    .failOffsetY([-15, 15])
+    .onEnd((e) => {
+      if (e.translationX < -60 && nextDay) router.replace(`/trip/${tripId}/day/${nextDay.date}`);
+      else if (e.translationX > 60 && prevDay) router.replace(`/trip/${tripId}/day/${prevDay.date}`);
+    });
 
   function renderItem({ item, drag, isActive }: RenderItemParams<Item>) {
     const idx = orderable.findIndex((i) => i.id === item.id);
@@ -339,14 +343,6 @@ export default function DayView() {
       <OfflineBanner dataUpdatedAt={!isOnline ? dataUpdatedAt : undefined} />
 
       <View style={styles.dayStripOuter}>
-        <Pressable
-          style={[styles.navArrow, !prevDay && styles.navArrowDisabled]}
-          disabled={!prevDay}
-          onPress={() => prevDay && router.replace(`/trip/${tripId}/day/${prevDay.date}`)}
-          accessibilityLabel="Previous day"
-        >
-          <Icon name="back" size={16} color={prevDay ? colors.ink : colors.line} />
-        </Pressable>
         <ScrollView
           ref={stripScrollRef}
           horizontal
@@ -389,14 +385,6 @@ export default function DayView() {
             );
           })}
         </ScrollView>
-        <Pressable
-          style={[styles.navArrow, !nextDay && styles.navArrowDisabled]}
-          disabled={!nextDay}
-          onPress={() => nextDay && router.replace(`/trip/${tripId}/day/${nextDay.date}`)}
-          accessibilityLabel="Next day"
-        >
-          <Icon name="forward" size={16} color={nextDay ? colors.ink : colors.line} />
-        </Pressable>
       </View>
 
       {/* The theme row, stay banner, and item list are all one scrollable
@@ -417,7 +405,7 @@ export default function DayView() {
           </Pressable>
           <Pressable
             style={[styles.colorSquare, { backgroundColor: effectiveDayColor }]}
-            onPress={() => { if (requireOnline()) setColorPickerOpen(true); }}
+            onPress={openEditModal}
             accessibilityLabel="Change this day's map color"
           />
         </View>
@@ -436,15 +424,36 @@ export default function DayView() {
           </Pressable>
         ))}
 
-        <NestableDraggableFlatList
-          data={orderable}
-          keyExtractor={(i) => i.id}
-          onDragEnd={({ data }) => persistOrder(data)}
-          renderItem={renderItem}
-          contentContainerStyle={{ padding: 16 }}
-          ListEmptyComponent={<Text style={styles.empty}>Nothing planned yet.</Text>}
-        />
+        <GestureDetector gesture={swipeGesture}>
+          <View>
+            <NestableDraggableFlatList
+              data={orderable}
+              keyExtractor={(i) => i.id}
+              onDragEnd={({ data }) => persistOrder(data)}
+              renderItem={renderItem}
+              contentContainerStyle={{ padding: 16 }}
+              ListEmptyComponent={<Text style={styles.empty}>Nothing planned yet.</Text>}
+            />
+          </View>
+        </GestureDetector>
       </NestableScrollContainer>
+
+      <Pressable
+        style={[styles.floatingNavArrow, styles.floatingNavArrowLeft, !prevDay && styles.floatingNavArrowDisabled]}
+        disabled={!prevDay}
+        onPress={() => prevDay && router.replace(`/trip/${tripId}/day/${prevDay.date}`)}
+        accessibilityLabel="Previous day"
+      >
+        <Icon name="back" size={20} color="#fff" />
+      </Pressable>
+      <Pressable
+        style={[styles.floatingNavArrow, styles.floatingNavArrowRight, !nextDay && styles.floatingNavArrowDisabled]}
+        disabled={!nextDay}
+        onPress={() => nextDay && router.replace(`/trip/${tripId}/day/${nextDay.date}`)}
+        accessibilityLabel="Next day"
+      >
+        <Icon name="forward" size={20} color="#fff" />
+      </Pressable>
 
       <Pressable style={styles.fab} onPress={() => { if (requireOnline()) setPickerOpen(true); }}>
         <Icon name="add" size={24} color="#fff" />
@@ -503,13 +512,7 @@ export default function DayView() {
         onSelect={setEditCityPick}
       />
 
-      <DayColorPickerModal
-        visible={colorPickerOpen}
-        onClose={() => setColorPickerOpen(false)}
-        onSelect={saveColor}
-        selected={effectiveDayColor}
-      />
-      <TripTabBar tripId={tripId} active="overview" />
+      <TripTabBar tripId={tripId} />
     </View>
   );
 }
@@ -539,10 +542,6 @@ const styles = StyleSheet.create({
   themeText: { color: colors.lightBlue, fontWeight: "700", fontSize: 14 },
   themePlaceholder: { color: colors.inkSoft, fontStyle: "italic", fontSize: 13 },
   dayTitleSecondary: { color: colors.inkSoft, fontSize: 12, marginTop: 2 },
-  navArrow: {
-    width: 32, alignItems: "center", justifyContent: "center", alignSelf: "stretch",
-  },
-  navArrowDisabled: { opacity: 0.4 },
   editCityRow: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.line,
@@ -597,6 +596,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.ink, alignItems: "center", justifyContent: "center",
     shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4,
   },
+  floatingNavArrow: {
+    position: "absolute", bottom: 74, width: 48, height: 48, borderRadius: 24,
+    backgroundColor: colors.ink, alignItems: "center", justifyContent: "center",
+    shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4,
+  },
+  floatingNavArrowLeft: { left: 16 },
+  floatingNavArrowRight: { right: 80 },
+  floatingNavArrowDisabled: { opacity: 0.35 },
   modalBackdrop: { flex: 1, backgroundColor: "rgba(33,47,61,0.4)", justifyContent: "center", padding: 30 },
   modalCard: { backgroundColor: colors.paperRaised, borderRadius: radius.lg, padding: 18, width: "100%", maxWidth: 420, alignSelf: "center" },
   modalLabel: { color: colors.inkSoft, fontSize: 11, fontWeight: "700", textTransform: "uppercase", marginBottom: 8 },

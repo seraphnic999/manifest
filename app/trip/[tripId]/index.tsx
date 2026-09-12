@@ -183,7 +183,7 @@ export default function TripOverview() {
                   <Text style={styles.weatherDate}>{formatDateDDMMYYYY(localIsoDate()).slice(0, 5)}</Text>
                 </View>
               )}
-              <Text style={styles.tripName}>{trip.name}</Text>
+              <Text style={styles.tripName} numberOfLines={3}>{trip.name}</Text>
               {!isCurrent && <TripCountdown tripId={tripId} fallbackDateIso={trip.start_date} />}
             </ImageBackground>
 
@@ -311,7 +311,7 @@ export default function TripOverview() {
               <>
                 <View style={styles.dateRow}>
                   <Text style={styles.date}>{formatDateDDMMYYYY(item.date)}</Text>
-                  {item.date === localIsoDate() && <View style={styles.todayDot} />}
+                  {item.date === localIsoDate() && <Text style={styles.todayLabel}>TODAY</Text>}
                 </View>
                 {(() => {
                   const city = dayCityLabel(item, tripCities);
@@ -353,7 +353,7 @@ const styles = StyleSheet.create({
   },
   weatherTemp: { color: "#fff", fontFamily: fonts.monoBold, fontSize: 15 },
   weatherDate: { color: "#fff", fontSize: 7, opacity: 0.85 },
-  tripName: { color: "#fff", fontFamily: fonts.display, fontSize: 21, marginBottom: 4 },
+  tripName: { color: "#fff", fontFamily: fonts.display, fontSize: 21, marginBottom: 4, paddingRight: 84 },
 
   gapWarning: { backgroundColor: "rgba(216,80,58,0.1)", borderRadius: radius.md, padding: 10, marginTop: 10 },
   gapWarningText: { color: colors.coral, fontFamily: fonts.bodyBold, fontSize: 11.5 },
@@ -401,7 +401,7 @@ const styles = StyleSheet.create({
   },
   dateRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   date: { fontFamily: fonts.mono, color: colors.ink, fontSize: 13 },
-  todayDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.gold },
+  todayLabel: { color: colors.gold, fontFamily: fonts.bodyBold, fontSize: 10, letterSpacing: 0.5 },
   theme: { color: colors.blue, fontFamily: fonts.bodySemi, fontSize: 12, marginTop: 2 },
   themeEmpty: { color: colors.inkSoft, fontSize: 11, marginTop: 2, fontStyle: "italic" },
 });
