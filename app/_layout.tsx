@@ -14,6 +14,7 @@ import { claimPendingTripShares } from "@/lib/tripSharing";
 import { registerPushToken } from "@/lib/reminders";
 import { colors } from "@/lib/theme";
 import { queryClient } from "@/lib/queryClient";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 const asyncStoragePersister = createAsyncStoragePersister({
   storage: AsyncStorage,
@@ -87,18 +88,20 @@ export default function RootLayout() {
     >
       <GestureHandlerRootView style={styles.outer}>
         <View style={styles.inner}>
-          <Stack
-            screenOptions={{
-              headerStyle: { backgroundColor: colors.paperRaised },
-              headerTintColor: colors.ink,
-              headerTitleStyle: { fontWeight: "700" },
-              headerBackTitle: "Back",
-              contentStyle: { backgroundColor: colors.paper },
-            }}
-          >
-            <Stack.Screen name="index" options={{ title: "Trips" }} />
-            <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
-          </Stack>
+          <ErrorBoundary>
+            <Stack
+              screenOptions={{
+                headerStyle: { backgroundColor: colors.paperRaised },
+                headerTintColor: colors.ink,
+                headerTitleStyle: { fontWeight: "700" },
+                headerBackTitle: "Back",
+                contentStyle: { backgroundColor: colors.paper },
+              }}
+            >
+              <Stack.Screen name="index" options={{ title: "Trips" }} />
+              <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
+            </Stack>
+          </ErrorBoundary>
         </View>
       </GestureHandlerRootView>
     </PersistQueryClientProvider>

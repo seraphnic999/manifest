@@ -137,6 +137,28 @@ export default function EditTrip() {
     await syncCurrenciesToCities(next);
   }
 
+  // Explicitly promoting a city to primary always overwrites cover photo +
+  // timezone from the new primary — unlike the passive first-pick auto-fill
+  // above, this is a deliberate user action, not a side effect of merely
+  // adding another destination. Map focus follows automatically at save()
+  // time, since that always reads cityPicks[0].
+  async function makePrimary(index: number) {
+    if (index === 0) return;
+    const next = [...cityPicks];
+    const [picked] = next.splice(index, 1);
+    next.unshift(picked);
+    setCityPicks(next);
+
+    if (picked.cityId) {
+      const cities = await fetchAllCities();
+      const city = cities.find((c) => c.id === picked.cityId);
+      if (city) {
+        setCoverPhotoId(city.cover_photo_id);
+        setTimezone(city.timezone);
+      }
+    }
+  }
+
   async function addCurrency() {
     const code = newCode.toUpperCase();
     const rate = parseFloat(newRate);
@@ -289,6 +311,34 @@ export default function EditTrip() {
       <Text style={styles.label}>Trip name</Text>
       <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="e.g. Summer road trip" />
 
+      <Text style={styles.label}>Destinations</Text>
+      <Pressable style={styles.addDestinationButton} onPress={() => setCityPickerOpen(true)}>
+        <Text style={styles.addDestinationButtonText}>+ Add destination</Text>
+      </Pressable>
+      {cityPicks.map((p, i) => (
+        <View key={p.cityId ?? `custom-${i}`} style={styles.currencyRow}>
+          <Text style={[styles.currencyRate, i === 0 && styles.primaryCityText]}>{p.label}</Text>
+          {i !== 0 && (
+            <Pressable onPress={() => makePrimary(i)}>
+              <Text style={styles.primeText}>Prime</Text>
+            </Pressable>
+          )}
+          <Pressable onPress={() => handleCityPicksChange(cityPicks.filter((_, j) => j !== i))}>
+            <Text style={styles.removeText}>Remove</Text>
+          </Pressable>
+        </View>
+      ))}
+      {syncingCities && <Text style={styles.hint}>Updating currencies…</Text>}
+      <Text style={styles.hint}>The primary city (bold) sets the cover photo, timezone, and map focus.</Text>
+
+      <CityPickerModal
+        visible={cityPickerOpen}
+        onClose={() => setCityPickerOpen(false)}
+        selected={cityPicks}
+        onChange={handleCityPicksChange}
+        onMakePrimary={makePrimary}
+      />
+
       <Text style={styles.label}>Cover photo</Text>
       <CoverPhotoPicker value={coverPhotoId} onChange={setCoverPhotoId} />
 
@@ -315,29 +365,6 @@ export default function EditTrip() {
       {(type === "business" || type === "mixed") && origType === "pleasure" && (
         <Text style={styles.hint}>A "Work" party will be added automatically for expense tracking.</Text>
       )}
-
-      <Text style={styles.label}>Destinations</Text>
-      <Pressable style={styles.input} onPress={() => setCityPickerOpen(true)}>
-        <Text style={{ color: cityPicks.length ? colors.ink : colors.inkSoft }}>
-          {cityPicks.length ? cityPicks.map((p) => p.label).join(", ") : "Choose cities…"}
-        </Text>
-      </Pressable>
-      {cityPicks.map((p, i) => (
-        <View key={p.cityId ?? `custom-${i}`} style={styles.currencyRow}>
-          <Text style={styles.currencyRate}>{p.label}{i === 0 ? " (primary)" : ""}</Text>
-          <Pressable onPress={() => handleCityPicksChange(cityPicks.filter((_, j) => j !== i))}>
-            <Text style={styles.removeText}>Remove</Text>
-          </Pressable>
-        </View>
-      ))}
-      {syncingCities && <Text style={styles.hint}>Updating currencies…</Text>}
-
-      <CityPickerModal
-        visible={cityPickerOpen}
-        onClose={() => setCityPickerOpen(false)}
-        selected={cityPicks}
-        onChange={handleCityPicksChange}
-      />
 
       <Text style={styles.label}>Planned budget (NIS, optional)</Text>
       <NumberStepper value={budgetAmount} onChange={setBudgetAmount} step={100} placeholder="e.g. 8000" />
@@ -499,6 +526,13 @@ const styles = StyleSheet.create({
   typeChipTextActive: { color: "#fff" },
   hint: { color: colors.inkSoft, fontSize: 11, marginTop: 6, fontStyle: "italic" },
   linkText: { color: colors.lightBlue, fontSize: 12, fontWeight: "600", marginTop: 8 },
+  addDestinationButton: {
+    backgroundColor: colors.lightBlue, borderRadius: radius.md, paddingVertical: 12,
+    alignItems: "center", alignSelf: "flex-start", paddingHorizontal: 16,
+  },
+  addDestinationButtonText: { color: "#fff", fontWeight: "700", fontSize: 13 },
+  primaryCityText: { color: colors.ink, fontWeight: "700" },
+  primeText: { color: colors.lightBlue, fontSize: 12, fontWeight: "600" },
   button: { backgroundColor: colors.ink, borderRadius: radius.md, padding: 14, alignItems: "center", marginTop: 28 },
   buttonText: { color: colors.paper, fontWeight: "700" },
   duplicateButton: {

@@ -16,9 +16,10 @@ interface Props {
   onClose: () => void;
   selected: CityPick[];
   onChange: (next: CityPick[]) => void;
+  onMakePrimary: (index: number) => void;
 }
 
-export default function CityPickerModal({ visible, onClose, selected, onChange }: Props) {
+export default function CityPickerModal({ visible, onClose, selected, onChange, onMakePrimary }: Props) {
   const [cities, setCities] = useState<City[]>([]);
   const [query, setQuery] = useState("");
   const [customInput, setCustomInput] = useState("");
@@ -65,9 +66,14 @@ export default function CityPickerModal({ visible, onClose, selected, onChange }
           <View style={styles.selectedRow}>
             {selected.map((p, i) => (
               <View key={p.cityId ?? `custom-${i}`} style={styles.selectedChip}>
-                <Text style={styles.selectedChipText} numberOfLines={1}>
-                  {p.label}{i === 0 ? " · primary" : ""}
+                <Text style={[styles.selectedChipText, i === 0 && styles.selectedChipTextPrimary]} numberOfLines={1}>
+                  {p.label}
                 </Text>
+                {i !== 0 && (
+                  <Pressable onPress={() => onMakePrimary(i)} hitSlop={8}>
+                    <Text style={styles.selectedChipPrime}>Prime</Text>
+                  </Pressable>
+                )}
                 <Pressable onPress={() => removePick(p)} hitSlop={8}>
                   <Text style={styles.selectedChipRemove}>×</Text>
                 </Pressable>
@@ -147,6 +153,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.blue, borderRadius: 16, paddingVertical: 6, paddingHorizontal: 10,
   },
   selectedChipText: { color: "#fff", fontSize: 12.5, fontWeight: "600", flexShrink: 1 },
+  selectedChipTextPrimary: { fontWeight: "800" },
+  selectedChipPrime: { color: "#fff", fontSize: 11.5, fontWeight: "600", textDecorationLine: "underline" },
   selectedChipRemove: { color: "#fff", fontSize: 16, fontWeight: "700", lineHeight: 16 },
   searchRow: {
     flexDirection: "row", alignItems: "center", gap: 8, margin: 16, marginBottom: 4,
