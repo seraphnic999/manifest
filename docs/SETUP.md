@@ -21,8 +21,9 @@
 
 ### Create yourself a user
 7. **Authentication** → **Users** → **Add user** → **Create new user**.
-   Enter an email and password (this is the login you'll use in the app —
-   there's no public sign-up screen, it's a single-user personal tool).
+   Enter an email and password (this is the login you'll use in the app).
+   The app also has its own self-serve sign-up screen now, so creating a
+   user here manually is optional — either works.
 8. Click into the user you just created and copy the **UUID** shown at the
    top — you'll need it in the next step.
 

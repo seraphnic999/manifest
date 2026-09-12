@@ -12,26 +12,52 @@ Built from scratch across one long design conversation, working backward
 from ~5 real past itineraries (business trips, a cruise, city breaks) the
 owner shared to derive the data model, rather than guessing at features.
 
-Single-user personal tool — no public sign-up, no multi-tenancy beyond
-Supabase RLS scoping everything to `auth.uid()`.
+Effectively single-family personal tool — a self-serve sign-up screen
+exists (the owner and their spouse both use it), but there's no public
+onboarding/discovery, and no multi-tenancy beyond Supabase RLS scoping
+everything to `auth.uid()` (plus explicit per-trip sharing, see
+`trip_shares`).
 
 ## Stack
 
 - **Expo + React Native + react-native-web**, via **Expo Router** (file-based
-  routing). One codebase targets both web (deployed to Vercel) and,
-  eventually, a native Android build (phase 2, chosen specifically because
-  it reuses the same components rather than being a separate app).
-- **Supabase**: Postgres (schema in `supabase/schema.sql`), Auth
-  (email/password, single user), Storage (private `item-photos` bucket).
+  routing). One codebase targets both web (deployed to Vercel) and a native
+  Android build (built locally via `npx expo prebuild` + Android Studio,
+  explicitly NOT EAS — see `docs/ANDROID_LOCAL_BUILD.md`; `android/` is
+  gitignored, hand-maintained edits are documented below). Signed release
+  APKs are published to `E:\GoogleDrive\Apps\Manifest_v{NN}_stable.apk`
+  (`{NN}` = the current `versionCode` in `app.json`/`android/app/build.gradle`
+  — bump both on every release build), one file per app in that shared
+  folder, old versions deleted on each release.
+- **Supabase**: Postgres (schema in `supabase/schema.sql` plus numbered
+  `supabase/migration_NNN_*.sql` files — `schema.sql` is the base snapshot,
+  migrations since roughly the Cities feature are the authoritative source
+  for later tables; when in doubt, check `list_migrations`/the live schema
+  over `schema.sql`), Auth (email/password — a self-serve sign-up screen
+  was added later, see below; still effectively single-user, no public
+  onboarding flow), Storage (private buckets: `item-photos`,
+  `companion-photos`, `travel-documents`).
 - App name: **Manifest**. Repo: `seraphnic999/manifest`.
+- The owner also runs several other Expo/Supabase apps (Cellar, Kinetic,
+  Mommy, FamilyTrip2026) on **the same shared Android emulator** and, for
+  some, **the same Supabase project** (different Postgres schemas —
+  `cellar`, `mommy`, etc. — alongside this app's `public` schema). Two
+  practical consequences: (1) another Claude Code session may be using the
+  emulator concurrently — check `adb shell dumpsys window | grep
+  mCurrentFocus` before driving it if anything looks off; (2) a
+  security/RLS advisory on the Supabase project may be about a different
+  app's table, not this one.
 
 ## Design language
 
 Deliberately not the generic "cream background + terracotta + serif" AI
 look. Direction: a "departure board / boarding pass" aesthetic —
-- Ink navy (`#212F3D`) for structure, warm paper (`#F3EFE6`) background,
-  amber (`#C98A2E`) accent, teal (`#3B6E71`) secondary, coral for
-  destructive/pending states.
+- Ink navy for structure, warm paper background, gold/amber accent, blue
+  (`colors.blue`)/light blue (`colors.lightBlue`) secondary — renamed from
+  an earlier `teal` token during the v19 redesign, coral for
+  destructive/pending states. Exact current hex values live in
+  `lib/theme.ts`; don't assume any specific value from this doc is still
+  current, it's the kind of thing that drifts.
 - Times and confirmation codes render in a monospace font
   (`IBMPlexMono_500Medium`) — evokes an airport departure board.
 - Day-view items render like ticket stubs: a dark time-column on the left,
@@ -45,12 +71,30 @@ look. Direction: a "departure board / boarding pass" aesthetic —
 ## Data model (see `supabase/schema.sql` for the authoritative version, with inline comments)
 
 **Trip** → name, dates, `type` (business/pleasure/mixed — drives whether a
-"Work" party is auto-seeded), destinations, `default_timezone`,
-`custom_fields` (jsonb escape hatch), soft-delete via `deleted_at`.
+"Work" party is auto-seeded), `destinations` (text array — still the
+display list of destination names, but now derived from picked cities, see
+below, not free-typed), `default_timezone`, `budget_amount` (NIS, optional
+— drives the Budget progress bar on Overview/Money), `cover_photo_id`
+(bundled static asset id, see `lib/destinationPhotos.ts` — a ~200-entry
+curated set, `null` falls back to a generic photo), `latitude`/`longitude`
+(the map's default focus point, derived from the primary picked city),
+`custom_fields` (jsonb escape hatch), soft-delete via `deleted_at`. A
+`trips_force_owner()` trigger overwrites `user_id` from `auth.uid()` on
+insert (irrelevant for normal app use; it blocks seeding data "as" a real
+user via direct SQL/service-role without temporarily disabling the
+trigger).
 
 **Day** → one per date in the trip's range, auto-generated by a DB trigger
-when a trip is created. Has an optional `theme` (short title, e.g. "At
-sea", editable in the UI).
+(`generate_trip_days()`, gap-filling only — it never deletes/updates
+existing rows, so shrinking a trip's date range orphans days/items unless
+the UI explicitly handles it, see below) when a trip is created. Has an
+optional `theme` (short title, e.g. "At sea", editable in the UI), a
+`color` (map marker color for that day's items — a fixed swatch palette in
+`lib/dayColors.ts`, auto-assigned per day at creation, editable), and
+`city_id`/`custom_city_name` (a day-level override of which city this day
+is in — both null means "inherit the trip's primary city"; see Cities
+below). One special row per trip has `date = null`, `theme = 'Proposals'`
+— the shortlist-places day (see Map view section).
 
 **Item** → the core unit. Belongs to a day (`day_id`) OR is a trip-level
 lodging span (see below). Key fields: `type` (enum: flight, transfer,
@@ -79,7 +123,55 @@ will need to be disambiguated before sub-steps are built), `alt_group_id`
 
 **ItemPhoto** → separate table (not jsonb), so multiple photos per item
 can each have a caption/order. Stored in Supabase Storage, private bucket,
-RLS scoped by a `{user_id}/{item_id}/filename` path convention.
+RLS scoped by a `{trip_owner_user_id}/{item_id}/filename` path convention
+— deliberately the trip **owner's** id, not the uploader's, so a shared
+collaborator's upload still matches the storage RLS check (which looks up
+trip access via that path prefix, not `auth.uid()` directly).
+
+**City** / **TripCity** → added later (the "Cities" feature) to replace
+free-typed destinations. `cities` is a ~200-row global reference table
+(name, country, IANA timezone, ISO currency, coordinates, a matching
+bundled cover photo where one exists) seeded once via migration, RLS
+read-only for any authenticated user. `trip_cities` is the per-trip picked
+destinations join table (`city_id` or a free-text `custom_name` for a
+place not in the dataset, `sort_order` — lowest = the trip's **primary**
+city, which drives the trip's `cover_photo_id`/`default_timezone`/
+`latitude`/`longitude` auto-fill and default map focus). The old free-text
+"Destinations" field became a searchable multi-select city picker
+(`components/CityPickerModal.tsx`); picking cities auto-fills cover
+photo/timezone once (never silently overwrites a since-edited value) and
+keeps the trip's currency list and map focus in sync on every save.
+`days.city_id`/`custom_city_name` (see Day above) let an individual day
+override the trip's primary city — `lib/cities.ts`'s `dayCityLabel()` is
+the single place that resolves "this day's effective city" (override, else
+inherit primary), and is what the day-aware weather badges (Overview, Home
+hero) and the trip Overview's day list both read from — never hardcode
+`trip.destinations[0]` for "the current city," it's wrong the moment a
+multi-city trip's current day isn't in the primary city.
+
+**PackingItem** / **PackingTemplate** / **PackingTemplateItem** →
+per-trip packing checklist (`packing_items`, `packed` boolean) seedable
+from a reusable named template (`packing_templates` + its items, user-owned
+across trips, not trip-scoped).
+
+**Companion** / **CompanionPhoto** / **TravelDocument** → the "Doc
+Tracker" feature (a separate app-wide section, reachable from the
+hamburger menu on Home and every trip screen — not trip-scoped at all).
+`companions` are people the user might travel with (first/last name, birth
+date, `relationship` enum, notes, profile photo) — directly user-owned
+(`user_id`, plain `user_id = auth.uid()` RLS, no trip involved), not
+`user_has_trip_access`-gated like everything else. Exactly one row per
+user has `is_self = true` (a partial unique index enforces this) — the
+user's own "Me" entry, auto-created the first time Doc Tracker is opened.
+`companion_photos` are additional (non-profile) photos, owned via a join
+back to `companions.user_id`. `travel_documents` (passport/national
+ID/visa/driver's license/other) belong to one companion, each with an
+optional photo (own private bucket, full-screen pinch-zoom viewer via
+`react-native-image-viewing`). Companion/document fields support
+tap-to-copy (`expo-clipboard`) and a per-companion export: select one or
+more of their documents and share a formatted plain-text block via the
+native `Share` API (not `expo-sharing` — that needs a file, this is a text
+message).
 
 **Expense** → trip-level, optionally linked to one item (`item_id`).
 **Allocation** → belongs to one expense; this is where the interesting
@@ -104,38 +196,94 @@ true iff an allocation links to this row.
 
 ## Feature status — what's actually built and wired to real data
 
-- Auth (Supabase email/password)
-- Trip list (root screen) → Trip creation (dates via native/web date
-  picker, type, destinations, default timezone with a combo-box-style
-  picker sorted by UTC offset + custom entry, currencies as a matching
-  combo-box)
-- Trip Overview: flights list, lodging list, day list (all tappable),
-  running Money total, link to Shopping — all populated from real queries,
-  not placeholders
-- Day view: chronological items with a "STAY" banner for active lodging,
-  drag-and-drop reordering (`react-native-draggable-flatlist`), a
-  day-picker pill strip for quick lateral navigation, editable day title
-- Item creation: a dark icon-tile picker (9 categories; Food&Drink and
-  Activity each fold two DB types behind one form with a subtype toggle)
-  → category-specific form fields
-- Item editing: same field set, plus delete (soft) and — for lodging spans
-  specifically — date changes that cascade to move the linked check-in/out
-  events
-- Item details page: date/time (now shown+editable for every item type,
-  not just lodging), type-specific fields (e.g. flight number), notes,
-  Expenses section (add/edit/delete inline), Shopping-list section
-  (add/edit inline), Photos section (deliberately last on the page — least
-  commonly used)
-- Money screen: total spent (converted to NIS), owed-by-party rollup,
-  expense list, add/edit/delete with the full split-allocation UI
-  (per-row party AND shopping-item linking)
-- Shopping screen: grouped by linked-activity vs. general, bought status
-  derived from allocations, add/edit/delete, "mark bought" flow reuses the
-  expense form pre-linked to the shopping item
-- `TripNavBar`: a small persistent pill-row (Overview/Money/Shopping) on
-  every trip-scoped screen for direct lateral navigation, independent of
-  back-button history
-- A real `Stack` navigator (was missing entirely early on — see below)
+This list is current as of **v27** (`versionCode` in `app.json`). Trip
+creation AND editing are both fully built (an early "create-only" limit is
+long gone — trips can be renamed, re-dated, re-typed, currencies/
+destinations changed, budget set, archived, deleted, or duplicated into a
+new trip at any time from the trip Edit screen).
+
+- **Auth**: Supabase email/password, plus a self-serve sign-up screen on
+  the login page (email confirmation is currently disabled in the Supabase
+  dashboard for this single-family-use project — re-enable it there, not
+  in code, if that ever needs to change).
+- **Trip list (Home)**: search across trips/items/expenses
+  (`lib/search.ts`), a big "current trip" hero card (name, day-aware
+  weather, next-up item), Upcoming/Past sections, archive/unarchive,
+  per-trip countdown. Global hamburger menu: Doc Tracker, Archived Trips,
+  Packing Templates, Sign Out.
+- **Trip creation/editing**: dates, type, the Cities destination picker
+  (see Data model), currencies (combo-box + live-rate lookup), budget,
+  default timezone, cover photo (auto-filled from the primary city, still
+  manually overridable) — **Duplicate trip** (own screen,
+  `app/trip/[tripId]/duplicate.tsx`) lets the user pick a new date range
+  and choose which items/stays carry over, remapping positionally (day 1 →
+  day 1, etc.); a shorter new trip flags anything that falls off the end
+  and needs a day picked or sent to Proposals. Duplicated days also now
+  carry over their theme/color/city override, and the new trip inherits
+  the source trip's picked destinations.
+- **Trip Overview**: hero (day-aware weather, trip-name title that wraps
+  instead of colliding with the weather badge, countdown if not yet
+  current), weather carousel per destination, budget progress bar,
+  "Today" next-up card when the trip is current, flights list, lodging
+  list, day list (each row shows `{city} · {day title}`, "TODAY" label
+  on the current date) — all tappable, all real queries.
+- **Day view**: chronological items with a "STAY" banner, drag-and-drop
+  reordering, an auto-scrolling day-pill strip (jumps to the current day
+  on load, no manual scrolling needed on long trips), floating prev/next
+  day arrows next to the add-item button, and a left/right swipe over the
+  item list as a third way to move between days. The day title area is a
+  two-line "{city} / {optional day title}" — tapping it (or the color
+  square) opens one unified edit modal for city + title + color together
+  (there used to be a separate color-only picker; it's gone now, this is
+  the only way to change a day's color).
+- **Item creation/editing**: dark icon-tile category picker (9 categories,
+  Food&Drink/Activity each fold two DB types behind a subtype toggle),
+  category-specific fields, date/time editable for every type, photo/PDF
+  attachments, linking items to each other, reminders (see Push
+  notifications below).
+- **Item details page**: full field set, Expenses section, Shopping-list
+  section, Photos/attachments (photo or PDF via `expo-document-picker`),
+  flight status lookup (AeroDataBox API) for flight-type items, a bottom
+  trip tab bar so Overview/Map/etc. are reachable directly from here too.
+- **Money (Expenses) screen**: total spent (converted to NIS), owed-by-
+  party rollup, budget pace, add/edit/delete with the full split-
+  allocation UI, refunds, a standalone currency converter screen.
+- **Shopping screen**: grouped by linked-activity vs. general, derived
+  bought status, add/edit/delete, mark-bought flow.
+- **Packing screen**: per-trip checklist, seed from a reusable named
+  template (create/manage templates from Home's hamburger menu).
+- **Map view**: see its own section below — both web and native Android
+  are done.
+- **Cities feature**: see Data model above — replaced free-text
+  destinations app-wide, including day-level per-day city overrides with
+  day-aware weather everywhere a "current city" is shown (Home hero, trip
+  Overview hero — never just `destinations[0]`).
+- **Doc Tracker**: see Data model above — companions grouped Me/Family/
+  Friends/Others, per-companion detail page with tap-to-copy fields and a
+  document export-to-share flow.
+- **Push notifications**: Expo push tokens registered per device, FCM
+  wired end-to-end, per-item reminders
+  (`reminder_minutes_before`/`reminder_sent_at` on items); a "near-me"
+  mode using device location to surface nearby unvisited items.
+- **Offline support**: TanStack Query persisted to AsyncStorage
+  (`lib/queryClient.ts`, with a `QUERY_CACHE_SCHEMA_VERSION` cache-buster —
+  bump it whenever a query's shape changes, see the crash-postmortem
+  below), an offline banner showing how stale the visible data is.
+- **PDF itinerary export** (`lib/exportItinerary.ts`, `expo-print` +
+  `expo-sharing`).
+- **Trip sharing**: invite another user by email to a trip
+  (`trip_shares`), `user_has_trip_access()` gates every trip-scoped table.
+- A global `ErrorBoundary` (`components/ErrorBoundary.tsx`) around the
+  root `Stack`, and an unsaved-changes confirmation guard
+  (`lib/useUnsavedChangesGuard.ts`) on the trip/item edit screens.
+- `TripTabBar` (`components/TripTabBar.tsx`): the persistent bottom nav
+  (Overview/Map/Expenses/Packing/Currency) on every trip-scoped screen —
+  this replaced the earlier `TripNavBar` pill-row. `active` is optional;
+  a screen that isn't literally one of those five tabs (a day page, an
+  item page) should omit it rather than passing a tab it doesn't
+  actually match, or that tab's button silently no-ops (a real bug hit
+  and fixed once already — see below).
+- A real `Stack` navigator (was missing entirely very early on).
 
 ## Map view
 
@@ -193,7 +341,10 @@ worth knowing before adding any other ESM-only library to this project:
 **Phase B — native MapLibre — is done.** `components/TripMap.tsx` is a
 real `@maplibre/maplibre-react-native` renderer now (`MapView`/`Camera`/
 `PointAnnotation`/`ShapeSource`+`LineLayer`), matching the web version's
-day-colored markers, Ionicons glyphs, and focus/highlight behavior.
+day-colored markers, marker glyphs, and focus/highlight behavior. Marker
+icons come from `components/icons/Icon.tsx` — a custom inlined SVG set
+(the owner's own icon pack, not Ionicons/any vector-icon library; see
+"Icon set" below), not a font-icon library.
 Pinned to **`@maplibre/maplibre-react-native@10.4.2`, not the current
 11.x** — v11 dropped support for React Native's legacy architecture,
 which this app still uses (`newArchEnabled=false` in
@@ -266,20 +417,98 @@ prebuild — reapply after any `--clean` prebuild:
 
 ## Not built yet
 
-- Alternatives ("pick one of" slash-separated options, e.g. "Dinner —
-  Disrepute/Cahoots/Swift") — explicitly deferred by the owner
-- Multi-leg sub-steps (e.g. the Cinque Terre train-hopping chain) —
-  explicitly deferred; will need its own relationship since
-  `parent_item_id` is already used for lodging check-in/out linkage
-- PDF itinerary export
-- Trip editing (trips are currently create-only; can't extend date range,
-  add/remove currencies or parties after creation)
-- Android native build has NOT been produced yet — only prepared for
-  (`expo-image-picker` config plugin, `expo-dev-client` dependency,
-  `docs/ANDROID_LOCAL_BUILD.md` written). The owner intends to build
-  locally via `npx expo prebuild` + Android Studio, NOT EAS.
+Nearly everything from the original handoff (PDF export, trip editing,
+the Android build) has since shipped — this list is genuinely short now:
 
-## Recent major fixes (this session, roughly in order — worth knowing so they aren't re-litigated)
+- **Alternatives** ("pick one of" slash-separated options, e.g. "Dinner —
+  Disrepute/Cahoots/Swift") — explicitly deferred by the owner, still not
+  built.
+- **Multi-leg sub-steps** (e.g. the Cinque Terre train-hopping chain) —
+  explicitly deferred, still not built; will need its own relationship
+  since `parent_item_id` is already used for lodging check-in/out linkage.
+- **Deleting a companion** in Doc Tracker — documents can be deleted, but
+  there's currently no way to delete a companion itself (wasn't in that
+  feature's original spec; flagged as a known gap, not yet requested).
+- The `spatial_ref_sys` RLS-disabled security advisory (PostGIS system
+  table, not app data) has been explained to the owner but the fix
+  (`enable RLS` + an open read policy) hasn't been applied — confirm with
+  them before running it, since it's a live-project change.
+
+## Recent major fixes and features, v20–v27 (worth knowing so they aren't re-litigated)
+
+Roughly chronological. Version numbers refer to `versionCode` in
+`app.json`/`android/app/build.gradle` — bump both together on every
+release build, then rebuild+publish the signed APK per the Stack section
+above.
+
+1. **The v19 "Skyfare" redesign**: a full visual overhaul (theme tokens in
+   `lib/theme.ts`, a new custom SVG icon set replacing whatever came
+   before — `components/icons/Icon.tsx`, two packs: a core set plus an
+   "activity" pack, `lightBlue` replacing an earlier `teal` token), a
+   bundled destination cover-photo set (`lib/destinationPhotos.ts`), and
+   the "Today" screen folded into Trip Overview instead of being separate.
+2. **The Cities feature** (see Data model above) replaced free-text
+   destinations everywhere. Non-obvious decisions worth preserving:
+   auto-fill (cover photo/timezone) happens **once**, only while the
+   field is still at its unset/default value, never silently overwriting
+   something the user has since edited; currencies and map-focus
+   coordinates, by contrast, always stay in sync with the current city
+   list on every save (no manual-edit UI of their own to conflict with).
+3. **A real production crash, root-caused via source-map symbolication**
+   (`metro-symbolicate` against the actual release bundle's map, not
+   guessing from function names): a stale AsyncStorage-persisted
+   react-query cache entry — from before a queried field existed on that
+   query's shape — rehydrated with a missing/wrong-shaped field and
+   crashed render before the screen's own refetch could correct it,
+   self-perpetuating until forced out. Fixed with a `queryClient.ts`
+   cache-buster (`QUERY_CACHE_SCHEMA_VERSION` — bump this whenever a
+   query's shape changes) plus defensive `Array.isArray()` guards at every
+   call site that assumed a field was always an array. A global
+   `ErrorBoundary` was added at the same time so a future crash like this
+   shows a diagnosable screen instead of silently vanishing.
+4. **Day-level city overrides + day navigation UX**: each day can now
+   have its own city, independent of the trip's primary (see Data model);
+   the day-pill strip auto-scrolls to the current day; two different
+   day-to-day navigation UIs were tried — inline arrows flanking the pill
+   strip (looked cramped, replaced) then floating arrows next to the
+   add-item button plus a swipe gesture over the item list. The swipe
+   gesture (`react-native-gesture-handler`'s `Gesture.Pan()`) needed
+   `.runOnJS(true)` — without it, calling `router.replace()` from
+   `.onEnd()` throws ("tried to synchronously call a non-worklet function
+   ... on the UI thread"), since gesture callbacks run on the UI thread by
+   default. It coexists fine with the pre-existing drag-to-reorder
+   gesture in the item list (also gesture-handler-based) as long as it's
+   scoped with `activeOffsetX`/`failOffsetY` so a vertical drag fails out
+   of the swipe recognizer immediately — verified by hand on a real
+   device, not assumed, after an initial false alarm (a coordinate-scaling
+   mistake in manual testing, not an actual regression).
+5. **Doc Tracker** (see Data model above): new subsystem, modeled on the
+   `packing_templates` user-owned-not-trip-scoped RLS pattern
+   (`user_id = auth.uid()`, no `trips_force_owner()`-style trigger needed
+   since the app never sets `user_id` explicitly and the column default
+   already handles it) and `item_photos`' private-bucket-plus-signed-URL
+   photo pattern.
+6. **`duplicate_trip` initially dropped day theme/color/city** when
+   copying a trip (it only ever copied item fields) — fixed to also copy
+   each day's theme/color/city override and the source trip's own picked
+   destinations, so a duplicated trip's days don't come back title-less,
+   default-colored, city-less.
+7. **`TripTabBar`'s `active` prop being hardcoded wrong hid a real bug**:
+   the day-view screen passed `active="overview"` (probably copy-pasted),
+   which made the Overview tab always render as already-active — and
+   since the tab bar's `onPress` is guarded by `!isActive`, tapping
+   Overview from the day page silently did nothing. Fixed by making
+   `active` optional; a screen that isn't literally one of the five real
+   tabs should omit it rather than pass a plausible-looking wrong value.
+8. **A shared-emulator gotcha, worth remembering for any future native
+   testing session**: only one Android emulator exists on this machine
+   and it's shared across the owner's several Expo apps/Claude Code
+   sessions — check `adb shell dumpsys window | grep mCurrentFocus` (or
+   ask via cross-session messaging) before assuming exclusive control, and
+   never force-relaunch/uninstall over what turns out to be a different
+   app already in the foreground.
+
+## Recent major fixes (older — pre-v19, worth knowing so they aren't re-litigated)
 
 1. **Every item now gets an explicit `start_date`**, not just lodging spans
    — originally only lodging had dates, but the owner wanted date always
@@ -343,7 +572,12 @@ prebuild — reapply after any `--clean` prebuild:
 
 ## Suggested next steps
 
-In the order the owner has been prioritizing (adjust based on what they
-say when you start): PDF export, then trip editing, then
-alternatives/sub-steps. But confirm with the owner directly rather than
-assuming this handoff's ordering still holds.
+The PDF export → trip editing → alternatives/sub-steps ordering from the
+original handoff is stale — the first two shipped long ago, and
+alternatives/sub-steps are still explicitly deferred with no indication
+they've moved up the queue. As of this update there's no standing backlog
+ordering from the owner beyond "Not built yet" above — confirm directly
+with them rather than assuming any particular priority, since work has
+been arriving as ad-hoc feature requests + bug-fix batches (see "Recent
+major fixes" and the update note at the top of Feature status) rather
+than a fixed roadmap.
