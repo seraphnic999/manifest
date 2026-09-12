@@ -238,6 +238,7 @@ export default function TripList() {
             </Pressable>
             <HamburgerMenu
               items={[
+                { icon: "document", label: "Doc Tracker", onPress: () => router.push("/doctracker") },
                 { icon: "archive", label: "Archived Trips", onPress: () => router.push("/archived") },
                 { icon: "packing", label: "Packing Templates", onPress: () => router.push("/packingTemplates") },
                 { icon: "signOut", label: "Sign Out", onPress: signOut, danger: true },

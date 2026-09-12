@@ -192,6 +192,50 @@ export interface MapRoute {
   sort_order: number;
 }
 
+export type Relationship =
+  | "mother" | "father" | "brother" | "sister" | "wife" | "husband"
+  | "son" | "daughter" | "friend" | "other";
+
+export interface Companion {
+  id: string;
+  user_id: string;
+  is_self: boolean;
+  first_name: string;
+  last_name: string;
+  birth_date: string | null;
+  relationship: Relationship | null; // null only for the self row
+  profile_photo_path: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CompanionPhoto {
+  id: string;
+  companion_id: string;
+  storage_path: string;
+  caption: string | null;
+  sort_order: number;
+  created_at: string;
+}
+
+export type DocumentType = "passport" | "national_id" | "visa" | "drivers_license" | "other";
+
+export interface TravelDocument {
+  id: string;
+  companion_id: string;
+  type: DocumentType;
+  document_number: string | null;
+  issuing_country: string | null;
+  issue_date: string | null;
+  expiry_date: string | null;
+  notes: string | null;
+  photo_path: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export function tripStatus(trip: Pick<Trip, "start_date" | "end_date">): TripStatus {
   const today = localIsoDate();
   if (today < trip.start_date) return "future";

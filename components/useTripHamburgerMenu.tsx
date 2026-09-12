@@ -44,6 +44,7 @@ export function useTripHamburgerMenu(tripId: string) {
     { icon: "export", label: exporting ? "Exporting…" : "Export PDF", onPress: handleExportPdf },
     { icon: "edit", label: "Edit Trip", onPress: () => router.push(`/trip/${tripId}/edit`) },
     ...(isOwner ? [{ icon: "share" as const, label: "Share Trip", onPress: () => setShareOpen(true) }] : []),
+    { icon: "document", label: "Doc Tracker", onPress: () => router.push("/doctracker") },
     { icon: "signOut", label: "Sign Out", onPress: signOut, danger: true },
   ];
 
