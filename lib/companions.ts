@@ -87,7 +87,23 @@ export async function saveCompanion(id: string, fields: Partial<Pick<Companion,
   if (error) throw error;
 }
 
+/** Deleting a companion cascades the DB rows (companion_photos,
+ * travel_documents, trip_companions) automatically, but not their storage
+ * objects — those are removed here first. */
 export async function deleteCompanion(id: string): Promise<void> {
+  const [{ data: companion }, { data: photos }, { data: documents }] = await Promise.all([
+    supabase.from("companions").select("profile_photo_path").eq("id", id).single(),
+    supabase.from("companion_photos").select("storage_path").eq("companion_id", id),
+    supabase.from("travel_documents").select("photo_path").eq("companion_id", id),
+  ]);
+
+  const companionPaths = [companion?.profile_photo_path, ...(photos ?? []).map((p) => p.storage_path)]
+    .filter((p): p is string => !!p);
+  if (companionPaths.length > 0) await supabase.storage.from(BUCKET).remove(companionPaths);
+
+  const documentPaths = (documents ?? []).map((d) => d.photo_path).filter((p): p is string => !!p);
+  if (documentPaths.length > 0) await supabase.storage.from("travel-documents").remove(documentPaths);
+
   const { error } = await supabase.from("companions").delete().eq("id", id);
   if (error) throw error;
 }
