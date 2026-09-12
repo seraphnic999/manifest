@@ -36,6 +36,7 @@ const NAV_ITEMS: { label: string; icon: IconName; danger?: boolean; onPress: (ct
   { label: "Packing Templates", icon: "packing", onPress: ({ router }) => router.push("/packingTemplates") },
   { label: "Keepers", icon: "star", onPress: ({ router }) => router.push("/keepers") },
   { label: "Travel Stats", icon: "overview", onPress: ({ router }) => router.push("/travelStats") },
+  { label: "Research Queue", icon: "flag", onPress: ({ router }) => router.push("/researchQueue") },
   { label: "Sign Out", icon: "signOut", danger: true, onPress: ({ signOut }) => signOut() },
 ];
 

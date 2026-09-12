@@ -276,6 +276,57 @@ export interface Keeper {
   created_at: string;
 }
 
+export type FieldConfidence = "high" | "medium" | "low" | "none";
+
+export interface ProposedField<T> {
+  value: T | null;
+  confidence: FieldConfidence;
+  basis: string | null;
+  source: string | null;
+}
+
+export interface ItemResearchProposal {
+  name: ProposedField<string>;
+  address: ProposedField<string>;
+  phone: ProposedField<string>;
+  website: ProposedField<string>;
+  google_maps_link: ProposedField<string>;
+  opening_hours: ProposedField<string>;
+  reservation_lead_time: ProposedField<string>;
+  price_range: ProposedField<string>;
+  latitude: ProposedField<number>;
+  longitude: ProposedField<number>;
+  unresolved: string | null;
+}
+
+export type ItemResearchStatus = "queued" | "researching" | "ready" | "accepted" | "rejected" | "failed";
+
+export interface ItemResearchJob {
+  id: string;
+  item_id: string;
+  trip_id: string;
+  status: ItemResearchStatus;
+  identified_name: string | null;
+  identified_context: Record<string, unknown> | null;
+  proposal: ItemResearchProposal | null;
+  accepted: Record<string, unknown> | null;
+  error: string | null;
+  cost_usd: number | null;
+  usage: Record<string, unknown> | null;
+  created_by: string;
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  reviewed_at: string | null;
+}
+
+export interface IdentifyCandidate {
+  name: string;
+  area_hint: string | null;
+  confidence: FieldConfidence;
+  reasoning: string;
+}
+
 export function tripStatus(trip: Pick<Trip, "start_date" | "end_date">): TripStatus {
   const today = localIsoDate();
   if (today < trip.start_date) return "future";

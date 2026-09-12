@@ -10,6 +10,7 @@ import { colors, radius } from "@/lib/theme";
 import { Item, Day } from "@/lib/types";
 import { renumberedOrders } from "@/lib/reorder";
 import { categoryForDbType } from "@/lib/itemTypeMeta";
+import { fetchReadyResearchItemIds } from "@/lib/itemResearch";
 import ItemTypePickerModal from "@/components/ItemTypePickerModal";
 import TripScreenHeader from "@/components/TripScreenHeader";
 import TripTabBar from "@/components/TripTabBar";
@@ -152,6 +153,14 @@ export default function DayView() {
   }, [data]);
 
   useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
+
+  // Small pending-review badge per row — a bulk lookup rather than one
+  // subscription per item, since a day can hold a dozen-plus items.
+  const [readyResearchItemIds, setReadyResearchItemIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    const allIds = [...orderable, ...stayBanners].map((i) => i.id);
+    fetchReadyResearchItemIds(allIds).then(setReadyResearchItemIds);
+  }, [orderable, stayBanners]);
 
   // Day-pill strip: auto-scroll to bring the current day into view instead
   // of leaving the user to scroll a long trip's strip by hand every time
@@ -301,6 +310,9 @@ export default function DayView() {
               <View style={styles.row1}>
                 <Text style={styles.typeTag}>{item.type.toUpperCase()}</Text>
                 <Text style={styles.statusBadge}>{STATUS_LABEL[item.status]}</Text>
+                {readyResearchItemIds.has(item.id) && (
+                  <Icon name="search" size={13} color={colors.gold} />
+                )}
               </View>
               <Text style={styles.itemTitle}>{item.title}</Text>
             </View>
@@ -428,6 +440,9 @@ export default function DayView() {
           <Pressable key={item.id} style={styles.stayBanner} onPress={() => router.push(`/item/${item.id}`)}>
             <Text style={styles.stayBannerLabel}>STAY</Text>
             <Text style={styles.stayBannerTitle}>{item.title}</Text>
+            {readyResearchItemIds.has(item.id) && (
+              <Icon name="search" size={13} color={colors.gold} />
+            )}
           </Pressable>
         ))}
 
