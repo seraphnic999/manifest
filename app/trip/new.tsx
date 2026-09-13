@@ -68,6 +68,17 @@ export default function NewTrip() {
     return list.find((x) => x.id === packingSourceId)?.name ?? "Choose one…";
   }
 
+  // Defaults end date to match whenever start date moves onto or past it —
+  // an empty end date on a fresh trip, or one a start-date edit just made
+  // invalid — so the end-date picker opens already on the right day instead
+  // of some unrelated default, and picking the actual (later) end date is
+  // just a few taps forward. A later end date that's still valid is left
+  // alone rather than clobbered.
+  function handleStartDateChange(v: string) {
+    setStartDate(v);
+    if (!endDate || endDate < v) setEndDate(v);
+  }
+
   function addCurrency() {
     if (!newCode || !newRate) return;
     setCurrencies([...currencies, { code: newCode.toUpperCase(), rate: newRate }]);
@@ -83,7 +94,15 @@ export default function NewTrip() {
   // the list — never removes one, so a manually added or since-unpicked
   // currency is left alone. Runs after every city-picker change.
   async function syncCurrenciesToCities(picks: CityPick[], currentCurrencies: CurrencyRow[]) {
-    const cities = await fetchAllCities();
+    let cities = await fetchAllCities();
+    if (cities.length === 0 && picks.some((p) => p.cityId)) {
+      // fetchAllCities() silently returns [] on a network/Supabase error
+      // (see lib/cities.ts) rather than throwing — with a real city picked,
+      // an empty result means the fetch failed, not that cities is empty.
+      // Retry once instead of silently skipping the sync (confirmed prod
+      // case: EUR wasn't added to a Rome trip because this call failed once).
+      cities = await fetchAllCities();
+    }
     const activeCodes = new Set(
       picks.map((p) => (p.cityId ? cities.find((c) => c.id === p.cityId)?.currency_code : undefined)).filter((c): c is string => !!c)
     );
@@ -245,7 +264,7 @@ export default function NewTrip() {
       <CoverPhotoPicker value={coverPhotoId} onChange={setCoverPhotoId} />
 
       <View style={styles.row}>
-        <DateField label="Start date" value={startDate} onChange={setStartDate} />
+        <DateField label="Start date" value={startDate} onChange={handleStartDateChange} />
         <View style={{ width: 12 }} />
         <DateField label="End date" value={endDate} onChange={setEndDate} />
       </View>

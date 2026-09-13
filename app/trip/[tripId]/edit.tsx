@@ -159,7 +159,13 @@ export default function EditTrip() {
   // Adds any currency implied by the picked cities that isn't already
   // present — never removes one, mirroring the same rule in new.tsx.
   async function syncCurrenciesToCities(picks: CityPick[]) {
-    const cities = await fetchAllCities();
+    let cities = await fetchAllCities();
+    if (cities.length === 0 && picks.some((p) => p.cityId)) {
+      // See the matching comment in trip/new.tsx's syncCurrenciesToCities —
+      // an empty result with a real city picked means the fetch failed, not
+      // that cities is empty. Retry once rather than silently skipping.
+      cities = await fetchAllCities();
+    }
     const activeCodes = new Set(
       picks.map((p) => (p.cityId ? cities.find((c) => c.id === p.cityId)?.currency_code : undefined)).filter((c): c is string => !!c)
     );
