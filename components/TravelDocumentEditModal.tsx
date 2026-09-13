@@ -1,16 +1,48 @@
 import { useEffect, useRef, useState } from "react";
-import { View, Text, Pressable, StyleSheet, Modal, TextInput, ScrollView, Image } from "react-native";
+import { View, Text, Pressable, StyleSheet, Modal, TextInput, ScrollView, Image, ActivityIndicator } from "react-native";
 import * as ImagePicker from "expo-image-picker";
+import { supabase } from "@/lib/supabase";
 import { colors, radius, fonts } from "@/lib/theme";
 import Icon from "@/components/icons/Icon";
+import Checkbox from "@/components/Checkbox";
 import { Alert } from "@/lib/alert";
 import { DocumentType, TravelDocument } from "@/lib/types";
 import {
   DOCUMENT_TYPE_OPTIONS, createDocument, saveDocument, deleteDocument,
-  setDocumentPhoto, fetchDocumentPhotoUrl, DocumentFields,
+  setDocumentPhoto, fetchDocumentPhotoUrl, DocumentFields, documentTypeLabel,
 } from "@/lib/travelDocuments";
 import { DateField } from "@/components/DateTimeFields";
 import PhotoLightbox from "@/components/PhotoLightbox";
+
+type Confidence = "high" | "medium" | "low" | "none";
+
+interface ScanResult {
+  document_type: DocumentType;
+  document_type_confidence: Confidence;
+  document_number: string | null;
+  document_number_confidence: Confidence;
+  full_name: string | null;
+  full_name_confidence: Confidence;
+  issuing_country: string | null;
+  issuing_country_confidence: Confidence;
+  issue_date: string | null;
+  issue_date_confidence: Confidence;
+  expiry_date: string | null;
+  expiry_date_confidence: Confidence;
+  used_mrz: boolean;
+  unresolved: string | null;
+}
+
+type ScanFieldKey = "document_type" | "document_number" | "issuing_country" | "issue_date" | "expiry_date";
+
+const CONFIDENCE_COLOR: Record<Confidence, string> = {
+  high: "#3E8E5A", medium: colors.gold, low: colors.coral, none: colors.inkSoft,
+};
+
+function scanFieldDisplay(key: ScanFieldKey, value: unknown): string {
+  if (value === null || value === undefined || value === "") return "(not found)";
+  return key === "document_type" ? documentTypeLabel(value as DocumentType) : String(value);
+}
 
 interface Props {
   visible: boolean;
@@ -42,6 +74,16 @@ export default function TravelDocumentEditModal({ visible, onClose, companionId,
   const [photoChanged, setPhotoChanged] = useState(false);
   const initialSnapshotRef = useRef("");
 
+  // AI scan (parse-document): proposes fields for review, same "never write
+  // until a human applies it" shape as item research — this only ever calls
+  // the setters below, never the DB directly. Committing still goes through
+  // the normal Save button once the reviewed values are sitting in the form.
+  const [scanning, setScanning] = useState(false);
+  const [scanResult, setScanResult] = useState<ScanResult | null>(null);
+  const [scanSelected, setScanSelected] = useState<Record<ScanFieldKey, boolean>>({
+    document_type: false, document_number: false, issuing_country: false, issue_date: false, expiry_date: false,
+  });
+
   function fieldsSnapshot() {
     return JSON.stringify({ type, documentNumber, issuingCountry, issueDate, expiryDate, notes });
   }
@@ -58,6 +100,8 @@ export default function TravelDocumentEditModal({ visible, onClose, companionId,
     setPhotoStoragePath(document?.photo_path ?? null);
     setImplicitlyCreated(false);
     setPhotoChanged(false);
+    setScanResult(null);
+    setScanning(false);
     if (document?.photo_path) fetchDocumentPhotoUrl(document.photo_path).then(setPhotoUrl);
     else setPhotoUrl(null);
     // Runs after the state above is queued, so it captures this document's
@@ -108,10 +152,44 @@ export default function TravelDocumentEditModal({ visible, onClose, companionId,
       setPhotoStoragePath(path);
       setPhotoUrl(result.assets[0].uri);
       setPhotoChanged(true);
+      setScanResult(null); // a replaced photo invalidates whatever the old one scanned to
       onSaved();
     } catch (e: any) {
       Alert.alert("Couldn't add photo", e.message ?? "Unknown error");
     }
+  }
+
+  async function scanWithAI() {
+    if (!docId) return;
+    setScanning(true);
+    setScanResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("parse-document", { body: { document_id: docId } });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      const extracted = data.extracted as ScanResult;
+      setScanResult(extracted);
+      setScanSelected({
+        document_type: extracted.document_type_confidence === "high" || extracted.document_type_confidence === "medium",
+        document_number: extracted.document_number_confidence === "high" || extracted.document_number_confidence === "medium",
+        issuing_country: extracted.issuing_country_confidence === "high" || extracted.issuing_country_confidence === "medium",
+        issue_date: extracted.issue_date_confidence === "high" || extracted.issue_date_confidence === "medium",
+        expiry_date: extracted.expiry_date_confidence === "high" || extracted.expiry_date_confidence === "medium",
+      });
+    } catch (e: any) {
+      Alert.alert("Couldn't scan this document", e.message ?? "Unknown error");
+    }
+    setScanning(false);
+  }
+
+  function applyScan() {
+    if (!scanResult) return;
+    if (scanSelected.document_type) setType(scanResult.document_type);
+    if (scanSelected.document_number) setDocumentNumber(scanResult.document_number ?? "");
+    if (scanSelected.issuing_country) setIssuingCountry(scanResult.issuing_country ?? "");
+    if (scanSelected.issue_date) setIssueDate(scanResult.issue_date ?? "");
+    if (scanSelected.expiry_date) setExpiryDate(scanResult.expiry_date ?? "");
+    setScanResult(null);
   }
 
   async function save() {
@@ -221,6 +299,53 @@ export default function TravelDocumentEditModal({ visible, onClose, companionId,
             <Text style={styles.photoBtnText}>{photoUrl ? "Replace photo" : "Add photo"}</Text>
           </Pressable>
 
+          {photoUrl && !scanResult && (
+            <Pressable style={[styles.scanBtn, scanning && { opacity: 0.6 }]} onPress={scanWithAI} disabled={scanning}>
+              {scanning ? <ActivityIndicator color={colors.blue} /> : <Icon name="research" size={18} color={colors.blue} />}
+              <Text style={styles.scanBtnText}>{scanning ? "Reading photo…" : "Scan with AI"}</Text>
+            </Pressable>
+          )}
+
+          {scanResult && (
+            <View style={styles.scanCard}>
+              <Text style={styles.scanCardTitle}>Scanned from the photo — review before applying</Text>
+              {(["document_type", "document_number", "issuing_country", "issue_date", "expiry_date"] as ScanFieldKey[]).map((key) => {
+                const confidence = scanResult[`${key}_confidence` as const] as Confidence;
+                const value = scanResult[key];
+                return (
+                  <Pressable
+                    key={key}
+                    style={styles.scanFieldRow}
+                    onPress={() => setScanSelected((prev) => ({ ...prev, [key]: !prev[key] }))}
+                  >
+                    <Checkbox checked={scanSelected[key]} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.scanFieldLabel}>
+                        {key === "document_type" ? "Type" : key === "document_number" ? "Number" : key === "issuing_country" ? "Issuing country" : key === "issue_date" ? "Issue date" : "Expiry date"}
+                      </Text>
+                      <Text style={styles.scanFieldValue}>{scanFieldDisplay(key, value)}</Text>
+                    </View>
+                    <Text style={[styles.scanConfidence, { color: CONFIDENCE_COLOR[confidence] }]}>{confidence}</Text>
+                  </Pressable>
+                );
+              })}
+              {scanResult.full_name && (
+                <Text style={styles.scanFullName}>Name on document: {scanResult.full_name}</Text>
+              )}
+              {scanResult.unresolved && (
+                <Text style={styles.scanUnresolved}>{scanResult.unresolved}</Text>
+              )}
+              <View style={styles.scanActions}>
+                <Pressable style={styles.scanDismissBtn} onPress={() => setScanResult(null)}>
+                  <Text style={styles.scanDismissBtnText}>Dismiss</Text>
+                </Pressable>
+                <Pressable style={styles.scanApplyBtn} onPress={applyScan}>
+                  <Text style={styles.scanApplyBtnText}>Apply selected</Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
+
           <Pressable style={[styles.saveBtn, saving && { opacity: 0.6 }]} onPress={save} disabled={saving}>
             <Text style={styles.saveBtnText}>{saving ? "Saving…" : "Save"}</Text>
           </Pressable>
@@ -273,6 +398,28 @@ const styles = StyleSheet.create({
     borderRadius: radius.md, padding: 12,
   },
   photoBtnText: { color: colors.blue, fontWeight: "600", fontSize: 14 },
+  scanBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    backgroundColor: colors.blueSoft, borderWidth: 1, borderColor: colors.blue,
+    borderRadius: radius.md, padding: 12, marginTop: 8,
+  },
+  scanBtnText: { color: colors.blue, fontWeight: "700", fontSize: 14 },
+  scanCard: {
+    backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,
+    borderRadius: radius.lg, padding: 14, marginTop: 10,
+  },
+  scanCardTitle: { color: colors.ink, fontWeight: "700", fontSize: 13.5, marginBottom: 8 },
+  scanFieldRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 8 },
+  scanFieldLabel: { color: colors.inkSoft, fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.4 },
+  scanFieldValue: { color: colors.ink, fontSize: 14.5, marginTop: 2 },
+  scanConfidence: { fontSize: 11, fontWeight: "700", textTransform: "uppercase" },
+  scanFullName: { color: colors.inkSoft, fontSize: 12.5, marginTop: 6, fontStyle: "italic" },
+  scanUnresolved: { color: colors.coral, fontSize: 12.5, marginTop: 8, lineHeight: 17 },
+  scanActions: { flexDirection: "row", gap: 10, marginTop: 12 },
+  scanDismissBtn: { flex: 1, alignItems: "center", padding: 11, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line },
+  scanDismissBtnText: { color: colors.inkSoft, fontWeight: "600", fontSize: 14 },
+  scanApplyBtn: { flex: 1, alignItems: "center", padding: 11, borderRadius: radius.md, backgroundColor: colors.blue },
+  scanApplyBtnText: { color: "#fff", fontWeight: "700", fontSize: 14 },
   saveBtn: { backgroundColor: colors.ink, borderRadius: radius.md, padding: 14, alignItems: "center", marginTop: 24 },
   saveBtnText: { color: colors.paper, fontWeight: "700", fontSize: 15 },
   deleteBtn: { alignItems: "center", padding: 12, marginTop: 6 },

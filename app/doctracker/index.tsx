@@ -17,14 +17,25 @@ interface Section {
   data: Companion[];
 }
 
+// Family reads as a household roster, where age order (via birth date) is
+// the natural way to scan it; Friends/Others have no such shared context,
+// so alphabetical is the only order that's easy to scan for a specific name.
+const byBirthDate = (a: Companion, b: Companion) => {
+  if (!a.birth_date && !b.birth_date) return 0;
+  if (!a.birth_date) return 1;
+  if (!b.birth_date) return -1;
+  return a.birth_date.localeCompare(b.birth_date);
+};
+const byFirstName = (a: Companion, b: Companion) => a.first_name.localeCompare(b.first_name);
+
 async function fetchSections(): Promise<Section[]> {
   await ensureSelfCompanion();
   const companions = await fetchCompanions();
   const self = companions.filter((c) => c.is_self);
   const others = companions.filter((c) => !c.is_self);
-  const family = others.filter((c) => relationshipGroup(c) === "family");
-  const friends = others.filter((c) => relationshipGroup(c) === "friends");
-  const rest = others.filter((c) => relationshipGroup(c) === "others");
+  const family = others.filter((c) => relationshipGroup(c) === "family").sort(byBirthDate);
+  const friends = others.filter((c) => relationshipGroup(c) === "friends").sort(byFirstName);
+  const rest = others.filter((c) => relationshipGroup(c) === "others").sort(byFirstName);
   const sections: Section[] = [
     { key: "self", title: "Me", data: self },
     { key: "family", title: "Family", data: family },
