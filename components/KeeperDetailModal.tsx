@@ -4,11 +4,12 @@ import { useRouter } from "expo-router";
 import { colors, radius, fonts } from "@/lib/theme";
 import Icon from "@/components/icons/Icon";
 import { Alert } from "@/lib/alert";
-import { Keeper, Trip } from "@/lib/types";
+import { Keeper, Trip, Day } from "@/lib/types";
 import { updateKeeper, deleteKeeper, fetchTripsForKeeper, KeeperTripLink } from "@/lib/keepers";
 import { categoryForDbType } from "@/lib/itemTypeMeta";
 import { formatDateDDMMYYYY } from "@/lib/dateFormat";
 import FutureTripPickerModal from "@/components/FutureTripPickerModal";
+import TripDayPickerModal from "@/components/TripDayPickerModal";
 
 interface Props {
   visible: boolean;
@@ -34,6 +35,7 @@ export default function KeeperDetailModal({ visible, onClose, keeper, onChanged 
   const [saving, setSaving] = useState(false);
   const [trips, setTrips] = useState<KeeperTripLink[]>([]);
   const [tripPickerOpen, setTripPickerOpen] = useState(false);
+  const [dayPickerTrip, setDayPickerTrip] = useState<Trip | null>(null);
 
   const loadTrips = useCallback(() => {
     fetchTripsForKeeper(keeper.id).then(setTrips).catch((e) => console.error("fetchTripsForKeeper failed", e));
@@ -80,9 +82,17 @@ export default function KeeperDetailModal({ visible, onClose, keeper, onChanged 
 
   function addToTrip(trip: Trip) {
     setTripPickerOpen(false);
+    setDayPickerTrip(trip);
+  }
+
+  function pickDay(day: Day) {
+    if (!dayPickerTrip) return;
+    setDayPickerTrip(null);
     onClose();
     const category = categoryForDbType(keeper.item_type).key;
-    router.push(`/item/new?tripId=${trip.id}&dayId=&date=&category=${category}&fromKeeperId=${keeper.id}`);
+    router.push(
+      `/item/new?tripId=${dayPickerTrip.id}&dayId=${day.id}&date=${day.date}&category=${category}&fromKeeperId=${keeper.id}`
+    );
   }
 
   const categoryIcon = categoryForDbType(keeper.item_type).icon;
@@ -171,6 +181,14 @@ export default function KeeperDetailModal({ visible, onClose, keeper, onChanged 
         onClose={() => setTripPickerOpen(false)}
         onSelect={addToTrip}
       />
+      {dayPickerTrip && (
+        <TripDayPickerModal
+          visible
+          onClose={() => setDayPickerTrip(null)}
+          tripId={dayPickerTrip.id}
+          onSelect={pickDay}
+        />
+      )}
     </Modal>
   );
 }
