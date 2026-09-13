@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { View, Text, TextInput, Pressable, StyleSheet, ScrollView, Modal } from "react-native";
 import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
+import { itemTypeTag } from "@/lib/itemTypeMeta";
 
 interface PickableItem {
   id: string;
@@ -50,7 +51,7 @@ export default function ItemPickerModal({
                 style={styles.row}
                 onPress={() => { onSelect(i); setSearch(""); }}
               >
-                <Text style={styles.rowType}>{i.type.toUpperCase()}</Text>
+                <Text style={styles.rowType}>{itemTypeTag(i.type)}</Text>
                 <Text style={styles.rowTitle}>{i.title}</Text>
               </Pressable>
             ))}

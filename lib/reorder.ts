@@ -56,7 +56,15 @@ export function computeInsertSortOrder(existing: OrderableItem[], newTime: strin
     return sorted[sorted.length - 1].sort_order + GAP;
   }
   if (insertBeforeIdx === 0) {
-    return sorted[0].sort_order - GAP > 0 ? sorted[0].sort_order - GAP : sorted[0].sort_order / 2;
+    // Must land strictly below sorted[0].sort_order — the old `/ 2` fallback
+    // collided head-on whenever that item's own sort_order was 0 (0/2 is
+    // still 0), silently tying two items at the same sort_order with no
+    // guaranteed order between them (a real prod case: an item moved to a
+    // new time via edit.tsx landed tied with its neighbor instead of before
+    // it). `- 1` always works, matching the same-collision guard already
+    // used for the general middle-insert case below.
+    const candidate = sorted[0].sort_order - GAP;
+    return candidate > 0 ? candidate : sorted[0].sort_order - 1;
   }
 
   const prev = sorted[insertBeforeIdx - 1].sort_order;

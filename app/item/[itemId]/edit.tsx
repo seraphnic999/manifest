@@ -6,7 +6,7 @@ import { Alert } from "@/lib/alert";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
-import { categoryForDbType, categoryByKey, CONVERTIBLE_CATEGORIES, isConvertibleType, FieldKey } from "@/lib/itemTypeMeta";
+import { categoryForDbType, categoryByKey, CONVERTIBLE_CATEGORIES, isConvertibleType, itemTypeTag, FieldKey } from "@/lib/itemTypeMeta";
 import { DateField, TimeField } from "@/components/DateTimeFields";
 import { computeInsertSortOrder } from "@/lib/reorder";
 import { computeDurationMinutes, formatDuration } from "@/lib/duration";
@@ -509,7 +509,7 @@ export default function EditItem() {
           <View style={{ flex: 1 }}>
             <Text style={styles.linkedTitle}>{li.title}</Text>
             <Text style={styles.linkedMeta}>
-              {[li.day_date ? formatDateDDMM(li.day_date) : null, normalizeTimeHHMM(li.time_start)].filter(Boolean).join(" · ") || li.type.toUpperCase()}
+              {[li.day_date ? formatDateDDMM(li.day_date) : null, normalizeTimeHHMM(li.time_start)].filter(Boolean).join(" · ") || itemTypeTag(li.type)}
             </Text>
           </View>
           <Pressable onPress={() => handleUnlink(li.id)} hitSlop={8} style={styles.unlinkBtn}>

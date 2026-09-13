@@ -86,6 +86,14 @@ export function isConvertibleType(type: ItemType): boolean {
   return type !== "flight" && categoryForDbType(type).key !== "lodging";
 }
 
+/** A DB item_type as a display tag (e.g. for the day view's small uppercase
+ * label) — underscores in a multi-word type like "ice_cream" read as a
+ * literal underscore once uppercased ("ICE_CREAM"), so this swaps them for
+ * spaces first ("ICE CREAM"). */
+export function itemTypeTag(type: string): string {
+  return type.replace(/_/g, " ").toUpperCase();
+}
+
 /** Reverse lookup: which UI category owns a given DB item_type (for editing). */
 export function categoryForDbType(type: ItemType) {
   return ITEM_CATEGORIES.find((c) => c.dbTypes.includes(type)) ?? ITEM_CATEGORIES[ITEM_CATEGORIES.length - 1];

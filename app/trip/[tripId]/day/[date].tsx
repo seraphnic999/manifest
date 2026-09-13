@@ -9,7 +9,7 @@ import Icon from "@/components/icons/Icon";
 import { colors, radius } from "@/lib/theme";
 import { Item, Day, Keeper } from "@/lib/types";
 import { renumberedOrders } from "@/lib/reorder";
-import { categoryForDbType, mapIconForItem } from "@/lib/itemTypeMeta";
+import { categoryForDbType, mapIconForItem, itemTypeTag } from "@/lib/itemTypeMeta";
 import { fetchReadyResearchItemIds } from "@/lib/itemResearch";
 import ItemTypePickerModal from "@/components/ItemTypePickerModal";
 import KeeperPickerModal from "@/components/KeeperPickerModal";
@@ -333,7 +333,7 @@ export default function DayView() {
             </View>
             <View style={styles.itemTextCol}>
               <View style={styles.row1}>
-                <Text style={styles.typeTag}>{item.type.toUpperCase()}</Text>
+                <Text style={styles.typeTag}>{itemTypeTag(item.type)}</Text>
                 <Text style={styles.statusBadge}>{STATUS_LABEL[item.status]}</Text>
                 {readyResearchItemIds.has(item.id) && (
                   <Icon name="research" size={13} color={colors.gold} />

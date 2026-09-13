@@ -14,7 +14,7 @@ import { fetchKeeperById } from "@/lib/keepers";
 import { uploadItemPhoto, uploadItemDocument, fetchItemPhotosWithUrls, deleteItemPhoto, isImageAttachment } from "@/lib/photos";
 import { downloadAttachment } from "@/lib/downloadAttachment";
 import { fetchLinkedItems, LinkedItemSummary } from "@/lib/itemLinks";
-import { categoryForDbType } from "@/lib/itemTypeMeta";
+import { categoryForDbType, itemTypeTag } from "@/lib/itemTypeMeta";
 import { computeDurationMinutes, formatDuration } from "@/lib/duration";
 import { formatDateDDMMYYYY, formatDateDDMM } from "@/lib/dateFormat";
 import { normalizeTimeHHMM } from "@/lib/timeFormat";
@@ -354,7 +354,7 @@ export default function ItemDetails() {
 
       <OfflineBanner dataUpdatedAt={!isOnline ? dataUpdatedAt : undefined} />
       <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
-      <Text style={styles.typeTag}>{item.type.toUpperCase()}</Text>
+      <Text style={styles.typeTag}>{itemTypeTag(item.type)}</Text>
       <Text style={styles.title}>{item.title}</Text>
 
       {fields.map(([label, value]) =>
@@ -516,7 +516,7 @@ export default function ItemDetails() {
               <View style={{ flex: 1 }}>
                 <Text style={styles.expenseDesc}>{li.title}</Text>
                 <Text style={styles.expenseDate}>
-                  {[li.day_date ? formatDateDDMM(li.day_date) : null, normalizeTimeHHMM(li.time_start)].filter(Boolean).join(" · ") || li.type.toUpperCase()}
+                  {[li.day_date ? formatDateDDMM(li.day_date) : null, normalizeTimeHHMM(li.time_start)].filter(Boolean).join(" · ") || itemTypeTag(li.type)}
                 </Text>
               </View>
               <Icon name="forward" size={20} color={colors.blue} />

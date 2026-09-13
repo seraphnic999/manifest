@@ -1,6 +1,7 @@
 import { Component, ReactNode } from "react";
 import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
 import { colors, radius, fonts } from "@/lib/theme";
+import { queryClient } from "@/lib/queryClient";
 
 interface Props {
   children: ReactNode;
@@ -36,7 +37,21 @@ export default class ErrorBoundary extends Component<Props, State> {
             <Text style={styles.message}>{this.state.error.message}</Text>
             <Text style={styles.stack}>{this.state.error.stack}</Text>
           </ScrollView>
-          <Pressable style={styles.button} onPress={() => this.setState({ error: null })}>
+          <Pressable
+            style={styles.button}
+            onPress={() => {
+              // A render crash here is most often a bad *cached* value (a
+              // stale persisted react-query entry shaped wrong for what the
+              // current screen reads — see lib/queryClient.ts) rather than a
+              // one-off fluke, so just clearing this boundary's error and
+              // re-rendering would hand the exact same bad value straight
+              // back to the same crash. Clearing the query cache first means
+              // every mounted screen re-fetches from the network instead of
+              // replaying whatever local state caused this.
+              queryClient.clear();
+              this.setState({ error: null });
+            }}
+          >
             <Text style={styles.buttonText}>Try again</Text>
           </Pressable>
         </View>
