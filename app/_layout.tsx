@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import * as Notifications from "expo-notifications";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { Session } from "@supabase/supabase-js";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -32,6 +33,22 @@ const asyncStoragePersister = createAsyncStoragePersister({
 if (I18nManager.isRTL) {
   I18nManager.allowRTL(false);
   I18nManager.forceRTL(false);
+}
+
+// Without this, expo-notifications' default behavior is to deliver a push
+// silently (no banner, no sound) whenever the app is already in the
+// foreground — which is exactly when a research job's "ready" notification
+// tends to arrive, since the user just queued it and is often still
+// looking at the app. Background/killed-app delivery is unaffected either
+// way; this only controls the foreground case.
+if (Platform.OS !== "web") {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
 }
 
 export default function RootLayout() {

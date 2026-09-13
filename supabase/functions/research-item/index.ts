@@ -212,14 +212,14 @@ async function callClaude(apiKey: string, messages: Json[], finish = false) {
   return await res.json();
 }
 
-async function notify(supabase: Json, userId: string, itemTitle: string, jobId: string) {
+async function notify(supabase: Json, userId: string, title: string, body: string, jobId: string) {
   const { data: tokens } = await supabase.from("push_tokens").select("expo_push_token").eq("user_id", userId);
   if (!tokens?.length) return;
 
   const messages = tokens.map((t: Json) => ({
     to: t.expo_push_token,
-    title: "Research ready",
-    body: `${itemTitle} is ready for review.`,
+    title,
+    body,
     sound: "default",
     data: { jobId },
   }));
@@ -239,13 +239,21 @@ async function research(jobId: string) {
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
 
-  const fail = async (msg: string, spend?: Spend) => {
+  const fail = async (msg: string, spend?: Spend, notifyCtx?: { userId: string; itemTitle: string }) => {
     await supabase.from("item_research_jobs").update({
       status: "failed",
       error: msg,
       completed_at: new Date().toISOString(),
       ...(spend && spend.turns > 0 ? { cost_usd: Number(costOf(spend).toFixed(4)), usage: { ...spend } } : {}),
     }).eq("id", jobId);
+
+    if (notifyCtx) {
+      try {
+        await notify(supabase, notifyCtx.userId, "Research failed", `Couldn't finish researching ${notifyCtx.itemTitle}.`, jobId);
+      } catch (e) {
+        console.error("notify failed", e);
+      }
+    }
   };
 
   if (!apiKey) return fail("ANTHROPIC_API_KEY is not set on this project.");
@@ -354,13 +362,17 @@ async function research(jobId: string) {
     }).eq("id", jobId);
 
     try {
-      await notify(supabase, job.created_by, item.title, jobId);
+      await notify(supabase, job.created_by, "Research ready", `${item.title} is ready for review.`, jobId);
     } catch (e) {
       console.error("notify failed", e);
     }
   } catch (e) {
     console.error("research failed", jobId, e);
-    await fail(String(e instanceof Error ? e.message : e).slice(0, 500), spend);
+    await fail(
+      String(e instanceof Error ? e.message : e).slice(0, 500),
+      spend,
+      { userId: job.created_by, itemTitle: job.identified_name || "your item" }
+    );
   }
 }
 

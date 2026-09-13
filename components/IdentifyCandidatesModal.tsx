@@ -40,8 +40,14 @@ export default function IdentifyCandidatesModal({ visible, onClose, item, onQueu
       Alert.alert("Couldn't start research", error);
       return;
     }
-    onQueued();
-    onClose();
+    // onQueued/onClose only fire once this is dismissed, so the confirmation
+    // is guaranteed to be seen rather than racing whatever navigation the
+    // caller does in those callbacks (e.g. item/new.tsx's router.back()).
+    Alert.alert(
+      "Research started",
+      "We're researching this place in the background. You'll get a notification when it's ready to review.",
+      [{ text: "OK", onPress: () => { onQueued(); onClose(); } }]
+    );
   }
 
   return (
