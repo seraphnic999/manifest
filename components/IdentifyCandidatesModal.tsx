@@ -43,9 +43,15 @@ export default function IdentifyCandidatesModal({ visible, onClose, item, onQueu
     // onQueued/onClose only fire once this is dismissed, so the confirmation
     // is guaranteed to be seen rather than racing whatever navigation the
     // caller does in those callbacks (e.g. item/new.tsx's router.back()).
+    // A null name means the "None of these"/"Research anyway" fallback —
+    // no confirmed identification, so the copy sets expectations
+    // differently than the confident-match path.
+    const message = name
+      ? "We're researching this place in the background. You'll get a notification when it's ready to review."
+      : "We couldn't identify an exact match, but we'll still try to research the item using its title. You'll get a notification when it's ready to review.";
     Alert.alert(
       "Research started",
-      "We're researching this place in the background. You'll get a notification when it's ready to review.",
+      message,
       [{ text: "OK", onPress: () => { onQueued(); onClose(); } }]
     );
   }

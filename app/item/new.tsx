@@ -415,8 +415,8 @@ export default function NewItem() {
         <IdentifyCandidatesModal
           visible
           item={pendingIdentify}
-          onClose={() => { setPendingIdentify(null); router.back(); }}
-          onQueued={() => { setPendingIdentify(null); router.back(); }}
+          onClose={() => { const id = pendingIdentify.id; setPendingIdentify(null); router.replace(`/item/${id}`); }}
+          onQueued={() => { const id = pendingIdentify.id; setPendingIdentify(null); router.replace(`/item/${id}`); }}
         />
       )}
     </View>
