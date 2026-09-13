@@ -1,13 +1,19 @@
-import { useEffect, useState } from "react";
-import { View, Text, TextInput, Pressable, StyleSheet, ScrollView } from "react-native";
+import { useState } from "react";
+import { View, Text, Pressable, StyleSheet, ScrollView } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { Alert } from "@/lib/alert";
 import { supabase } from "@/lib/supabase";
-import { colors, radius } from "@/lib/theme";
+import { colors, radius, fonts } from "@/lib/theme";
 import { PackingTemplateItem } from "@/lib/types";
-import { PACKING_CATEGORIES } from "@/lib/packing";
-import SubpageHeader from "@/components/SubpageHeader";
+import {
+  renamePackingTemplate, deletePackingTemplate,
+  addPackingTemplateItem, updatePackingTemplateItem, deletePackingTemplateItem,
+} from "@/lib/packing";
+import Icon from "@/components/icons/Icon";
+import TemplateNameModal from "@/components/TemplateNameModal";
+import PackingTemplateItemModal from "@/components/PackingTemplateItemModal";
 
 interface TemplateData {
   name: string;
@@ -26,135 +32,136 @@ async function fetchTemplate(templateId: string): Promise<TemplateData> {
 export default function PackingTemplateEditor() {
   const { templateId } = useLocalSearchParams<{ templateId: string }>();
   const router = useRouter();
-  const [name, setName] = useState("");
-  const [newItemName, setNewItemName] = useState("");
-  const [newItemCategory, setNewItemCategory] = useState<string | null>(null);
+  const insets = useSafeAreaInsets();
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [itemModalItem, setItemModalItem] = useState<PackingTemplateItem | "new" | null>(null);
 
   const { data, refetch } = useQuery({ queryKey: ["packingTemplate", templateId], queryFn: () => fetchTemplate(templateId) });
+  const name = data?.name ?? "";
   const items = data?.items ?? [];
 
-  useEffect(() => { if (data) setName(data.name); }, [data?.name]);
-
-  async function saveName() {
-    if (!name.trim()) return;
-    await supabase.from("packing_templates").update({ name: name.trim() }).eq("id", templateId);
+  async function saveRename(newName: string) {
+    setRenaming(true);
+    try {
+      await renamePackingTemplate(templateId, newName);
+      setRenameOpen(false);
+      refetch();
+    } catch (e: any) {
+      Alert.alert("Couldn't rename template", e?.message ?? "Unknown error");
+    }
+    setRenaming(false);
   }
 
-  async function addItem() {
-    if (!newItemName.trim()) return;
-    const nextOrder = items.length > 0 ? Math.max(...items.map((i) => i.sort_order)) + 1 : 0;
-    await supabase.from("packing_template_items").insert({
-      template_id: templateId, name: newItemName.trim(), category: newItemCategory, sort_order: nextOrder,
-    });
-    setNewItemName("");
-    setNewItemCategory(null);
-    refetch();
-  }
-
-  async function removeItem(itemId: string) {
-    await supabase.from("packing_template_items").delete().eq("id", itemId);
-    refetch();
-  }
-
-  function deleteTemplate() {
+  function confirmDeleteTemplate() {
     Alert.alert("Delete template", `Delete "${name}"? This can't be undone.`, [
       { text: "Cancel", style: "cancel" },
       {
         text: "Delete", style: "destructive",
         onPress: async () => {
-          await supabase.from("packing_templates").delete().eq("id", templateId);
+          await deletePackingTemplate(templateId);
           router.back();
         },
       },
     ]);
   }
 
+  async function saveItem(itemName: string, category: string | null) {
+    if (itemModalItem === "new") {
+      const nextOrder = items.length > 0 ? Math.max(...items.map((i) => i.sort_order)) + 1 : 0;
+      await addPackingTemplateItem(templateId, itemName, category, nextOrder);
+    } else if (itemModalItem) {
+      await updatePackingTemplateItem(itemModalItem.id, itemName, category);
+    }
+    setItemModalItem(null);
+    refetch();
+  }
+
+  async function deleteItem() {
+    if (itemModalItem === "new" || !itemModalItem) return;
+    await deletePackingTemplateItem(itemModalItem.id);
+    setItemModalItem(null);
+    refetch();
+  }
+
+  const editingItem = itemModalItem === "new" ? null : itemModalItem;
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.paper }}>
       <Stack.Screen options={{ headerShown: false }} />
-      <SubpageHeader title="Edit Template" />
-      <ScrollView style={styles.container} contentContainerStyle={{ padding: 20, paddingBottom: 60 }}>
 
-      <Text style={styles.label}>Template name</Text>
-      <TextInput style={styles.input} value={name} onChangeText={setName} onBlur={saveName} />
-
-      <Text style={styles.label}>Items</Text>
-      {items.map((item) => (
-        <View key={item.id} style={styles.itemRow}>
-          <Text style={styles.itemName}>{item.name}</Text>
-          {item.category && <Text style={styles.itemCategory}>{item.category}</Text>}
-          <Pressable onPress={() => removeItem(item.id)}>
-            <Text style={styles.removeText}>Remove</Text>
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+        <Pressable onPress={() => (router.canGoBack() ? router.back() : router.replace("/packingTemplates"))} hitSlop={10} style={styles.backBtn}>
+          <Icon name="back" size={25} color={colors.blue} />
+        </Pressable>
+        <View style={styles.titleGroup}>
+          <Text style={styles.title} numberOfLines={1}>{name}</Text>
+          <Pressable onPress={() => setRenameOpen(true)} hitSlop={10}>
+            <Icon name="edit" size={16} color={colors.blue} />
           </Pressable>
         </View>
-      ))}
-      {items.length === 0 && <Text style={styles.empty}>No items yet.</Text>}
-
-      <View style={styles.addCard}>
-        <TextInput
-          style={styles.input}
-          value={newItemName}
-          onChangeText={setNewItemName}
-          placeholder="e.g. Passport, Charger, Swimsuit"
-          onSubmitEditing={addItem}
-        />
-        <View style={styles.chipRow}>
-          {PACKING_CATEGORIES.map((c) => (
-            <Pressable
-              key={c}
-              style={[styles.chip, newItemCategory === c && styles.chipActive]}
-              onPress={() => setNewItemCategory(newItemCategory === c ? null : c)}
-            >
-              <Text style={[styles.chipText, newItemCategory === c && styles.chipTextActive]}>{c}</Text>
-            </Pressable>
-          ))}
-        </View>
-        <Pressable style={styles.addButton} onPress={addItem}>
-          <Text style={styles.addButtonText}>+ Add item</Text>
+        <Pressable onPress={confirmDeleteTemplate} hitSlop={10}>
+          <Icon name="trash" size={20} color={colors.coral} />
         </Pressable>
       </View>
 
-      <Pressable style={styles.deleteButton} onPress={deleteTemplate}>
-        <Text style={styles.deleteButtonText}>Delete template</Text>
-      </Pressable>
+      <ScrollView style={styles.container} contentContainerStyle={{ padding: 20, paddingBottom: 100 }}>
+        {items.map((item) => (
+          <Pressable key={item.id} style={styles.itemRow} onPress={() => setItemModalItem(item)}>
+            <Text style={styles.itemName}>{item.name}</Text>
+            {item.category && <Text style={styles.itemCategory}>{item.category}</Text>}
+            <Icon name="forward" size={16} color={colors.inkSoft} />
+          </Pressable>
+        ))}
+        {items.length === 0 && <Text style={styles.empty}>No items yet — tap the + button to add one.</Text>}
       </ScrollView>
+
+      <Pressable style={styles.fab} onPress={() => setItemModalItem("new")}>
+        <Icon name="add" size={24} color="#fff" />
+      </Pressable>
+
+      <TemplateNameModal
+        visible={renameOpen}
+        onClose={() => setRenameOpen(false)}
+        onSave={saveRename}
+        initialName={name}
+        title="Rename template"
+        saving={renaming}
+      />
+
+      <PackingTemplateItemModal
+        visible={itemModalItem !== null}
+        onClose={() => setItemModalItem(null)}
+        onSave={saveItem}
+        onDelete={editingItem ? deleteItem : undefined}
+        initialName={editingItem?.name}
+        initialCategory={editingItem?.category}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
-  label: {
-    color: colors.inkSoft, fontSize: 12, fontWeight: "600", marginTop: 16, marginBottom: 6,
-    textTransform: "uppercase", letterSpacing: 0.5,
+  header: {
+    flexDirection: "row", alignItems: "center", gap: 12,
+    paddingHorizontal: 16, paddingBottom: 10,
+    backgroundColor: colors.paperRaised, borderBottomWidth: 1, borderBottomColor: colors.line,
   },
-  input: {
-    backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,
-    borderRadius: radius.md, padding: 12, fontSize: 15, color: colors.ink,
-  },
+  backBtn: { padding: 2 },
+  titleGroup: { flex: 1, flexDirection: "row", alignItems: "center", gap: 8, minWidth: 0 },
+  title: { fontFamily: fonts.display, fontSize: 19, color: colors.ink, flexShrink: 1 },
   itemRow: {
     flexDirection: "row", alignItems: "center", gap: 10,
     backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,
-    borderRadius: radius.md, padding: 10, marginBottom: 6,
+    borderRadius: radius.md, padding: 14, marginBottom: 8,
   },
-  itemName: { color: colors.ink, fontSize: 14, flex: 1 },
+  itemName: { color: colors.ink, fontSize: 15, flex: 1 },
   itemCategory: { color: colors.lightBlue, fontSize: 11, fontWeight: "600" },
-  removeText: { color: colors.coral, fontSize: 12, fontWeight: "600" },
-  empty: { color: colors.inkSoft, fontStyle: "italic", fontSize: 13, marginTop: 4 },
-  addCard: {
-    backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line, borderStyle: "dashed",
-    borderRadius: radius.md, padding: 12, marginTop: 10,
+  empty: { color: colors.inkSoft, fontStyle: "italic", fontSize: 13, textAlign: "center", marginTop: 30 },
+  fab: {
+    position: "absolute", bottom: 20, right: 20, width: 56, height: 56, borderRadius: 28,
+    backgroundColor: colors.ink, alignItems: "center", justifyContent: "center",
+    shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4,
   },
-  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 10 },
-  chip: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.paper },
-  chipActive: { backgroundColor: colors.lightBlue, borderColor: colors.lightBlue },
-  chipText: { color: colors.inkSoft, fontWeight: "600", fontSize: 12 },
-  chipTextActive: { color: "#fff" },
-  addButton: { backgroundColor: colors.ink, borderRadius: radius.md, padding: 12, alignItems: "center", marginTop: 10 },
-  addButtonText: { color: colors.paper, fontWeight: "700" },
-  deleteButton: {
-    borderWidth: 1, borderColor: colors.coral, borderRadius: radius.md,
-    padding: 14, alignItems: "center", marginTop: 24,
-  },
-  deleteButtonText: { color: colors.coral, fontWeight: "700" },
 });

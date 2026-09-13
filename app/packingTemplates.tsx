@@ -1,39 +1,33 @@
+import { useCallback, useState } from "react";
 import { View, Text, FlatList, StyleSheet, Pressable } from "react-native";
-import { Stack, useRouter } from "expo-router";
+import { Stack, useRouter, useFocusEffect } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { Alert } from "@/lib/alert";
-import { supabase } from "@/lib/supabase";
 import { colors, radius, fonts } from "@/lib/theme";
 import SubpageHeader from "@/components/SubpageHeader";
 import Icon from "@/components/icons/Icon";
-
-interface TemplateRow {
-  id: string;
-  name: string;
-  itemCount: number;
-}
-
-async function fetchTemplates(): Promise<TemplateRow[]> {
-  const { data, error } = await supabase
-    .from("packing_templates")
-    .select("id, name, packing_template_items(count)")
-    .order("name");
-  if (error) throw error;
-  return (data ?? []).map((t: any) => ({ id: t.id, name: t.name, itemCount: t.packing_template_items?.[0]?.count ?? 0 }));
-}
+import TemplateNameModal from "@/components/TemplateNameModal";
+import { fetchPackingTemplates, createPackingTemplate } from "@/lib/packing";
 
 export default function PackingTemplates() {
   const router = useRouter();
-  const { data, refetch } = useQuery({ queryKey: ["packingTemplates"], queryFn: fetchTemplates });
+  const [creating, setCreating] = useState(false);
+  const [nameModalOpen, setNameModalOpen] = useState(false);
+  const { data, refetch } = useQuery({ queryKey: ["packingTemplates"], queryFn: fetchPackingTemplates });
   const templates = data ?? [];
 
-  async function createTemplate() {
-    const { data: t, error } = await supabase.from("packing_templates").insert({ name: "New template" }).select().single();
-    if (error || !t) {
-      Alert.alert("Couldn't create template", error?.message ?? "Unknown error");
-      return;
+  useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
+
+  async function saveNewTemplate(name: string) {
+    setCreating(true);
+    try {
+      const id = await createPackingTemplate(name);
+      setNameModalOpen(false);
+      router.push(`/packingTemplate/${id}`);
+    } catch (e: any) {
+      Alert.alert("Couldn't create template", e?.message ?? "Unknown error");
     }
-    router.push(`/packingTemplate/${t.id}`);
+    setCreating(false);
   }
 
   return (
@@ -60,9 +54,17 @@ export default function PackingTemplates() {
           <Text style={styles.empty}>No templates yet — create one to reuse across trips.</Text>
         }
       />
-      <Pressable style={styles.fab} onPress={createTemplate}>
+      <Pressable style={styles.fab} onPress={() => setNameModalOpen(true)}>
         <Icon name="add" size={24} color="#fff" />
       </Pressable>
+
+      <TemplateNameModal
+        visible={nameModalOpen}
+        onClose={() => setNameModalOpen(false)}
+        onSave={saveNewTemplate}
+        title="New template"
+        saving={creating}
+      />
     </View>
   );
 }

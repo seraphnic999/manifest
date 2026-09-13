@@ -37,6 +37,56 @@ export async function mergePackingItems(tripId: string, sourceItems: PackingSour
   if (insertError) throw insertError;
 }
 
+export interface PackingTemplateRow {
+  id: string;
+  name: string;
+  itemCount: number;
+}
+
+export async function fetchPackingTemplates(): Promise<PackingTemplateRow[]> {
+  const { data, error } = await supabase
+    .from("packing_templates")
+    .select("id, name, packing_template_items(count)")
+    .order("name");
+  if (error) throw error;
+  return (data ?? []).map((t: any) => ({ id: t.id, name: t.name, itemCount: t.packing_template_items?.[0]?.count ?? 0 }));
+}
+
+export async function createPackingTemplate(name: string): Promise<string> {
+  const { data, error } = await supabase.from("packing_templates").insert({ name }).select("id").single();
+  if (error || !data) throw error ?? new Error("Could not create template.");
+  return data.id as string;
+}
+
+export async function renamePackingTemplate(id: string, name: string): Promise<void> {
+  const { error } = await supabase.from("packing_templates").update({ name }).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deletePackingTemplate(id: string): Promise<void> {
+  const { error } = await supabase.from("packing_templates").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function addPackingTemplateItem(
+  templateId: string, name: string, category: string | null, sortOrder: number
+): Promise<void> {
+  const { error } = await supabase
+    .from("packing_template_items")
+    .insert({ template_id: templateId, name, category, sort_order: sortOrder });
+  if (error) throw error;
+}
+
+export async function updatePackingTemplateItem(id: string, name: string, category: string | null): Promise<void> {
+  const { error } = await supabase.from("packing_template_items").update({ name, category }).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deletePackingTemplateItem(id: string): Promise<void> {
+  const { error } = await supabase.from("packing_template_items").delete().eq("id", id);
+  if (error) throw error;
+}
+
 export async function fetchTemplateItems(templateId: string): Promise<PackingSourceItem[]> {
   const { data, error } = await supabase
     .from("packing_template_items").select("name, category").eq("template_id", templateId).order("sort_order");
