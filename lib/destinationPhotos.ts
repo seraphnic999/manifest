@@ -116,6 +116,11 @@ export const DESTINATION_PHOTOS: DestinationPhoto[] = [
   { id: "dubai", city: "Dubai", country: "United Arab Emirates", source: require("../assets/destinations/dubai.jpg") },
   { id: "ha-long-bay", city: "Ha Long Bay", country: "Vietnam", source: require("../assets/destinations/ha-long-bay.jpg") },
   { id: "lyon", city: "Lyon", country: "France", source: require("../assets/destinations/lyon.jpg") },
+  // Not a real place — a cruise's "day at sea", so a trip whose primary
+  // destination is mostly a cruise can pick this as its cover instead of
+  // whatever port city happens to be first. See migration_036 for the
+  // matching `cities` row.
+  { id: "at-sea", city: "At Sea", country: "International Waters", source: require("../assets/destinations/at-sea.jpg") },
 ];
 
 export const FALLBACK_COVER_PHOTO: ImageSourcePropType = require("../assets/destinations/_fallback.jpg");
