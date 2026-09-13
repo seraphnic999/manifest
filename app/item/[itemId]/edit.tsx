@@ -6,17 +6,18 @@ import { Alert } from "@/lib/alert";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
-import { categoryForDbType, FieldKey } from "@/lib/itemTypeMeta";
+import { categoryForDbType, categoryByKey, CONVERTIBLE_CATEGORIES, isConvertibleType, FieldKey } from "@/lib/itemTypeMeta";
 import { DateField, TimeField } from "@/components/DateTimeFields";
 import { computeInsertSortOrder } from "@/lib/reorder";
 import { computeDurationMinutes, formatDuration } from "@/lib/duration";
 import { useUnsavedChangesGuard } from "@/lib/useUnsavedChangesGuard";
-import { Item, ItemStatus } from "@/lib/types";
+import { Item, ItemStatus, ItemType } from "@/lib/types";
 import { DEFAULT_REMINDER_MINUTES } from "@/lib/reminders";
 import { linkItems, unlinkItems, fetchLinkedItems, LinkedItemSummary } from "@/lib/itemLinks";
 import { formatDateDDMM } from "@/lib/dateFormat";
 import { normalizeTimeHHMM } from "@/lib/timeFormat";
 import ItemPickerModal from "@/components/ItemPickerModal";
+import ItemTypePickerModal from "@/components/ItemTypePickerModal";
 import QuickNotesList from "@/components/QuickNotesList";
 import HomeButton from "@/components/HomeButton";
 import SubpageHeader from "@/components/SubpageHeader";
@@ -56,6 +57,9 @@ export default function EditItem() {
   const [googleMapsLink, setGoogleMapsLink] = useState("");
   const [reminderMinutes, setReminderMinutes] = useState("");
   const [itemType, setItemType] = useState("other");
+  const [origItemType, setOrigItemType] = useState("other");
+  const [origTime, setOrigTime] = useState("");
+  const [typePickerOpen, setTypePickerOpen] = useState(false);
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
   const [mapIcon, setMapIcon] = useState<IconName | null>(null);
@@ -81,7 +85,7 @@ export default function EditItem() {
   const latestSnapshotRef = useRef("");
   function currentSnapshot() {
     return JSON.stringify({
-      title, status, itemDate, time, address, phone, vendor, flightNumber,
+      title, status, itemType, itemDate, time, address, phone, vendor, flightNumber,
       bookingSource, confirmationCode, link, googleMapsLink, latitude, longitude, mapIcon,
       reminderMinutes,
       checkInDate, checkInTime, checkOutDate, checkOutTime,
@@ -107,6 +111,7 @@ export default function EditItem() {
       const item = data as Item;
       setIsStaySpan(item.is_stay_span);
       setItemType(item.type);
+      setOrigItemType(item.type);
       const cat = categoryForDbType(item.type);
       // A lodging check-in/check-out event isn't the span itself, so drop
       // the date-range fields even though its DB type is also 'lodging'.
@@ -115,6 +120,7 @@ export default function EditItem() {
       setTitle(item.title);
       setStatus(item.status);
       setTime(item.time_start ?? "");
+      setOrigTime(item.time_start ?? "");
       setItemDate(item.start_date ?? "");
       setOrigItemDate(item.start_date ?? "");
       setAddress(item.address ?? "");
@@ -142,7 +148,7 @@ export default function EditItem() {
       // JSON.stringify preserves insertion order and the dirty check is a
       // plain string comparison.
       originalSnapshotRef.current = JSON.stringify({
-        title: item.title, status: item.status,
+        title: item.title, status: item.status, itemType: item.type,
         itemDate: item.start_date ?? "", time: item.time_start ?? "",
         address: item.address ?? "", phone: item.phone ?? "", vendor: item.vendor ?? "",
         flightNumber: (item.custom_fields as any)?.flight_number ?? "",
@@ -187,6 +193,14 @@ export default function EditItem() {
   }
 
   const has = (f: FieldKey) => fields.includes(f);
+  const typeChangeable = isConvertibleType(origItemType as ItemType);
+
+  function handleCategorySelect(categoryKey: string) {
+    const cat = categoryByKey(categoryKey);
+    setItemType(cat.dbTypes[0]);
+    setFields(cat.fields);
+    setTypePickerOpen(false);
+  }
 
   // Returns whether the save succeeded — it doesn't navigate itself, since
   // the two callers need different post-save navigation: the plain "Save
@@ -223,6 +237,7 @@ export default function EditItem() {
 
     const { error } = await supabase.from("items").update({
       title, status,
+      type: itemType,
       time_start: newTimeStart,
       time_end: isStaySpan ? (checkOutTime || null) : (has("flightTimes") ? (arrivalTime || null) : undefined),
       start_date: newStartDate,
@@ -254,6 +269,11 @@ export default function EditItem() {
     }
     if (!isStaySpan && itemDate && itemDate !== origItemDate && current) {
       await moveToDay(current.trip_id, itemDate);
+    } else if (!isStaySpan && time !== origTime && current?.day_id) {
+      // Date (and so day_id) is unchanged, but the time moved — reslot the
+      // item among its current day's siblings so the day view stays in
+      // chronological order without a full cross-day move.
+      await repositionInDay(current.day_id);
     }
     return true;
   }
@@ -285,6 +305,18 @@ export default function EditItem() {
       .eq("day_id", targetDay.id).is("deleted_at", null);
     const newSortOrder = computeInsertSortOrder(siblings ?? [], time || null);
     await supabase.from("items").update({ day_id: targetDay.id, sort_order: newSortOrder }).eq("id", itemId);
+  }
+
+  // Same-day counterpart to moveToDay: the date didn't change, but the time
+  // did, so re-slot the item among its current siblings (excluding itself)
+  // instead of leaving it wherever it happened to sit before the edit.
+  async function repositionInDay(dayId: string) {
+    const { data: siblings } = await supabase
+      .from("items").select("id, sort_order, time_start")
+      .eq("day_id", dayId).is("deleted_at", null);
+    const others = (siblings ?? []).filter((s) => s.id !== itemId);
+    const newSortOrder = computeInsertSortOrder(others, time || null);
+    await supabase.from("items").update({ sort_order: newSortOrder }).eq("id", itemId);
   }
 
   // Keeps the auto-created "Check in"/"Check out" day items in sync when
@@ -329,6 +361,31 @@ export default function EditItem() {
 
       <Text style={styles.label}>Title</Text>
       <TextInput style={styles.input} value={title} onChangeText={setTitle} />
+
+      {typeChangeable && (
+        <>
+          <Text style={styles.label}>Type</Text>
+          <Pressable style={styles.mapIconRow} onPress={() => setTypePickerOpen(true)}>
+            <View style={[styles.mapIconPreview, { backgroundColor: categoryForDbType(itemType as ItemType).tileColor }]}>
+              <Icon name={categoryForDbType(itemType as ItemType).icon} size={22} color="#fff" />
+            </View>
+            <Text style={styles.mapIconRowText}>{categoryForDbType(itemType as ItemType).label}</Text>
+            <Icon name="forward" size={16} color={colors.blue} />
+          </Pressable>
+          {(() => {
+            const cat = categoryForDbType(itemType as ItemType);
+            return cat.dbTypes.length > 1 && cat.subtypeLabels ? (
+              <View style={[styles.chipRow, { marginTop: 8 }]}>
+                {cat.dbTypes.map((t) => (
+                  <Pressable key={t} style={[styles.chip, itemType === t && styles.chipActive]} onPress={() => setItemType(t)}>
+                    <Text style={[styles.chipText, itemType === t && styles.chipTextActive]}>{cat.subtypeLabels![t]}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null;
+          })()}
+        </>
+      )}
 
       {isStaySpan ? (
         <>
@@ -477,6 +534,14 @@ export default function EditItem() {
       onSelect={(icon) => { setMapIcon(icon); setMapIconPickerOpen(false); }}
       defaultIcon={categoryForDbType(itemType as any).icon}
       selected={mapIcon}
+    />
+
+    <ItemTypePickerModal
+      visible={typePickerOpen}
+      onClose={() => setTypePickerOpen(false)}
+      onSelect={handleCategorySelect}
+      categories={CONVERTIBLE_CATEGORIES}
+      title="Change type"
     />
 
     <ItemPickerModal

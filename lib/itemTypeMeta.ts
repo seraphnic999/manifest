@@ -42,11 +42,9 @@ export const ITEM_CATEGORIES: ItemCategory[] = [
   },
   {
     key: "dining", label: "Food & Drink", icon: "dining", tileColor: "#E07A3C",
-    dbTypes: ["meal", "bar", "cafe", "bakery"],
-    subtypeLabels: { meal: "Restaurant", bar: "Bar", cafe: "Cafe", bakery: "Bakery" },
-    // Bakery has no icon of its own yet — reusing iceCream as a placeholder
-    // until a dedicated one is added.
-    subtypeIcons: { cafe: "cafe", bakery: "iceCream" },
+    dbTypes: ["meal", "bar", "cafe", "bakery", "ice_cream"],
+    subtypeLabels: { meal: "Restaurant", bar: "Bar", cafe: "Cafe", bakery: "Bakery", ice_cream: "Ice Cream" },
+    subtypeIcons: { cafe: "cafe", bakery: "croissant", ice_cream: "iceCream" },
     fields: ["time", "address", "phone", "bookingSource", "confirmationCode", "link", "notes"],
   },
   {
@@ -74,6 +72,18 @@ export const ITEM_CATEGORIES: ItemCategory[] = [
 
 export function categoryByKey(key: string) {
   return ITEM_CATEGORIES.find((c) => c.key === key) ?? ITEM_CATEGORIES[ITEM_CATEGORIES.length - 1];
+}
+
+// Flight and lodging carry structural behavior a plain type change can't
+// carry over (flight duration/status lookups, the stay-span + auto-created
+// check-in/out children) — every other category is just a title plus a
+// handful of optional fields, so converting between them is safe.
+export const CONVERTIBLE_CATEGORIES = ITEM_CATEGORIES.filter(
+  (c) => c.key !== "flight" && c.key !== "lodging"
+);
+
+export function isConvertibleType(type: ItemType): boolean {
+  return type !== "flight" && categoryForDbType(type).key !== "lodging";
 }
 
 /** Reverse lookup: which UI category owns a given DB item_type (for editing). */

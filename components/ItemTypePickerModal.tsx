@@ -1,10 +1,10 @@
 import { View, Text, Pressable, Modal, StyleSheet, ScrollView } from "react-native";
 import { colors, radius } from "@/lib/theme";
-import { ITEM_CATEGORIES } from "@/lib/itemTypeMeta";
+import { ITEM_CATEGORIES, ItemCategory } from "@/lib/itemTypeMeta";
 import Icon from "@/components/icons/Icon";
 
 export default function ItemTypePickerModal({
-  visible, onClose, onSelect, onSelectKeeper,
+  visible, onClose, onSelect, onSelectKeeper, categories = ITEM_CATEGORIES, title = "Add item",
 }: {
   visible: boolean;
   onClose: () => void;
@@ -16,14 +16,19 @@ export default function ItemTypePickerModal({
    * this prop to leave the tile out entirely (e.g. the map's "add
    * proposal" picker has no day/city to match keepers against). */
   onSelectKeeper?: () => void;
+  /** Defaults to every category (the "Add item" picker) — pass a filtered
+   * subset for other uses, e.g. changing an existing item's type, which
+   * excludes flight/lodging (see CONVERTIBLE_CATEGORIES). */
+  categories?: ItemCategory[];
+  title?: string;
 }) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-          <Text style={styles.title}>Add item</Text>
+          <Text style={styles.title}>{title}</Text>
           <ScrollView contentContainerStyle={styles.grid}>
-            {ITEM_CATEGORIES.map((cat) => (
+            {categories.map((cat) => (
               <Pressable
                 key={cat.key}
                 style={styles.tile}

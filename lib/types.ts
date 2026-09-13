@@ -5,7 +5,7 @@ export type TripStatus = "future" | "current" | "past"; // derived, not stored
 
 export type ItemType =
   | "flight" | "transfer" | "transport" | "lodging" | "activity"
-  | "meal" | "bar" | "cafe" | "bakery" | "sightseeing" | "attraction" | "shopping" | "work" | "other";
+  | "meal" | "bar" | "cafe" | "bakery" | "ice_cream" | "sightseeing" | "attraction" | "shopping" | "work" | "other";
 
 export type ItemStatus = "booked" | "optional" | "planned";
 
