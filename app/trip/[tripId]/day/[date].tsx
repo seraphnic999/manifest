@@ -143,15 +143,22 @@ export default function DayView() {
   // feedback, same as before this screen read through TanStack Query.
   useEffect(() => {
     if (!data) return;
-    setAllDays(data.allDays);
-    setTripCities(data.tripCities);
+    // Array.isArray, not just the field itself: guards against a stale
+    // persisted react-query cache entry (from before one of these fields
+    // existed on this query's shape, e.g. a trip day not opened since
+    // tripCities/orderable were added) rehydrating as undefined and
+    // crashing dayCityLabel/resolveDayCityPick's rows.length read before
+    // this screen's own refetch can replace it with a fresh value — see
+    // lib/queryClient.ts's QUERY_CACHE_SCHEMA_VERSION comment.
+    setAllDays(Array.isArray(data.allDays) ? data.allDays : []);
+    setTripCities(Array.isArray(data.tripCities) ? data.tripCities : []);
     setDayId(data.dayId);
     setTheme(data.theme);
     setDayCityId(data.cityId);
     setDayCustomCityName(data.customCityName);
     setDayColor(data.color);
-    setOrderable(data.orderable);
-    setStayBanners(data.stayBanners);
+    setOrderable(Array.isArray(data.orderable) ? data.orderable : []);
+    setStayBanners(Array.isArray(data.stayBanners) ? data.stayBanners : []);
   }, [data]);
 
   useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
