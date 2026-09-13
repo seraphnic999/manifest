@@ -21,6 +21,18 @@ import { Alert } from "@/lib/alert";
 import { fetchTripCities, dayCityLabel } from "@/lib/cities";
 import { useResearchJobs } from "@/lib/itemResearch";
 
+// Past-trips list is already sorted most-recent-first before this runs, so
+// a Map (insertion-order) naturally yields years newest-first too, with each
+// year's own trips still in that same date order — no re-sort needed here.
+function groupTripsByYear(trips: Trip[]): [string, Trip[]][] {
+  const byYear = new Map<string, Trip[]>();
+  for (const trip of trips) {
+    const year = trip.start_date.slice(0, 4);
+    byYear.set(year, [...(byYear.get(year) ?? []), trip]);
+  }
+  return [...byYear.entries()];
+}
+
 interface NavCtx {
   router: ReturnType<typeof useRouter>;
   setSearchOpen: (v: boolean) => void;
@@ -380,16 +392,26 @@ export default function TripList() {
                 </Pressable>
               );
             }
+            if (section.label === "Past") {
+              return (
+                <View>
+                  <Text style={styles.sectionLabel}>{section.label}</Text>
+                  {groupTripsByYear(section.items).map(([year, yearTrips]) => (
+                    <View key={year}>
+                      <Text style={styles.yearLabel}>{year}</Text>
+                      {yearTrips.map((trip) => (
+                        <TripPhotoCard key={trip.id} trip={trip} showCountdown={false} onArchive={() => archiveTrip(trip)} />
+                      ))}
+                    </View>
+                  ))}
+                </View>
+              );
+            }
             return (
               <View>
                 <Text style={styles.sectionLabel}>{section.label}</Text>
                 {section.items.map((trip) => (
-                  <TripPhotoCard
-                    key={trip.id}
-                    trip={trip}
-                    showCountdown={section.label === "Upcoming"}
-                    onArchive={section.label === "Past" ? () => archiveTrip(trip) : undefined}
-                  />
+                  <TripPhotoCard key={trip.id} trip={trip} showCountdown={section.label === "Upcoming"} />
                 ))}
               </View>
             );
@@ -431,6 +453,10 @@ const styles = StyleSheet.create({
   sectionLabel: {
     color: colors.ink, fontFamily: fonts.display, fontSize: 18,
     marginTop: 14, marginBottom: 10,
+  },
+  yearLabel: {
+    color: colors.inkSoft, fontWeight: "700", fontSize: 13,
+    textTransform: "uppercase", letterSpacing: 1, marginTop: 12, marginBottom: 6,
   },
   empty: { textAlign: "center", color: colors.inkSoft, marginTop: 40 },
 
