@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { View, Text, FlatList, StyleSheet, Pressable, ImageBackground, Image } from "react-native";
+import { View, Text, FlatList, StyleSheet, Pressable, ImageBackground, Image, ActivityIndicator } from "react-native";
 import { useLocalSearchParams, useRouter, Stack, useFocusEffect } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { StatusBar } from "expo-status-bar";
@@ -111,7 +111,7 @@ export default function TripOverview() {
   const { menuItems, shareModal } = useTripHamburgerMenu(tripId);
   const router = useRouter();
 
-  const { data, dataUpdatedAt, refetch } = useQuery({
+  const { data, error: tripError, dataUpdatedAt, refetch } = useQuery({
     queryKey: ["tripOverview", tripId],
     queryFn: () => fetchOverviewData(tripId),
   });
@@ -166,7 +166,33 @@ export default function TripOverview() {
   // until the next full reload.
   useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
 
-  if (!trip) return null;
+  // The header is set here (not further down) so it renders on every path —
+  // loading, error, and success alike. Without that, a failed or still-
+  // pending fetch would return before ever reaching headerShown:false, and
+  // React Navigation's own fallback header would show the raw route
+  // pattern ("trip/[tripId]/index") as its title over a blank screen.
+  if (!trip) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.paper }}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={styles.loadingCenter}>
+          {tripError ? (
+            <>
+              <Text style={styles.loadingErrorTitle}>Couldn't load this trip</Text>
+              <Text style={styles.loadingErrorMessage}>
+                {(tripError as any)?.message ?? "Something went wrong."}
+              </Text>
+              <Pressable style={styles.loadingRetryButton} onPress={() => refetch()}>
+                <Text style={styles.loadingRetryButtonText}>Try again</Text>
+              </Pressable>
+            </>
+          ) : (
+            <ActivityIndicator color={colors.blue} />
+          )}
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -371,6 +397,11 @@ export default function TripOverview() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   body: { paddingHorizontal: 16, paddingTop: 10 },
+  loadingCenter: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
+  loadingErrorTitle: { fontFamily: fonts.display, fontSize: 18, color: colors.ink, marginBottom: 8, textAlign: "center" },
+  loadingErrorMessage: { color: colors.inkSoft, fontSize: 13, textAlign: "center", marginBottom: 18 },
+  loadingRetryButton: { backgroundColor: colors.ink, borderRadius: radius.md, paddingVertical: 12, paddingHorizontal: 24 },
+  loadingRetryButtonText: { color: colors.paper, fontWeight: "700" },
 
   hero: { justifyContent: "flex-end", padding: 14 },
   heroScrim: {

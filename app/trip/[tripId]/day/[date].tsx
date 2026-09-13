@@ -133,7 +133,7 @@ export default function DayView() {
   const router = useRouter();
   const { menuItems, shareModal } = useTripHamburgerMenu(tripId);
 
-  const { data, dataUpdatedAt, refetch } = useQuery({
+  const { data, error: dayError, dataUpdatedAt, refetch } = useQuery({
     queryKey: ["day", tripId, date],
     queryFn: () => fetchDayData(tripId, date, isProposals),
   });
@@ -378,6 +378,11 @@ export default function DayView() {
       />
       {shareModal}
       <OfflineBanner dataUpdatedAt={!isOnline ? dataUpdatedAt : undefined} />
+      {dayError && (
+        <Pressable style={styles.dayErrorBanner} onPress={() => refetch()}>
+          <Text style={styles.dayErrorBannerText}>Couldn't load this day — tap to retry</Text>
+        </Pressable>
+      )}
 
       <View style={styles.dayStripOuter}>
         <ScrollView
@@ -570,6 +575,8 @@ export default function DayView() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
+  dayErrorBanner: { backgroundColor: colors.coralSoft, paddingVertical: 8, paddingHorizontal: 12 },
+  dayErrorBannerText: { color: colors.coral, fontSize: 12, fontWeight: "700", textAlign: "center" },
   dayStripOuter: {
     height: 56, backgroundColor: colors.paperRaised,
     borderBottomWidth: 1, borderBottomColor: colors.line,

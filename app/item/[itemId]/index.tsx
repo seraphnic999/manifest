@@ -8,7 +8,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import { supabase } from "@/lib/supabase";
 import Icon from "@/components/icons/Icon";
-import { colors, radius } from "@/lib/theme";
+import { colors, radius, fonts } from "@/lib/theme";
 import { Item, ItemPhoto, Expense, TripCurrency, TripParty, Keeper } from "@/lib/types";
 import { fetchKeeperById } from "@/lib/keepers";
 import { uploadItemPhoto, uploadItemDocument, fetchItemPhotosWithUrls, deleteItemPhoto, isImageAttachment } from "@/lib/photos";
@@ -103,7 +103,7 @@ export default function ItemDetails() {
   const [reviewOpen, setReviewOpen] = useState(false);
   const { job: readyResearchJob, reload: reloadReadyResearchJob } = useItemReadyResearchJob(itemId);
 
-  const { data, dataUpdatedAt, refetch } = useQuery({
+  const { data, error: itemError, dataUpdatedAt, refetch } = useQuery({
     queryKey: ["itemDetail", itemId],
     queryFn: () => fetchItemDetail(itemId),
   });
@@ -250,7 +250,33 @@ export default function ItemDetails() {
     ]);
   }
 
-  if (!item) return null;
+  // The header is set here (not further down, alongside the rest of the
+  // custom UI) specifically so it renders on every path — loading, error,
+  // and success alike. Without that, a failed or still-pending fetch would
+  // return before ever reaching headerShown:false, and React Navigation's
+  // own fallback header would show the raw route pattern as its title.
+  if (!item) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.paper }}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={styles.loadingCenter}>
+          {itemError ? (
+            <>
+              <Text style={styles.loadingErrorTitle}>Couldn't load this item</Text>
+              <Text style={styles.loadingErrorMessage}>
+                {(itemError as any)?.message ?? "Something went wrong."}
+              </Text>
+              <Pressable style={styles.loadingRetryButton} onPress={() => refetch()}>
+                <Text style={styles.loadingRetryButtonText}>Try again</Text>
+              </Pressable>
+            </>
+          ) : (
+            <ActivityIndicator color={colors.blue} />
+          )}
+        </View>
+      </View>
+    );
+  }
 
   const flightNumber = (item.custom_fields as any)?.flight_number as string | undefined;
   const isFlight = item.type === "flight" && !item.is_stay_span;
@@ -604,6 +630,11 @@ export default function ItemDetails() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper, padding: 20 },
+  loadingCenter: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
+  loadingErrorTitle: { fontFamily: fonts.display, fontSize: 18, color: colors.ink, marginBottom: 8, textAlign: "center" },
+  loadingErrorMessage: { color: colors.inkSoft, fontSize: 13, textAlign: "center", marginBottom: 18 },
+  loadingRetryButton: { backgroundColor: colors.ink, borderRadius: radius.md, paddingVertical: 12, paddingHorizontal: 24 },
+  loadingRetryButtonText: { color: colors.paper, fontWeight: "700" },
   customHeader: {
     flexDirection: "row", alignItems: "center", paddingHorizontal: 8, paddingBottom: 10,
     backgroundColor: colors.paperRaised, borderBottomWidth: 1, borderBottomColor: colors.line,
