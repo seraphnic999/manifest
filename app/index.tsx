@@ -267,6 +267,17 @@ export default function TripList() {
     .filter((t) => tripStatus(t) === "past")
     .sort((a, b) => b.start_date.localeCompare(a.start_date));
 
+  // Filtered out before reaching the FlatList: with all three section
+  // wrappers always present, `data` was never actually empty even when
+  // every section's own items were — ListEmptyComponent checks data.length,
+  // so "No trips yet" could never show and a genuinely trip-less account
+  // just rendered a blank scroll area instead.
+  const homeSections = [
+    { label: "__hero__", items: currentTrip ? [currentTrip] : [] },
+    { label: "Upcoming", items: upcoming },
+    { label: "Past", items: previous },
+  ].filter((s) => s.items.length > 0);
+
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -330,22 +341,22 @@ export default function TripList() {
       {searching ? (
         <FlatList
           contentContainerStyle={{ padding: 16 }}
-          data={(["trip", "item", "shopping", "expense"] as const).map((kind) => ({ kind, items: resultsByKind[kind] }))}
+          data={(["trip", "item", "shopping", "expense"] as const)
+            .map((kind) => ({ kind, items: resultsByKind[kind] }))
+            .filter((s) => s.items.length > 0)}
           keyExtractor={(s) => s.kind}
-          renderItem={({ item: section }) =>
-            section.items.length === 0 ? null : (
-              <View>
-                <Text style={styles.sectionLabel}>{SEARCH_KIND_LABEL[section.kind]}{section.items.length > 1 ? "s" : ""}</Text>
-                {section.items.map((r) => (
-                  <Pressable key={r.id} style={styles.searchCard} onPress={() => openResult(r)}>
-                    <Text style={styles.searchTag}>{r.trip_name}</Text>
-                    <Text style={styles.searchTitle}>{r.title}</Text>
-                    {!!r.subtitle && <Text style={styles.searchSub}>{r.subtitle}</Text>}
-                  </Pressable>
-                ))}
-              </View>
-            )
-          }
+          renderItem={({ item: section }) => (
+            <View>
+              <Text style={styles.sectionLabel}>{SEARCH_KIND_LABEL[section.kind]}{section.items.length > 1 ? "s" : ""}</Text>
+              {section.items.map((r) => (
+                <Pressable key={r.id} style={styles.searchCard} onPress={() => openResult(r)}>
+                  <Text style={styles.searchTag}>{r.trip_name}</Text>
+                  <Text style={styles.searchTitle}>{r.title}</Text>
+                  {!!r.subtitle && <Text style={styles.searchSub}>{r.subtitle}</Text>}
+                </Pressable>
+              ))}
+            </View>
+          )}
           ListEmptyComponent={
             <Text style={styles.empty}>{searchLoading ? "Searching…" : "No matches."}</Text>
           }
@@ -354,11 +365,7 @@ export default function TripList() {
         <FlatList
           contentContainerStyle={{ padding: 16 }}
           refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={onRefresh} />}
-          data={[
-            { label: "__hero__", items: currentTrip ? [currentTrip] : [] },
-            { label: "Upcoming", items: upcoming },
-            { label: "Past", items: previous },
-          ]}
+          data={homeSections}
           keyExtractor={(s) => s.label}
           renderItem={({ item: section }) => {
             if (section.items.length === 0) return null;
