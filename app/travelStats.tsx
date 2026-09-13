@@ -2,8 +2,9 @@ import { FlatList, View, Text, StyleSheet, Pressable } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { Stack, useRouter } from "expo-router";
 import SubpageHeader from "@/components/SubpageHeader";
+import WorldMapPins from "@/components/WorldMapPins";
 import { colors, radius, fonts } from "@/lib/theme";
-import { fetchTravelStats, tripTimeStatus, YearStats, TripStatsRow } from "@/lib/travelStats";
+import { fetchTravelStats, fetchWorldMapPins, tripTimeStatus, YearStats, TripStatsRow } from "@/lib/travelStats";
 import { formatDateDDMMYYYY } from "@/lib/dateFormat";
 
 function StatTile({ label, value }: { label: string; value: string }) {
@@ -63,6 +64,7 @@ function YearSection({ year }: { year: YearStats }) {
 
 export default function TravelStats() {
   const { data } = useQuery({ queryKey: ["travelStats"], queryFn: fetchTravelStats });
+  const { data: pins } = useQuery({ queryKey: ["travelStatsMapPins"], queryFn: fetchWorldMapPins });
   const years = data ?? [];
 
   return (
@@ -74,6 +76,7 @@ export default function TravelStats() {
         data={years}
         keyExtractor={(y) => String(y.year)}
         renderItem={({ item }) => <YearSection year={item} />}
+        ListHeaderComponent={pins ? <WorldMapPins pins={pins} /> : null}
         ListEmptyComponent={<Text style={styles.empty}>No trips yet — your stats will show up here once you do.</Text>}
       />
     </View>

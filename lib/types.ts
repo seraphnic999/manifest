@@ -47,6 +47,11 @@ export interface TripCity {
   city_id: string | null;
   custom_name: string | null; // set only when city_id is null — a destination not in the cities dataset
   sort_order: number; // lowest = the trip's primary city, drives cover/timezone/map-focus auto-fill
+  // Only meaningful when custom_name is set — a picked city (city_id) always
+  // uses cities.latitude/longitude instead. Populated by geocode-city;
+  // null if geocoding hasn't run yet or found no match.
+  latitude: number | null;
+  longitude: number | null;
   created_at: string;
 }
 

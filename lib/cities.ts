@@ -37,19 +37,57 @@ export async function fetchTripCities(tripId: string): Promise<TripCityRow[]> {
   return data as unknown as TripCityRow[];
 }
 
+/** Best-effort geocode of a custom (free-text) destination name, for the
+ * travel-stats world map's pins. Never throws — a failed/timed-out lookup
+ * just means that one destination won't get a pin, which isn't worth
+ * blocking or erroring the trip save over. */
+async function geocodeCustomName(name: string): Promise<{ latitude: number | null; longitude: number | null }> {
+  try {
+    const { data, error } = await supabase.functions.invoke("geocode-city", { body: { name } });
+    if (error || !data) return { latitude: null, longitude: null };
+    return { latitude: data.latitude ?? null, longitude: data.longitude ?? null };
+  } catch {
+    return { latitude: null, longitude: null };
+  }
+}
+
 /** Replaces a trip's entire trip_cities set in one call. Safe as a full
  * delete-then-reinsert because nothing else in the schema references
  * trip_cities.id, and the picker always operates on the complete ordered
- * list rather than incremental diffs. */
+ * list rather than incremental diffs.
+ *
+ * Custom-named picks get geocoded here (once) so the travel-stats map can
+ * plot a pin for them — reusing this trip's existing coordinates for a name
+ * that was already geocoded, so re-saving the same picker selection doesn't
+ * re-hit the geocoding service every time. */
 export async function saveTripCities(
   tripId: string,
   picks: { cityId: string | null; customName: string | null }[]
 ): Promise<void> {
-  await supabase.from("trip_cities").delete().eq("trip_id", tripId);
-  if (picks.length === 0) return;
-  await supabase.from("trip_cities").insert(
-    picks.map((p, i) => ({ trip_id: tripId, city_id: p.cityId, custom_name: p.customName, sort_order: i }))
+  const existing = await fetchTripCities(tripId);
+  const existingCoordsByName = new Map(
+    existing
+      .filter((r) => r.custom_name && r.latitude != null && r.longitude != null)
+      .map((r) => [r.custom_name!.trim().toLowerCase(), { latitude: r.latitude, longitude: r.longitude }])
   );
+
+  const rows = await Promise.all(
+    picks.map(async (p, i) => {
+      let coords: { latitude: number | null; longitude: number | null } = { latitude: null, longitude: null };
+      if (p.customName) {
+        coords = existingCoordsByName.get(p.customName.trim().toLowerCase())
+          ?? await geocodeCustomName(p.customName);
+      }
+      return {
+        trip_id: tripId, city_id: p.cityId, custom_name: p.customName, sort_order: i,
+        latitude: coords.latitude, longitude: coords.longitude,
+      };
+    })
+  );
+
+  await supabase.from("trip_cities").delete().eq("trip_id", tripId);
+  if (rows.length === 0) return;
+  await supabase.from("trip_cities").insert(rows);
 }
 
 /** The trip's primary destination (lowest sort_order) — null if none picked

@@ -3,6 +3,7 @@
 // expense total; trip length mirrors its daysBetweenInclusive.
 import { supabase } from "./supabase";
 import { Trip } from "./types";
+import { AUTO_DAY_COLORS } from "./dayColors";
 
 function daysBetweenInclusive(startIso: string, endIso: string): number {
   const [y1, m1, d1] = startIso.split("-").map(Number);
@@ -97,4 +98,68 @@ export async function fetchTravelStats(): Promise<YearStats[]> {
   });
 
   return years.sort((a, b) => b.year - a.year);
+}
+
+export const MAP_YEAR_COLORS = AUTO_DAY_COLORS.slice(0, 5);
+
+export interface CityPin {
+  key: string; // city_id, or "custom:<lowercased name>" — dedupes repeat visits to the same place
+  label: string;
+  latitude: number;
+  longitude: number;
+  year: number; // the most recent year this place was visited, within the tracked window
+  color: string;
+}
+
+interface TripCityForMap {
+  trip_id: string;
+  city_id: string | null;
+  custom_name: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  city: { name: string; latitude: number; longitude: number } | null;
+}
+
+/** One pin per distinct place visited, colored by the most recent of the up
+ * to 5 most recent years the user has traveled — a place last visited
+ * outside that window is left off the map entirely (an older trip doesn't
+ * dilute the recent-years picture the map is showing). */
+export async function fetchWorldMapPins(): Promise<CityPin[]> {
+  const { data: trips, error: tripsError } = await supabase
+    .from("trips").select("id, start_date").is("deleted_at", null);
+  if (tripsError || !trips || trips.length === 0) return [];
+
+  const yearByTrip = new Map<string, number>(trips.map((t) => [t.id, Number(t.start_date.slice(0, 4))]));
+  const distinctYears = [...new Set(yearByTrip.values())].sort((a, b) => b - a);
+  const trackedYears = distinctYears.slice(0, MAP_YEAR_COLORS.length);
+  const colorByYear = new Map(trackedYears.map((y, i) => [y, MAP_YEAR_COLORS[i]]));
+
+  const { data: tripCities, error: citiesError } = await supabase
+    .from("trip_cities")
+    .select("trip_id, city_id, custom_name, latitude, longitude, city:cities(name, latitude, longitude)")
+    .in("trip_id", trips.map((t) => t.id));
+  if (citiesError || !tripCities) return [];
+
+  const latestByKey = new Map<string, { label: string; latitude: number; longitude: number; year: number }>();
+  for (const row of tripCities as unknown as TripCityForMap[]) {
+    const year = yearByTrip.get(row.trip_id);
+    if (year == null) continue;
+
+    const lat = row.city?.latitude ?? row.latitude;
+    const lon = row.city?.longitude ?? row.longitude;
+    if (lat == null || lon == null) continue; // ungeocoded custom name — no pin possible yet
+
+    const key = row.city_id ?? `custom:${row.custom_name!.trim().toLowerCase()}`;
+    const label = row.city?.name ?? row.custom_name!;
+    const prev = latestByKey.get(key);
+    if (!prev || year > prev.year) latestByKey.set(key, { label, latitude: lat, longitude: lon, year });
+  }
+
+  const pins: CityPin[] = [];
+  for (const [key, place] of latestByKey) {
+    const color = colorByYear.get(place.year);
+    if (!color) continue; // most recent visit predates the tracked window
+    pins.push({ key, label: place.label, latitude: place.latitude, longitude: place.longitude, year: place.year, color });
+  }
+  return pins;
 }
