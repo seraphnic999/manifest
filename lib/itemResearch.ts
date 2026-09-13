@@ -197,8 +197,14 @@ export function useResearchJobs() {
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
+    // A random suffix, not a fixed name: this hook now mounts concurrently
+    // in more than one place (Home's badge dot + the Research Queue screen
+    // itself), and Supabase's realtime client resolves `.channel(name)` to
+    // the same underlying channel object for a repeated name — a second
+    // `.on(...)` after the first has already called `.subscribe()` throws
+    // "cannot add postgres_changes callbacks ... after subscribe()".
     const channel = supabase
-      .channel("item-research-jobs-all")
+      .channel(`item-research-jobs-all:${Math.random().toString(36).slice(2)}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "item_research_jobs" }, () => load())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
@@ -223,16 +229,20 @@ export function useItemResearchJob(id: string | undefined) {
   return { job, loading, reload: load };
 }
 
-// The small pending-review badge on an item (day view row + detail page):
-// is there a job for this item sitting in 'ready'? Cheap, indexed lookup.
-export function useItemReadyResearchJob(itemId: string | undefined) {
+// The item detail page's research status button ("Fill in details" /
+// "Research in progress" / "Pending review") needs the item's most recent
+// job at any status, not just 'ready' — and needs to notice a status
+// change (queued -> researching -> ready) without the user navigating
+// away and back, hence the realtime subscription rather than a one-shot
+// fetch.
+export function useLatestItemResearchJob(itemId: string | undefined) {
   const [job, setJob] = useState<ItemResearchJob | null>(null);
 
   const load = useCallback(async () => {
     if (!itemId) { setJob(null); return; }
     const { data } = await supabase
       .from("item_research_jobs").select("*")
-      .eq("item_id", itemId).eq("status", "ready")
+      .eq("item_id", itemId)
       .order("created_at", { ascending: false }).limit(1).maybeSingle();
     setJob((data as ItemResearchJob) ?? null);
   }, [itemId]);

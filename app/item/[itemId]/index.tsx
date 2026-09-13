@@ -30,7 +30,7 @@ import { fetchFlightStatus, isFlightStatusConfigured, FlightStatus } from "@/lib
 import AddToKeepersModal from "@/components/AddToKeepersModal";
 import IdentifyCandidatesModal from "@/components/IdentifyCandidatesModal";
 import ItemResearchReviewModal from "@/components/ItemResearchReviewModal";
-import { itemResearchEligible, useItemReadyResearchJob } from "@/lib/itemResearch";
+import { itemResearchEligible, useLatestItemResearchJob } from "@/lib/itemResearch";
 
 type PhotoWithUrl = ItemPhoto & { url: string };
 type LinkedShoppingItem = { id: string; name: string; quantity: number; allocations: { id: string }[] };
@@ -101,7 +101,9 @@ export default function ItemDetails() {
   const [keepersModalOpen, setKeepersModalOpen] = useState(false);
   const [identifyOpen, setIdentifyOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
-  const { job: readyResearchJob, reload: reloadReadyResearchJob } = useItemReadyResearchJob(itemId);
+  const { job: latestResearchJob, reload: reloadResearchJob } = useLatestItemResearchJob(itemId);
+  const researchInProgress = latestResearchJob?.status === "queued" || latestResearchJob?.status === "researching";
+  const readyResearchJob = latestResearchJob?.status === "ready" ? latestResearchJob : null;
 
   const { data, error: itemError, dataUpdatedAt, refetch } = useQuery({
     queryKey: ["itemDetail", itemId],
@@ -337,14 +339,6 @@ export default function ItemDetails() {
           <Text numberOfLines={1} ellipsizeMode="tail" style={styles.headerTitleText}>{item.title}</Text>
         </View>
         <View style={styles.headerButtons}>
-          {readyResearchJob && (
-            <HeaderIconButton onPress={() => setReviewOpen(true)} accessibilityLabel="Research ready to review">
-              <View>
-                <Icon name="search" size={25} color={colors.gold} />
-                <View style={styles.pendingDot} />
-              </View>
-            </HeaderIconButton>
-          )}
           <HeaderIconButton onPress={deleteItem}>
             <Icon name="trash" size={25} color={colors.coral} />
           </HeaderIconButton>
@@ -415,11 +409,23 @@ export default function ItemDetails() {
         </Pressable>
       )}
 
-      {itemResearchEligible(item.type) && !readyResearchJob && (
-        <Pressable style={styles.mapLinkButton} onPress={() => setIdentifyOpen(true)}>
-          <Icon name="search" size={20} color={colors.blue} />
-          <Text style={styles.mapLinkButtonText}>Fill in details</Text>
-        </Pressable>
+      {itemResearchEligible(item.type) && (
+        researchInProgress ? (
+          <View style={[styles.mapLinkButton, styles.researchProgressButton]}>
+            <ActivityIndicator size="small" color={colors.inkSoft} />
+            <Text style={styles.researchProgressButtonText}>Research in progress…</Text>
+          </View>
+        ) : readyResearchJob ? (
+          <Pressable style={[styles.mapLinkButton, styles.researchReadyButton]} onPress={() => setReviewOpen(true)}>
+            <Icon name="search" size={20} color={colors.gold} />
+            <Text style={styles.researchReadyButtonText}>Pending review</Text>
+          </Pressable>
+        ) : (
+          <Pressable style={styles.mapLinkButton} onPress={() => setIdentifyOpen(true)}>
+            <Icon name="search" size={20} color={colors.blue} />
+            <Text style={styles.mapLinkButtonText}>Fill in details</Text>
+          </Pressable>
+        )
       )}
 
       {isFlight && flightNumber && isFlightStatusConfigured() ? (
@@ -588,14 +594,14 @@ export default function ItemDetails() {
             visible={identifyOpen}
             onClose={() => setIdentifyOpen(false)}
             item={item}
-            onQueued={reloadReadyResearchJob}
+            onQueued={reloadResearchJob}
           />
           {readyResearchJob && (
             <ItemResearchReviewModal
               visible={reviewOpen}
               onClose={() => setReviewOpen(false)}
               job={readyResearchJob}
-              onChanged={() => { reloadReadyResearchJob(); refetch(); }}
+              onChanged={() => { reloadResearchJob(); refetch(); }}
             />
           )}
         </>
@@ -642,10 +648,6 @@ const styles = StyleSheet.create({
   backBtn: { padding: 6, marginRight: 4 },
   customHeaderTitleWrap: { flex: 1, minWidth: 0, marginHorizontal: 4 },
   headerButtons: { flexDirection: "row", alignItems: "center", gap: 8, marginLeft: 8 },
-  pendingDot: {
-    position: "absolute", top: -2, right: -2, width: 9, height: 9, borderRadius: 5,
-    backgroundColor: colors.coral, borderWidth: 1.5, borderColor: colors.paperRaised,
-  },
   headerTitleText: { fontSize: 17, fontWeight: "700", color: colors.ink },
   typeTag: { fontFamily: "JetBrainsMono_600SemiBold", color: colors.lightBlue, fontWeight: "600", fontSize: 11 },
   title: { color: colors.ink, fontWeight: "800", fontSize: 22, marginVertical: 6 },
@@ -659,6 +661,10 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.lightBlue, borderRadius: radius.md, padding: 12, marginTop: 10,
   },
   mapLinkButtonText: { color: colors.lightBlue, fontWeight: "700" },
+  researchProgressButton: { borderColor: colors.line, backgroundColor: colors.paperRaised },
+  researchProgressButtonText: { color: colors.inkSoft, fontWeight: "700" },
+  researchReadyButton: { borderColor: colors.gold, backgroundColor: colors.goldSoft },
+  researchReadyButtonText: { color: colors.gold, fontWeight: "700" },
   keeperButton: {
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
     borderWidth: 1, borderColor: colors.gold, backgroundColor: colors.goldSoft,

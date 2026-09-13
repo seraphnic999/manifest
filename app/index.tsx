@@ -19,6 +19,7 @@ import { fetchDestinationForecast } from "@/lib/weather";
 import { weatherIconName } from "@/lib/weather";
 import { Alert } from "@/lib/alert";
 import { fetchTripCities, dayCityLabel } from "@/lib/cities";
+import { useResearchJobs } from "@/lib/itemResearch";
 
 interface NavCtx {
   router: ReturnType<typeof useRouter>;
@@ -167,6 +168,12 @@ export default function TripList() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Cross-trip, realtime-subscribed (see useResearchJobs) — the red dot on
+  // the Research Queue nav icon should appear/disappear the moment a job
+  // becomes ready or gets reviewed, not just on the next visit to Home.
+  const { jobs: researchJobs } = useResearchJobs();
+  const hasReadyResearch = researchJobs.some((j) => j.status === "ready");
   useEffect(() => {
     const handle = setTimeout(() => setSearchQuery(searchInput.trim()), 300);
     return () => clearTimeout(handle);
@@ -300,6 +307,7 @@ export default function TripList() {
             {NAV_ITEMS.map((n) => (
               <Pressable key={n.label} style={styles.navBtn} onPress={() => n.onPress({ router, setSearchOpen, signOut })} accessibilityLabel={n.label}>
                 <Icon name={n.icon} size={22} color={n.danger ? colors.coral : colors.blue} />
+                {n.label === "Research Queue" && hasReadyResearch && <View style={styles.navBtnDot} />}
               </Pressable>
             ))}
           </View>
@@ -409,6 +417,10 @@ const styles = StyleSheet.create({
   navBtn: {
     width: 40, height: 40, borderRadius: 20, backgroundColor: colors.paperRaised,
     borderWidth: 1, borderColor: colors.line, alignItems: "center", justifyContent: "center",
+  },
+  navBtnDot: {
+    position: "absolute", top: 2, right: 2, width: 9, height: 9, borderRadius: 5,
+    backgroundColor: colors.coral, borderWidth: 1.5, borderColor: colors.paperRaised,
   },
   searchRow: {
     flexDirection: "row", alignItems: "center", gap: 8,
