@@ -417,12 +417,12 @@ export default function ItemDetails() {
           </View>
         ) : readyResearchJob ? (
           <Pressable style={[styles.mapLinkButton, styles.researchReadyButton]} onPress={() => setReviewOpen(true)}>
-            <Icon name="search" size={20} color={colors.gold} />
+            <Icon name="research" size={20} color={colors.gold} />
             <Text style={styles.researchReadyButtonText}>Pending review</Text>
           </Pressable>
         ) : (
           <Pressable style={styles.mapLinkButton} onPress={() => setIdentifyOpen(true)}>
-            <Icon name="search" size={20} color={colors.blue} />
+            <Icon name="research" size={20} color={colors.blue} />
             <Text style={styles.mapLinkButtonText}>Fill in details</Text>
           </Pressable>
         )

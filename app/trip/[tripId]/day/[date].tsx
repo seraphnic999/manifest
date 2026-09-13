@@ -329,7 +329,7 @@ export default function DayView() {
                 <Text style={styles.typeTag}>{item.type.toUpperCase()}</Text>
                 <Text style={styles.statusBadge}>{STATUS_LABEL[item.status]}</Text>
                 {readyResearchItemIds.has(item.id) && (
-                  <Icon name="search" size={13} color={colors.gold} />
+                  <Icon name="research" size={13} color={colors.gold} />
                 )}
               </View>
               <Text style={styles.itemTitle}>{item.title}</Text>
@@ -464,7 +464,7 @@ export default function DayView() {
             <Text style={styles.stayBannerLabel}>STAY</Text>
             <Text style={styles.stayBannerTitle}>{item.title}</Text>
             {readyResearchItemIds.has(item.id) && (
-              <Icon name="search" size={13} color={colors.gold} />
+              <Icon name="research" size={13} color={colors.gold} />
             )}
           </Pressable>
         ))}

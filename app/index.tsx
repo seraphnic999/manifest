@@ -37,8 +37,8 @@ const NAV_ITEMS: { label: string; icon: IconName; danger?: boolean; onPress: (ct
   { label: "Archived Trips", icon: "archive", onPress: ({ router }) => router.push("/archived") },
   { label: "Packing Templates", icon: "packing", onPress: ({ router }) => router.push("/packingTemplates") },
   { label: "Keepers", icon: "star", onPress: ({ router }) => router.push("/keepers") },
-  { label: "Travel Stats", icon: "overview", onPress: ({ router }) => router.push("/travelStats") },
-  { label: "Research Queue", icon: "flag", onPress: ({ router }) => router.push("/researchQueue") },
+  { label: "Travel Stats", icon: "stats", onPress: ({ router }) => router.push("/travelStats") },
+  { label: "Research Queue", icon: "research", onPress: ({ router }) => router.push("/researchQueue") },
 ];
 
 // Set once a current-trip redirect has been attempted this app session, so
