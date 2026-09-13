@@ -135,6 +135,20 @@ export function dayCityLabel(
   return resolveDayCityPick(day, tripCities).label;
 }
 
+/** A day's effective city as a full catalog row (for its own cover_photo_id,
+ * coordinates, etc.) — null for a custom-named day/trip, since those have no
+ * catalog row of their own. Same fallback order as resolveDayCityPick. */
+export function resolveDayCity(
+  day: Pick<Day, "city_id" | "custom_city_name">,
+  tripCities: TripCityRow[]
+): City | null {
+  const pick = resolveDayCityPick(day, tripCities);
+  if (!pick.cityId) return null;
+  return tripCities.find((r) => r.city_id === pick.cityId)?.city
+    ?? citiesCache?.find((c) => c.id === pick.cityId)
+    ?? null;
+}
+
 /** Sets (or clears, if both fields are null) a single day's city override.
  * If the picked city/custom name isn't already one of the trip's
  * destinations, adds it (appended after the current list — never as

@@ -18,7 +18,8 @@ import { coverPhotoSource } from "@/lib/destinationPhotos";
 import { fetchDestinationForecast } from "@/lib/weather";
 import { weatherIconName } from "@/lib/weather";
 import { Alert } from "@/lib/alert";
-import { fetchTripCities, dayCityLabel } from "@/lib/cities";
+import { fetchTripCities, dayCityLabel, resolveDayCity } from "@/lib/cities";
+import { fetchTripCompanionsWithUrls } from "@/lib/companions";
 import { useResearchJobs } from "@/lib/itemResearch";
 
 // Past-trips list is already sorted most-recent-first before this runs, so
@@ -74,6 +75,8 @@ interface HeroExtra {
   nextItemTime: string | null;
   weatherTemp: number | null;
   weatherCode: number | null;
+  todayCityLabel: string | null;
+  todayCoverPhotoId: string | null;
 }
 
 // The ongoing-trip hero needs two things nothing else on this screen fetches:
@@ -111,6 +114,10 @@ async function fetchHeroExtra(tripId: string, destinations: string[]): Promise<H
   // overview screen's hero, so Home and Overview never disagree.
   const tripCities = await fetchTripCities(tripId);
   const heroCityName = todayDay ? dayCityLabel(todayDay, tripCities) : (destinations[0] ?? null);
+  // Today's cover photo follows today's actual city, same as the weather
+  // above — a city without its own bundled photo (or an unpicked/custom day)
+  // falls back to null here, which callers resolve to the trip's own cover.
+  const todayCoverPhotoId = todayDay ? resolveDayCity(todayDay, tripCities)?.cover_photo_id ?? null : null;
 
   let weatherTemp: number | null = null;
   let weatherCode: number | null = null;
@@ -126,11 +133,22 @@ async function fetchHeroExtra(tripId: string, destinations: string[]): Promise<H
     nextItemTitle: nextItem?.title ?? null,
     nextItemTime: nextItem ? normalizeTimeHHMM(nextItem.time_start) : null,
     weatherTemp, weatherCode,
+    todayCityLabel: heroCityName,
+    todayCoverPhotoId,
   };
 }
 
 function TripPhotoCard({ trip, showCountdown, onArchive }: { trip: Trip; showCountdown: boolean; onArchive?: () => void }) {
   const router = useRouter();
+  // Avatar-only, no names — just enough to see at a glance who a trip is
+  // with, right next to the arrow/archive button. Silently empty for a
+  // trip with no companions attached, same as the hero and hamburger menu
+  // don't show a companions row at all when there's nothing to show.
+  const { data: companions } = useQuery({
+    queryKey: ["tripCompanionsHome", trip.id],
+    queryFn: () => fetchTripCompanionsWithUrls(trip.id),
+  });
+
   return (
     <Pressable
       style={styles.tripCard}
@@ -148,13 +166,30 @@ function TripPhotoCard({ trip, showCountdown, onArchive }: { trip: Trip; showCou
           <Text style={styles.tripCardDates}>{formatDateDDMMYYYY(trip.start_date)} – {formatDateDDMMYYYY(trip.end_date)}</Text>
           {showCountdown && <TripCountdownInline tripId={trip.id} fallbackDateIso={trip.start_date} />}
         </View>
-        {onArchive ? (
-          <Pressable onPress={onArchive} hitSlop={10}>
-            <Icon name="archive" size={25} color={colors.blue} />
-          </Pressable>
-        ) : (
-          <Text style={styles.chevron}>{"›"}</Text>
-        )}
+        <View style={styles.tripCardBottomRight}>
+          {!!companions?.length && (
+            <View style={styles.tripCardAvatarRow}>
+              {companions.map((c, i) => (
+                <View key={c.id} style={[styles.tripCardAvatarWrap, i > 0 && { marginLeft: -8 }]}>
+                  {c.url ? (
+                    <Image source={{ uri: c.url }} style={styles.tripCardAvatar} />
+                  ) : (
+                    <View style={[styles.tripCardAvatar, styles.tripCardAvatarPlaceholder]}>
+                      <Icon name="user" size={13} color={colors.inkSoft} />
+                    </View>
+                  )}
+                </View>
+              ))}
+            </View>
+          )}
+          {onArchive ? (
+            <Pressable onPress={onArchive} hitSlop={10}>
+              <Icon name="archive" size={25} color={colors.blue} />
+            </Pressable>
+          ) : (
+            <Text style={styles.chevron}>{"›"}</Text>
+          )}
+        </View>
       </View>
     </Pressable>
   );
@@ -374,7 +409,7 @@ export default function TripList() {
               return (
                 <Pressable onPress={() => router.push(`/trip/${trip.id}`)}>
                   <ImageBackground
-                    source={coverPhotoSource(trip.cover_photo_id)}
+                    source={coverPhotoSource(heroExtra?.todayCoverPhotoId ?? trip.cover_photo_id)}
                     style={styles.hero}
                     imageStyle={{ borderRadius: radius.xl }}
                   >
@@ -386,6 +421,9 @@ export default function TripList() {
                       </View>
                     )}
                     <Text style={styles.heroDest} numberOfLines={2}>{trip.name}</Text>
+                    {heroExtra?.todayCityLabel && (
+                      <Text style={styles.heroTodayCity}>{heroExtra.todayCityLabel}</Text>
+                    )}
                     {heroExtra?.nextItemTitle ? (
                       <>
                         <Text style={styles.comingUpLabel}>Coming up</Text>
@@ -479,6 +517,7 @@ const styles = StyleSheet.create({
   },
   weatherTemp: { color: "#fff", fontFamily: fonts.monoBold, fontSize: 12 },
   heroDest: { color: "#fff", fontFamily: fonts.display, fontSize: 17, marginBottom: 4 },
+  heroTodayCity: { color: "rgba(255,255,255,0.85)", fontSize: 12, marginBottom: 6 },
   comingUpLabel: { color: colors.goldSoft, fontFamily: fonts.bodyBold, fontSize: 9, textTransform: "uppercase", letterSpacing: 1 },
   comingUpTitle: { color: "#fff", fontFamily: fonts.bodyBold, fontSize: 13, marginTop: 1 },
   comingUpMeta: { color: colors.goldSoft, fontFamily: fonts.mono, fontSize: 10, marginTop: 1 },
@@ -492,6 +531,11 @@ const styles = StyleSheet.create({
   tripCardBottom: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 12 },
   tripCardDates: { color: colors.inkSoft, fontSize: 11 },
   chevron: { color: colors.inkSoft, fontSize: 16 },
+  tripCardBottomRight: { flexDirection: "row", alignItems: "center", gap: 10 },
+  tripCardAvatarRow: { flexDirection: "row" },
+  tripCardAvatarWrap: { borderRadius: 13, borderWidth: 1.5, borderColor: colors.paperRaised },
+  tripCardAvatar: { width: 24, height: 24, borderRadius: 12 },
+  tripCardAvatarPlaceholder: { backgroundColor: colors.line, alignItems: "center", justifyContent: "center" },
 
   searchCard: {
     backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,

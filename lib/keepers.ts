@@ -5,7 +5,7 @@
 // number of trips (items.keeper_id), including future ones added via
 // "Add to Trip".
 import { supabase } from "./supabase";
-import { Item, Keeper, Trip, tripStatus } from "./types";
+import { Item, ItemType, Keeper, Trip, tripStatus } from "./types";
 
 export type NewKeeperFields = Pick<Keeper,
   | "city_id" | "custom_city_name" | "city_label" | "item_type" | "title"
@@ -89,6 +89,79 @@ export function groupKeepersByCity(keepers: Keeper[]): KeeperCityGroup[] {
 export async function updateKeeper(id: string, fields: Partial<Pick<Keeper, "rating" | "personal_notes">>): Promise<void> {
   const { error } = await supabase.from("keepers").update(fields).eq("id", id);
   if (error) throw error;
+}
+
+/** The descriptive, place-level fields a keeper and its linked trip items
+ * are kept in sync on — never a trip instance's own booking details. Same
+ * field set keeperFieldsFromItem snapshots from a fresh item, just named to
+ * the item side (type/title/... instead of item_type/title/...). */
+export interface KeeperSyncFields {
+  item_type: ItemType;
+  title: string;
+  address: string | null;
+  phone: string | null;
+  vendor: string | null;
+  link: string | null;
+  google_maps_link: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  map_icon: string | null;
+}
+
+/** Pushes a keeper's descriptive fields onto every trip item still linked to
+ * it. Called after editing the keeper directly, and after editing one of its
+ * linked items (which writes the new values onto the keeper first, then
+ * fans them back out here) — either way, whichever side was actually
+ * touched last ends up as what every instance converges on. */
+async function propagateKeeperToItems(keeperId: string, fields: KeeperSyncFields, excludeItemId?: string): Promise<void> {
+  let query = supabase.from("items").update({
+    type: fields.item_type,
+    title: fields.title,
+    address: fields.address,
+    phone: fields.phone,
+    vendor: fields.vendor,
+    link: fields.link,
+    google_maps_link: fields.google_maps_link,
+    latitude: fields.latitude,
+    longitude: fields.longitude,
+    map_icon: fields.map_icon,
+  }).eq("keeper_id", keeperId).is("deleted_at", null);
+  if (excludeItemId) query = query.neq("id", excludeItemId);
+  const { error } = await query;
+  if (error) throw error;
+}
+
+/** Full keeper edit — title, type, and every other place-level field, not
+ * just rating/notes — immediately fanned out to every trip item still
+ * linked to this keeper. This is what "edit items directly on the Keepers
+ * screen" actually does: correct the place once here, everywhere it's been
+ * added picks it up. */
+export async function editKeeper(id: string, fields: KeeperSyncFields): Promise<void> {
+  const { error } = await supabase.from("keepers").update(fields).eq("id", id);
+  if (error) throw error;
+  await propagateKeeperToItems(id, fields);
+}
+
+/** Called after saving a trip item that's linked to a keeper, with that
+ * item's current place-level fields: writes them onto the keeper (this edit
+ * is now the newest thing that's happened to this place) and fans them back
+ * out to every other trip instance of the same keeper. The keeper is always
+ * the hub — an item never updates a sibling item directly. */
+export async function syncItemToKeeper(keeperId: string, itemId: string, fields: KeeperSyncFields): Promise<void> {
+  const { error } = await supabase.from("keepers").update({
+    item_type: fields.item_type,
+    title: fields.title,
+    address: fields.address,
+    phone: fields.phone,
+    vendor: fields.vendor,
+    link: fields.link,
+    google_maps_link: fields.google_maps_link,
+    latitude: fields.latitude,
+    longitude: fields.longitude,
+    map_icon: fields.map_icon,
+  }).eq("id", keeperId);
+  if (error) throw error;
+  await propagateKeeperToItems(keeperId, fields, itemId);
 }
 
 export async function deleteKeeper(id: string): Promise<void> {

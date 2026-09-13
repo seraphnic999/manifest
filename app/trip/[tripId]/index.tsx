@@ -24,7 +24,7 @@ import { computeBudgetProgress } from "@/lib/budget";
 import { coverPhotoSource } from "@/lib/destinationPhotos";
 import { fetchDestinationForecast } from "@/lib/weather";
 import { weatherIconName } from "@/lib/weather";
-import { fetchTripCities, fetchAllCities, dayCityLabel, TripCityRow } from "@/lib/cities";
+import { fetchTripCities, fetchAllCities, dayCityLabel, resolveDayCity, TripCityRow } from "@/lib/cities";
 import { fetchTripCompanionsWithUrls, companionFullName } from "@/lib/companions";
 
 interface OverviewData {
@@ -140,6 +140,12 @@ export default function TripOverview() {
   const heroCityName = todayDay
     ? dayCityLabel(todayDay, tripCities)
     : (trip?.destinations?.[0] ?? null);
+  // Same idea as the weather badge above: while under way, the cover photo
+  // follows today's actual city rather than staying fixed on the trip's own
+  // (primary-destination) cover — a city with no bundled photo of its own,
+  // or an unpicked/custom day, falls back to the trip's usual cover.
+  const heroCoverPhotoId = (todayDay ? resolveDayCity(todayDay, tripCities)?.cover_photo_id : null)
+    ?? trip?.cover_photo_id ?? null;
 
   const { data: heroWeather } = useQuery({
     queryKey: ["overviewHeroWeather", tripId, heroCityName],
@@ -206,7 +212,7 @@ export default function TripOverview() {
         ListHeaderComponent={
           <>
             <ImageBackground
-              source={coverPhotoSource(trip.cover_photo_id)}
+              source={coverPhotoSource(heroCoverPhotoId)}
               style={[styles.hero, { minHeight: isCurrent ? 210 : 230 }]}
             >
               <View style={styles.heroScrim} />
@@ -224,7 +230,9 @@ export default function TripOverview() {
                 </View>
               )}
               <Text style={styles.tripName} numberOfLines={3}>{trip.name}</Text>
-              {!isCurrent && <TripCountdown tripId={tripId} fallbackDateIso={trip.start_date} />}
+              {isCurrent
+                ? (heroCityName && <Text style={styles.todayCityLabel}>{heroCityName}</Text>)
+                : <TripCountdown tripId={tripId} fallbackDateIso={trip.start_date} />}
             </ImageBackground>
 
             <View style={styles.body}>
@@ -421,6 +429,7 @@ const styles = StyleSheet.create({
   weatherTemp: { color: "#fff", fontFamily: fonts.monoBold, fontSize: 15 },
   weatherDate: { color: "#fff", fontSize: 7, opacity: 0.85 },
   tripName: { color: "#fff", fontFamily: fonts.display, fontSize: 21, marginBottom: 4, paddingRight: 84 },
+  todayCityLabel: { color: "rgba(255,255,255,0.85)", fontSize: 13 },
 
   companionsRow: { flexDirection: "row", gap: 12, marginTop: 10 },
   companionChip: { alignItems: "center", width: 48 },

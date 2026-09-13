@@ -14,6 +14,7 @@ import { useUnsavedChangesGuard } from "@/lib/useUnsavedChangesGuard";
 import { Item, ItemStatus, ItemType } from "@/lib/types";
 import { DEFAULT_REMINDER_MINUTES } from "@/lib/reminders";
 import { linkItems, unlinkItems, fetchLinkedItems, LinkedItemSummary } from "@/lib/itemLinks";
+import { syncItemToKeeper, KeeperSyncFields } from "@/lib/keepers";
 import { formatDateDDMM } from "@/lib/dateFormat";
 import { normalizeTimeHHMM } from "@/lib/timeFormat";
 import ItemPickerModal from "@/components/ItemPickerModal";
@@ -34,6 +35,12 @@ export default function EditItem() {
   const [fields, setFields] = useState<FieldKey[]>([]);
   const [saving, setSaving] = useState(false);
   const [tripId, setTripId] = useState("");
+  const [keeperId, setKeeperId] = useState<string | null>(null);
+  // Snapshot of the place-level fields a linked keeper cares about, captured
+  // at load — compared against the same fields after a successful save so a
+  // keeper-linked item only pushes a sync when one of them actually changed
+  // (see lib/keepers.ts's syncItemToKeeper).
+  const origKeeperFieldsRef = useRef("");
   const [linkedItems, setLinkedItems] = useState<LinkedItemSummary[]>([]);
   const [linkPickerOpen, setLinkPickerOpen] = useState(false);
 
@@ -93,6 +100,16 @@ export default function EditItem() {
     });
   }
   useEffect(() => { latestSnapshotRef.current = currentSnapshot(); });
+
+  function currentKeeperFields(): KeeperSyncFields {
+    return {
+      item_type: itemType as ItemType, title,
+      address: address || null, phone: phone || null, vendor: vendor || null,
+      link: link || null, google_maps_link: googleMapsLink || null,
+      latitude: latitude ? parseFloat(latitude) : null, longitude: longitude ? parseFloat(longitude) : null,
+      map_icon: mapIcon,
+    };
+  }
   const { promptVisible, proceed, cancel } = useUnsavedChangesGuard(
     () => latestSnapshotRef.current !== originalSnapshotRef.current
   );
@@ -164,6 +181,13 @@ export default function EditItem() {
         arrivalDate: item.end_date ?? "", arrivalTime: item.time_end ?? "",
       });
       setTripId(item.trip_id);
+      setKeeperId(item.keeper_id);
+      origKeeperFieldsRef.current = JSON.stringify({
+        item_type: item.type, title: item.title,
+        address: item.address, phone: item.phone, vendor: item.vendor,
+        link: item.link, google_maps_link: item.google_maps_link,
+        latitude: item.latitude, longitude: item.longitude, map_icon: item.map_icon,
+      });
       setLoaded(true);
     });
     loadLinkedItems();
@@ -263,6 +287,22 @@ export default function EditItem() {
     // subsequent navigation attempt would immediately re-trigger the
     // unsaved-changes prompt against the (now stale) original snapshot.
     originalSnapshotRef.current = currentSnapshot();
+
+    // This edit is now the newest thing that's happened to this place — if
+    // it actually touched a field the keeper cares about, push it onto the
+    // keeper (and every other trip instance of it) rather than leaving this
+    // item quietly diverged until the keeper happens to be edited next.
+    if (keeperId) {
+      const newKeeperFields = currentKeeperFields();
+      if (JSON.stringify(newKeeperFields) !== origKeeperFieldsRef.current) {
+        try {
+          await syncItemToKeeper(keeperId, itemId, newKeeperFields);
+          origKeeperFieldsRef.current = JSON.stringify(newKeeperFields);
+        } catch (e: any) {
+          Alert.alert("Saved, but couldn't sync to Keeper", e.message ?? "Unknown error");
+        }
+      }
+    }
 
     if (isStaySpan && (checkInDate !== origCheckInDate || checkOutDate !== origCheckOutDate)) {
       await moveCheckInOutChildren();
