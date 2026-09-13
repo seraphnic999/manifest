@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabase";
 import { colors, radius, fonts } from "@/lib/theme";
 import { PackingTemplateItem } from "@/lib/types";
 import {
+  PACKING_CATEGORIES,
   renamePackingTemplate, deletePackingTemplate,
   addPackingTemplateItem, updatePackingTemplateItem, deletePackingTemplateItem,
 } from "@/lib/packing";
@@ -86,6 +87,15 @@ export default function PackingTemplateEditor() {
 
   const editingItem = itemModalItem === "new" ? null : itemModalItem;
 
+  const grouped = new Map<string, PackingTemplateItem[]>();
+  for (const item of items) {
+    const key = item.category ?? "Other";
+    grouped.set(key, [...(grouped.get(key) ?? []), item]);
+  }
+  const groupOrder = PACKING_CATEGORIES.concat(
+    Array.from(grouped.keys()).filter((k) => !PACKING_CATEGORIES.includes(k))
+  ).filter((cat) => grouped.has(cat));
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.paper }}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -106,12 +116,15 @@ export default function PackingTemplateEditor() {
       </View>
 
       <ScrollView style={styles.container} contentContainerStyle={{ padding: 20, paddingBottom: 100 }}>
-        {items.map((item) => (
-          <Pressable key={item.id} style={styles.itemRow} onPress={() => setItemModalItem(item)}>
-            <Text style={styles.itemName}>{item.name}</Text>
-            {item.category && <Text style={styles.itemCategory}>{item.category}</Text>}
-            <Icon name="forward" size={16} color={colors.inkSoft} />
-          </Pressable>
+        {groupOrder.map((cat) => (
+          <View key={cat} style={styles.group}>
+            <Text style={styles.groupLabel}>{cat}</Text>
+            {grouped.get(cat)!.map((item) => (
+              <Pressable key={item.id} style={styles.itemRow} onPress={() => setItemModalItem(item)}>
+                <Text style={styles.itemName}>{item.name}</Text>
+              </Pressable>
+            ))}
+          </View>
         ))}
         {items.length === 0 && <Text style={styles.empty}>No items yet — tap the + button to add one.</Text>}
       </ScrollView>
@@ -151,13 +164,17 @@ const styles = StyleSheet.create({
   backBtn: { padding: 2 },
   titleGroup: { flex: 1, flexDirection: "row", alignItems: "center", gap: 8, minWidth: 0 },
   title: { fontFamily: fonts.display, fontSize: 19, color: colors.ink, flexShrink: 1 },
+  group: { marginBottom: 16 },
+  groupLabel: {
+    color: colors.inkSoft, fontWeight: "700", fontSize: 12,
+    textTransform: "uppercase", letterSpacing: 1, marginBottom: 6,
+  },
   itemRow: {
     flexDirection: "row", alignItems: "center", gap: 10,
     backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,
     borderRadius: radius.md, padding: 14, marginBottom: 8,
   },
   itemName: { color: colors.ink, fontSize: 15, flex: 1 },
-  itemCategory: { color: colors.lightBlue, fontSize: 11, fontWeight: "600" },
   empty: { color: colors.inkSoft, fontStyle: "italic", fontSize: 13, textAlign: "center", marginTop: 30 },
   fab: {
     position: "absolute", bottom: 20, right: 20, width: 56, height: 56, borderRadius: 28,
