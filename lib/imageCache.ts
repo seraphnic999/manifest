@@ -21,9 +21,17 @@
 // Downloaded once per path into FileSystem.cacheDirectory (OS-managed, gets
 // reclaimed under disk pressure — unlike documentDirectory, nothing here
 // needs to persist forever) and reused as a local file:// URI after that.
+//
+// Native only: expo-file-system's web shim doesn't implement getInfoAsync/
+// downloadAsync/makeDirectoryAsync at all (cacheDirectory is null, and
+// calling any of them throws UnavailabilityError) — there's no comparable
+// native filesystem to cache into on web anyway, so getCachedImageUri just
+// calls straight through to fetchSignedUrl there and lets the browser's own
+// HTTP cache do what it can.
+import { Platform } from "react-native";
 import * as FileSystem from "expo-file-system";
 
-const CACHE_DIR = `${FileSystem.cacheDirectory}image-cache/`;
+const CACHE_DIR = Platform.OS === "web" ? "" : `${FileSystem.cacheDirectory}image-cache/`;
 let dirReady: Promise<void> | null = null;
 
 async function ensureDir(): Promise<void> {
@@ -56,6 +64,7 @@ export async function getCachedImageUri(
   fetchSignedUrl: () => Promise<string | null>
 ): Promise<string | null> {
   if (!storagePath) return null;
+  if (Platform.OS === "web") return fetchSignedUrl();
 
   const existing = inFlight.get(storagePath);
   if (existing) return existing;
