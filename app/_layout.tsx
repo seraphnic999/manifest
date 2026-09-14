@@ -121,6 +121,12 @@ export default function RootLayout() {
             >
               <Stack.Screen name="index" options={{ title: "Trips" }} />
               <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
+              {/* doctracker/_layout.tsx is its own route group (for the lock
+                  gate) — without this, the root Stack renders its own default
+                  header ("doctracker", untitled) for that segment on top of
+                  every screen inside it, which already has its own real
+                  header via SubpageHeader. */}
+              <Stack.Screen name="doctracker" options={{ headerShown: false }} />
             </Stack>
           </ErrorBoundary>
         </View>

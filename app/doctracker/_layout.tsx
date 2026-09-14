@@ -1,9 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { AppState, AppStateStatus } from "react-native";
-import { Stack } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
+import { Slot } from "expo-router";
 import * as LocalAuthentication from "expo-local-authentication";
 import DocTrackerLockScreen from "@/components/DocTrackerLockScreen";
-import { colors } from "@/lib/theme";
 
 // Doc Tracker holds passport/ID/visa photos and numbers — the one part of
 // this app worth an extra check beyond the normal Supabase session, since
@@ -13,30 +11,53 @@ import { colors } from "@/lib/theme";
 // biometric/passcode prompt via expo-local-authentication — never a
 // custom PIN, so there's nothing new to store, forget, or leak.
 //
-// Locked again whenever the OS backgrounds the app while a Doc Tracker
-// screen is on screen (not just a sliding "unlocked for N minutes" timer —
-// matches how banking/password-manager apps behave), and naturally locked
-// again on next visit since this layout unmounts when the user navigates
-// away from Doc Tracker entirely.
+// Renders via <Slot />, not <Stack> — a nested Stack here would make this a
+// second navigator, and the ROOT Stack then renders its own default header
+// for the "doctracker" group on top of it (a plain, unstyled "doctracker"
+// bar above every screen's own real header), since only this layout knew to
+// hide its inner headers, not the root one wrapping it. <Slot /> renders the
+// matched child directly with no navigator of its own, so every screen's
+// existing `<Stack.Screen options={{ headerShown: false }} />` keeps
+// configuring its entry in the ROOT stack exactly as it did before this
+// layout existed.
+//
+// Unlocked once per app session — a module-level flag, not component state,
+// so it survives navigating away from and back into Doc Tracker, and
+// survives the app being backgrounded and foregrounded (e.g. handing off to
+// the OS photo picker mid-upload, which used to re-lock the gate on the way
+// back — the wrong granularity for a phone app; re-locking that eagerly is
+// what banking apps do, not what a personal document list needs). Only
+// resets when the JS module reloads, i.e. the app is fully killed and
+// relaunched, which is what "session" means here.
+let sessionUnlocked = false;
+// Whether the device can offer a lock at all — also cached at module level
+// (not just per-session) since hardware/enrollment doesn't change mid-session
+// and there's no reason to re-check the native module on every visit.
+let deviceCanLock: boolean | null = null;
+
 export default function DocTrackerLayout() {
   // null = still checking whether the device can even offer a lock.
-  const [locked, setLocked] = useState<boolean | null>(null);
+  const [locked, setLocked] = useState<boolean | null>(sessionUnlocked ? false : null);
   const [checking, setChecking] = useState(false);
   const [failed, setFailed] = useState(false);
-  const appState = useRef(AppState.currentState);
 
   useEffect(() => {
+    if (sessionUnlocked) return;
     let cancelled = false;
     (async () => {
-      const hasHardware = await LocalAuthentication.hasHardwareAsync();
-      // getEnrolledLevelAsync (not isEnrolledAsync) so a device secured only
-      // by a PIN/pattern — no biometric enrolled — still counts: NONE is the
-      // only level where the device genuinely cannot offer any lock at all,
-      // and locking the gate in that case would just strand the user with
-      // no way to ever unlock their own data.
-      const level = hasHardware ? await LocalAuthentication.getEnrolledLevelAsync() : LocalAuthentication.SecurityLevel.NONE;
+      if (deviceCanLock === null) {
+        const hasHardware = await LocalAuthentication.hasHardwareAsync();
+        // getEnrolledLevelAsync (not isEnrolledAsync) so a device secured only
+        // by a PIN/pattern — no biometric enrolled — still counts: NONE is the
+        // only level where the device genuinely cannot offer any lock at all,
+        // and locking the gate in that case would just strand the user with
+        // no way to ever unlock their own data.
+        const level = hasHardware ? await LocalAuthentication.getEnrolledLevelAsync() : LocalAuthentication.SecurityLevel.NONE;
+        deviceCanLock = level !== LocalAuthentication.SecurityLevel.NONE;
+      }
       if (cancelled) return;
-      setLocked(level !== LocalAuthentication.SecurityLevel.NONE);
+      if (!deviceCanLock) sessionUnlocked = true;
+      setLocked(deviceCanLock);
     })();
     return () => { cancelled = true; };
   }, []);
@@ -48,8 +69,12 @@ export default function DocTrackerLayout() {
       promptMessage: "Unlock Doc Tracker",
     });
     setChecking(false);
-    if (result.success) setLocked(false);
-    else setFailed(true);
+    if (result.success) {
+      sessionUnlocked = true;
+      setLocked(false);
+    } else {
+      setFailed(true);
+    }
   }, []);
 
   // Auto-prompt once when the gate first appears, so the user doesn't have
@@ -60,30 +85,10 @@ export default function DocTrackerLayout() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locked === true]);
 
-  useEffect(() => {
-    const sub = AppState.addEventListener("change", (next: AppStateStatus) => {
-      if (appState.current === "active" && next.match(/inactive|background/)) {
-        setLocked((prev) => (prev === false ? true : prev));
-      }
-      appState.current = next;
-    });
-    return () => sub.remove();
-  }, []);
-
   if (locked === null) return null; // avoid a flash while the hardware check resolves
   if (locked) {
     return <DocTrackerLockScreen checking={checking} failed={failed} onUnlock={unlock} />;
   }
 
-  return (
-    <Stack
-      screenOptions={{
-        headerStyle: { backgroundColor: colors.paperRaised },
-        headerTintColor: colors.ink,
-        headerTitleStyle: { fontWeight: "700" },
-        headerBackTitle: "Back",
-        contentStyle: { backgroundColor: colors.paper },
-      }}
-    />
-  );
+  return <Slot />;
 }
