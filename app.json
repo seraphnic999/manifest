@@ -50,6 +50,12 @@
       "@maplibre/maplibre-react-native",
       "expo-location",
       "expo-notifications",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Manifest uses Face ID to lock Doc Tracker's passport, ID, and visa photos."
+        }
+      ],
       "./plugins/withReleaseSigning.js"
     ],
     "extra": {
