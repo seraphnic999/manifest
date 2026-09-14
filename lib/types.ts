@@ -293,6 +293,14 @@ export interface ItemResearchProposal {
   price_range: ProposedField<string>;
   latitude: ProposedField<number>;
   longitude: ProposedField<number>;
+  // Ratings & reviews — a second, independent axis of research from the
+  // logistics fields above (address/phone/etc): what a place IS and how
+  // well-regarded it is, not how to get there or book it.
+  short_description: ProposedField<string>;
+  google_rating: ProposedField<number>;
+  google_rating_count: ProposedField<number>;
+  review_highlights: ProposedField<string[]>;
+  award_badges: ProposedField<string[]>;
   unresolved: string | null;
 }
 

@@ -64,6 +64,15 @@ PRICE RANGE
 
 Only for dining/bar-type places. Report as one of "€", "€€", "€€€", "€€€€" (roughly: cheap eats, mid-range, upscale, splurge) based on what you find, never a specific number — a specific number goes stale immediately and a range doesn't.
 
+RATINGS & REVIEWS
+
+A second, separate axis from the logistics fields above: what this place IS and how well-regarded it is, not how to reach or book it.
+
+- short_description: 2-3 plain sentences describing what the place is and what it's known for — the kind of thing you'd say to someone who's never heard of it. Not marketing copy, not a restatement of the name. Skip it (null) if you can't find enough to say something specific and true.
+- google_rating / google_rating_count: the place's rating and review count from Google Maps/Search if you can find it (a review aggregator or the venue's own site quoting it is also fine, at lower confidence). A rating without knowing roughly how many reviews it's based on is close to meaningless — leave both null together if you only have one.
+- review_highlights: 2-3 short sentences synthesizing what reviewers commonly say — the same shape as Google Maps' own "Know before you go" summaries (e.g. "Reviewers mention the tasting menu is worth the splurge" or "Visitors note it gets loud on weekend nights"). Synthesize from what multiple reviews actually say, not a single one-off review or your own opinion of the place. Omit entirely (empty array) rather than padding to 2-3 with something generic.
+- award_badges: ONLY real, specific, checkable recognitions — a Michelin star or Bib Gourmand, a World's 50 Best Restaurants/Bars placement (with rank if you have it, e.g. "World's 50 Best Bars #23"), "50 Best Discovery", a similarly well-known regional or national award. Never invent one and never count generic praise ("locals' favorite", "hidden gem") as a badge — that belongs in review_highlights instead, not here. Applies mainly to dining/bar-type places; leave empty for most other item types unless a specific award genuinely applies (e.g. a hotel with a real, named industry award).
+
 Finish by calling the propose_item_details tool exactly once. Do not write a prose summary.`;
 
 const PROPOSE_TOOL = {
@@ -103,6 +112,26 @@ const PROPOSE_TOOL = {
       price_range: { type: ["string", "null"], enum: ["€", "€€", "€€€", "€€€€", null], description: "Dining/bar only." },
       price_range_confidence: { type: "string", enum: ["high", "medium", "low", "none"] },
       price_range_basis: { type: "string" },
+
+      short_description: { type: ["string", "null"], description: "2-3 plain sentences on what the place is and is known for." },
+      short_description_confidence: { type: "string", enum: ["high", "medium", "low", "none"] },
+      short_description_basis: { type: "string" },
+      short_description_source: { type: ["string", "null"] },
+
+      google_rating: { type: ["number", "null"], description: "E.g. 4.4. Null if you don't also have a review count." },
+      google_rating_count: { type: ["integer", "null"], description: "E.g. 2992. Null if you don't also have a rating." },
+      google_rating_confidence: { type: "string", enum: ["high", "medium", "low", "none"] },
+      google_rating_basis: { type: "string" },
+      google_rating_source: { type: ["string", "null"] },
+
+      review_highlights: { type: "array", items: { type: "string" }, description: "0-3 short sentences synthesizing common review themes, Google Maps 'Know before you go' style. Empty array if reviews don't converge on anything specific." },
+      review_highlights_confidence: { type: "string", enum: ["high", "medium", "low", "none"] },
+      review_highlights_basis: { type: "string" },
+
+      award_badges: { type: "array", items: { type: "string" }, description: "0-3 real, specific, checkable awards only (Michelin, World's 50 Best, etc.) — never generic praise. Empty array for most places." },
+      award_badges_confidence: { type: "string", enum: ["high", "medium", "low", "none"] },
+      award_badges_basis: { type: "string" },
+      award_badges_source: { type: ["string", "null"] },
 
       unresolved: { type: ["string", "null"], description: "What you could not establish and why. Shown at the top of the review screen." },
     },
@@ -335,6 +364,11 @@ async function research(jobId: string) {
       if (coords) { lat = coords.lat; lon = coords.lon; }
     }
 
+    // A lone rating with no review count (or vice versa) is close to
+    // meaningless and shouldn't reach the review screen even if the model
+    // didn't follow the "leave both null together" instruction exactly.
+    const hasRatingPair = proposed.google_rating != null && proposed.google_rating_count != null;
+
     const proposal = {
       name: field(proposed.name, proposed.name_confidence, proposed.name_basis),
       address: field(proposed.address, proposed.address_confidence, proposed.address_basis, proposed.address_source),
@@ -346,6 +380,11 @@ async function research(jobId: string) {
       price_range: field(proposed.price_range, proposed.price_range_confidence, proposed.price_range_basis, null),
       latitude: field(lat, lat != null ? "medium" : "none", lat != null ? "Geocoded from the confirmed address." : "Could not geocode the address."),
       longitude: field(lon, lon != null ? "medium" : "none", lon != null ? "Geocoded from the confirmed address." : "Could not geocode the address."),
+      short_description: field(proposed.short_description, proposed.short_description_confidence, proposed.short_description_basis, proposed.short_description_source),
+      google_rating: field(hasRatingPair ? proposed.google_rating : null, hasRatingPair ? proposed.google_rating_confidence : "none", proposed.google_rating_basis, proposed.google_rating_source),
+      google_rating_count: field(hasRatingPair ? proposed.google_rating_count : null, hasRatingPair ? proposed.google_rating_confidence : "none", proposed.google_rating_basis, proposed.google_rating_source),
+      review_highlights: field(proposed.review_highlights?.length ? proposed.review_highlights : null, proposed.review_highlights_confidence, proposed.review_highlights_basis),
+      award_badges: field(proposed.award_badges?.length ? proposed.award_badges : null, proposed.award_badges_confidence, proposed.award_badges_basis, proposed.award_badges_source),
       unresolved: [
         proposed.unresolved ?? null,
         stoppedOnBudget ? `Research stopped at the $${BUDGET_USD.toFixed(2)} per-item limit, so some fields may be thinner than usual.` : null,

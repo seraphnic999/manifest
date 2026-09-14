@@ -98,9 +98,15 @@ export interface ResearchDraft {
   price_range: string;
   latitude: string;
   longitude: string;
+  short_description: string;
+  google_rating: string;
+  google_rating_count: string;
+  review_highlights: string; // one per line in the draft/edit UI, array in storage
+  award_badges: string; // one per line in the draft/edit UI, array in storage
 }
 
 const str = (v: unknown): string => (v === null || v === undefined ? "" : String(v));
+const listStr = (v: unknown): string => (Array.isArray(v) ? v.join("\n") : "");
 
 export function draftFromProposal(p: ItemResearchProposal | null): ResearchDraft {
   return {
@@ -113,14 +119,24 @@ export function draftFromProposal(p: ItemResearchProposal | null): ResearchDraft
     price_range: str(p?.price_range?.value),
     latitude: str(p?.latitude?.value),
     longitude: str(p?.longitude?.value),
+    short_description: str(p?.short_description?.value),
+    google_rating: str(p?.google_rating?.value),
+    google_rating_count: str(p?.google_rating_count?.value),
+    review_highlights: listStr(p?.review_highlights?.value),
+    award_badges: listStr(p?.award_badges?.value),
   };
+}
+
+function linesToList(s: string): string[] {
+  return s.split("\n").map((l) => l.trim()).filter(Boolean);
 }
 
 // Applying is the only path from a proposal to a real change — it writes
 // only the fields the user didn't blank out, leaves everything else on the
 // item untouched, and folds opening_hours/reservation_lead_time/price_range
-// into custom_fields (the same jsonb bucket a flight's flight_number
-// already lives in) rather than adding narrow columns for each.
+// (and the ratings/reviews fields below) into custom_fields (the same jsonb
+// bucket a flight's flight_number already lives in) rather than adding
+// narrow columns for each.
 export async function acceptResearchJob(
   job: ItemResearchJob,
   draft: ResearchDraft
@@ -131,6 +147,17 @@ export async function acceptResearchJob(
   if (draft.opening_hours.trim()) customFields.opening_hours = draft.opening_hours.trim();
   if (draft.reservation_lead_time.trim()) customFields.reservation_lead_time = draft.reservation_lead_time.trim();
   if (draft.price_range.trim()) customFields.price_range = draft.price_range.trim();
+  if (draft.short_description.trim()) customFields.short_description = draft.short_description.trim();
+  const googleRating = num(draft.google_rating);
+  const googleRatingCount = num(draft.google_rating_count);
+  if (googleRating !== null && googleRatingCount !== null) {
+    customFields.google_rating = googleRating;
+    customFields.google_rating_count = googleRatingCount;
+  }
+  const highlights = linesToList(draft.review_highlights);
+  if (highlights.length) customFields.review_highlights = highlights;
+  const badges = linesToList(draft.award_badges);
+  if (badges.length) customFields.award_badges = badges;
 
   const updates: Record<string, unknown> = { custom_fields: customFields };
   if (draft.address.trim()) updates.address = draft.address.trim();

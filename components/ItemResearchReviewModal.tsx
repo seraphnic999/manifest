@@ -156,6 +156,33 @@ export default function ItemResearchReviewModal({ visible, onClose, job, onChang
           <Field label="Reservation lead time" meta={p?.reservation_lead_time} value={draft.reservation_lead_time} onChange={set("reservation_lead_time")} placeholder="Not applicable" />
           <Field label="Price range" meta={p?.price_range} value={draft.price_range} onChange={set("price_range")} placeholder="Not applicable" />
 
+          <Text style={styles.subheading}>Ratings & reviews</Text>
+          <Field label="Short description" meta={p?.short_description} value={draft.short_description} onChange={set("short_description")} placeholder="Not found" multiline />
+          <View style={styles.ratingRow}>
+            <View style={styles.ratingField}>
+              <Field label="Google rating" meta={p?.google_rating} value={draft.google_rating} onChange={set("google_rating")} placeholder="e.g. 4.4" />
+            </View>
+            <View style={styles.ratingField}>
+              <Field label="Rating count" meta={p?.google_rating_count} value={draft.google_rating_count} onChange={set("google_rating_count")} placeholder="e.g. 2992" />
+            </View>
+          </View>
+          <Field
+            label="Review highlights"
+            meta={p?.review_highlights}
+            value={draft.review_highlights}
+            onChange={set("review_highlights")}
+            placeholder="Not found — one per line"
+            multiline
+          />
+          <Field
+            label="Award badges"
+            meta={p?.award_badges}
+            value={draft.award_badges}
+            onChange={set("award_badges")}
+            placeholder="Not applicable — one per line"
+            multiline
+          />
+
           {job.cost_usd != null && (
             <Text style={styles.costLine}>Research cost ${job.cost_usd.toFixed(3)}</Text>
           )}
@@ -183,6 +210,13 @@ const styles = StyleSheet.create({
   unresolved: {
     backgroundColor: colors.goldSoft, borderRadius: radius.md, padding: 12, marginBottom: 16,
   },
+  subheading: {
+    fontFamily: fonts.bodySemi, fontSize: 13, color: colors.inkSoft,
+    textTransform: "uppercase", letterSpacing: 0.5,
+    marginTop: 4, marginBottom: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.line,
+  },
+  ratingRow: { flexDirection: "row", gap: 12 },
+  ratingField: { flex: 1 },
   unresolvedLabel: { color: colors.ink, fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 3 },
   unresolvedText: { color: colors.ink, fontSize: 13, lineHeight: 18 },
   field: { marginBottom: 16 },

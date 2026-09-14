@@ -286,6 +286,17 @@ export default function ItemDetails() {
     ? computeDurationMinutes(item.start_date, item.time_start, item.end_date, item.time_end)
     : null;
 
+  // Ratings & reviews — proposed by item research, applied into custom_fields
+  // the same way opening_hours/price_range already are (see lib/itemResearch.ts).
+  const cf = (item.custom_fields as Record<string, unknown>) ?? {};
+  const googleRating = typeof cf.google_rating === "number" ? cf.google_rating : null;
+  const googleRatingCount = typeof cf.google_rating_count === "number" ? cf.google_rating_count : null;
+  const shortDescription = typeof cf.short_description === "string" ? cf.short_description : null;
+  const reviewHighlights = Array.isArray(cf.review_highlights) ? (cf.review_highlights as string[]) : [];
+  const awardBadges = Array.isArray(cf.award_badges) ? (cf.award_badges as string[]) : [];
+  const hasRatingsData =
+    (googleRating != null && googleRatingCount != null) || !!shortDescription || reviewHighlights.length > 0 || awardBadges.length > 0;
+
   const fields: [string, string | null][] = item.is_stay_span
     ? [
         ["Check-in", [formatDateDDMMYYYY(item.start_date), normalizeTimeHHMM(item.time_start)].filter(Boolean).join(" \u00b7 ") || null],
@@ -364,6 +375,38 @@ export default function ItemDetails() {
             <Text style={styles.fieldValue}>{value}</Text>
           </View>
         ) : null
+      )}
+
+      {hasRatingsData && (
+        <View style={styles.ratingsSection}>
+          {googleRating != null && googleRatingCount != null && (
+            <View style={styles.ratingLine}>
+              <Icon name="star" size={16} color={colors.gold} />
+              <Text style={styles.ratingScore}>{googleRating.toFixed(1)}</Text>
+              <Text style={styles.ratingCount}>({googleRatingCount.toLocaleString()})</Text>
+            </View>
+          )}
+          {!!shortDescription && <Text style={styles.shortDescription}>{shortDescription}</Text>}
+          {awardBadges.length > 0 && (
+            <View style={styles.badgeRow}>
+              {awardBadges.map((badge, i) => (
+                <View key={i} style={styles.badge}>
+                  <Text style={styles.badgeText}>{badge}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+          {reviewHighlights.length > 0 && (
+            <View style={styles.highlightsBox}>
+              {reviewHighlights.map((h, i) => (
+                <View key={i} style={styles.highlightRow}>
+                  <Text style={styles.highlightBullet}>{"•"}</Text>
+                  <Text style={styles.highlightText}>{h}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
       )}
 
       {item.link ? (
@@ -636,6 +679,18 @@ export default function ItemDetails() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper, padding: 20 },
+  ratingsSection: { marginTop: 4, marginBottom: 12 },
+  ratingLine: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 },
+  ratingScore: { color: colors.ink, fontWeight: "800", fontSize: 16 },
+  ratingCount: { color: colors.inkSoft, fontSize: 13 },
+  shortDescription: { color: colors.ink, fontSize: 14, lineHeight: 20, marginBottom: 10 },
+  badgeRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 10 },
+  badge: { backgroundColor: colors.goldSoft, borderRadius: 999, paddingVertical: 5, paddingHorizontal: 12 },
+  badgeText: { color: colors.gold, fontWeight: "700", fontSize: 12 },
+  highlightsBox: { backgroundColor: colors.paperRaised, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, padding: 12, gap: 6 },
+  highlightRow: { flexDirection: "row", gap: 8 },
+  highlightBullet: { color: colors.lightBlue, fontSize: 14 },
+  highlightText: { flex: 1, color: colors.ink, fontSize: 13.5, lineHeight: 19 },
   loadingCenter: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
   loadingErrorTitle: { fontFamily: fonts.display, fontSize: 18, color: colors.ink, marginBottom: 8, textAlign: "center" },
   loadingErrorMessage: { color: colors.inkSoft, fontSize: 13, textAlign: "center", marginBottom: 18 },
