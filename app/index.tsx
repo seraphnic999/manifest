@@ -409,7 +409,16 @@ export default function TripList() {
               return (
                 <Pressable onPress={() => router.push(`/trip/${trip.id}`)}>
                   <ImageBackground
-                    source={coverPhotoSource(heroExtra?.todayCoverPhotoId ?? trip.cover_photo_id)}
+                    // `?? trip.cover_photo_id` here would silently undo the
+                    // whole point of this feature — a city with genuinely no
+                    // bundled photo (todayCoverPhotoId === null, once
+                    // heroExtra has actually loaded) is supposed to fall
+                    // through to the generic placeholder, not quietly back
+                    // to the trip's own cover. Only use the trip's cover
+                    // while heroExtra hasn't loaded yet at all (no current
+                    // trip, or still fetching) — checking the whole object,
+                    // not the field, is what tells those two cases apart.
+                    source={coverPhotoSource(heroExtra ? heroExtra.todayCoverPhotoId : trip.cover_photo_id)}
                     style={styles.hero}
                     imageStyle={{ borderRadius: radius.xl }}
                   >

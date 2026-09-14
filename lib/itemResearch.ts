@@ -251,8 +251,18 @@ export function useLatestItemResearchJob(itemId: string | undefined) {
 
   useEffect(() => {
     if (!itemId) return;
+    // Random suffix, not a fixed name — same reason as item-research-jobs-all
+    // below: React Navigation keeps a screen mounted in the background stack
+    // rather than unmounting it (e.g. Item Detail stays mounted while you're
+    // on the Keeper screen it linked to), so this effect can end up running
+    // again for the same itemId before the previous run's cleanup has fully
+    // torn down its channel. Supabase's realtime client resolves a repeated
+    // `.channel(name)` to the same underlying channel object, and a second
+    // `.on(...)` after the first has already called `.subscribe()` throws
+    // "cannot add postgres_changes callbacks ... after subscribe()" — a real
+    // crash reproduced by: item detail -> Keeper -> back to the trip.
     const channel = supabase
-      .channel(`item-research:${itemId}`)
+      .channel(`item-research:${itemId}:${Math.random().toString(36).slice(2)}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "item_research_jobs", filter: `item_id=eq.${itemId}` },

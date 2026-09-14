@@ -142,10 +142,15 @@ export default function TripOverview() {
     : (trip?.destinations?.[0] ?? null);
   // Same idea as the weather badge above: while under way, the cover photo
   // follows today's actual city rather than staying fixed on the trip's own
-  // (primary-destination) cover — a city with no bundled photo of its own,
-  // or an unpicked/custom day, falls back to the trip's usual cover.
-  const heroCoverPhotoId = (todayDay ? resolveDayCity(todayDay, tripCities)?.cover_photo_id : null)
-    ?? trip?.cover_photo_id ?? null;
+  // (primary-destination) cover. A city with no bundled photo of its own
+  // falls through to coverPhotoSource's own generic placeholder — NOT back
+  // to the trip's cover, which would just silently undo the whole feature
+  // (today would keep showing the trip's primary city's photo instead of
+  // admitting today's city has none). The trip's cover is only the fallback
+  // when there's no resolvable "today" at all (not current, or no matching day).
+  const heroCoverPhotoId = todayDay
+    ? resolveDayCity(todayDay, tripCities)?.cover_photo_id ?? null
+    : trip?.cover_photo_id ?? null;
 
   const { data: heroWeather } = useQuery({
     queryKey: ["overviewHeroWeather", tripId, heroCityName],
