@@ -4,6 +4,7 @@
 import { supabase } from "./supabase";
 import { Companion, CompanionPhoto, Relationship, TripCompanion } from "./types";
 import { readUriAsArrayBuffer } from "./fileBytes";
+import { getCachedImageUri } from "./imageCache";
 
 const BUCKET = "companion-photos";
 const SIGNED_URL_TTL = 3600;
@@ -174,16 +175,17 @@ async function signedUrl(path: string): Promise<string> {
 }
 
 export async function fetchCompanionProfileUrl(path: string | null): Promise<string | null> {
-  if (!path) return null;
-  const url = await signedUrl(path);
-  return url || null;
+  return getCachedImageUri(path, () => signedUrl(path!));
 }
 
 export async function fetchCompanionPhotosWithUrls(companionId: string): Promise<(CompanionPhoto & { url: string })[]> {
   const { data } = await supabase.from("companion_photos").select("*").eq("companion_id", companionId).order("sort_order");
   if (!data || data.length === 0) return [];
   const withUrls = await Promise.all(
-    (data as CompanionPhoto[]).map(async (p) => ({ ...p, url: await signedUrl(p.storage_path) }))
+    (data as CompanionPhoto[]).map(async (p) => ({
+      ...p,
+      url: (await getCachedImageUri(p.storage_path, () => signedUrl(p.storage_path))) ?? "",
+    }))
   );
   return withUrls.filter((p) => p.url);
 }
