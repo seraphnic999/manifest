@@ -21,7 +21,7 @@
     },
     "android": {
       "package": "com.seraphnic999.manifest",
-      "versionCode": 42,
+      "versionCode": 43,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
