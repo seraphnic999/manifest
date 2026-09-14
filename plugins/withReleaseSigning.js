@@ -1,6 +1,6 @@
 const fs = require("fs");
 const path = require("path");
-const { withAppBuildGradle, withGradleProperties } = require("@expo/config-plugins");
+const { withAppBuildGradle, withProjectBuildGradle, withGradleProperties } = require("@expo/config-plugins");
 
 // Signs release builds with a real keystore instead of the shared Android
 // debug key.
@@ -73,7 +73,7 @@ function withReleaseSigning(config) {
     // just an earlier, friendlier nudge.
     console.warn(
       `\n  ⚠  ${PROPS_FILE} not found — a release build will REFUSE to run\n` +
-        `     (see the taskGraph guard in android/app/build.gradle) rather than\n` +
+        `     (see the taskGraph guard in android/build.gradle) rather than\n` +
         `     silently falling back to the debug key. See android-keystore/KEYSTORE_INFO.txt.\n`,
     );
   } else {
@@ -88,10 +88,10 @@ function withReleaseSigning(config) {
   }
 
   // Runs unconditionally, whether or not creds were found above: the release
-  // signingConfig and the taskGraph guard both need to exist in build.gradle
-  // regardless, so that a build with no credentials fails loudly at the
-  // *release build* step (via the guard) rather than either not existing at
-  // all or crashing on an "unknown property" during project evaluation.
+  // signingConfig needs to exist in app/build.gradle regardless, so a build
+  // with no credentials fails loudly at the *release build* step (via the
+  // taskGraph guard below, in the root build.gradle) rather than crashing on
+  // an "unknown property" during project evaluation.
   config = withAppBuildGradle(config, (cfg) => {
     if (cfg.modResults.language !== "groovy") return cfg;
     let src = cfg.modResults.contents;
@@ -136,29 +136,35 @@ function withReleaseSigning(config) {
       );
     }
 
-    // A release "successfully" signed with the debug key looks fine and
-    // installs nowhere useful (Android refuses to install an update whose
-    // cert doesn't match what's already on the device) — so refuse to run a
-    // release build at all when the real credentials aren't present, instead
-    // of letting the hasProperty guard above just quietly no-op.
-    //
-    // NOT appended at the very end of the file: this project's Firebase/FCM
-    // wiring requires `apply plugin: 'com.google.gms.google-services'` to be
-    // the LAST line in app/build.gradle (Google's own requirement), so the
-    // guard is inserted just before Expo's own trailing "Apply static values
-    // from `gradle.properties`..." boilerplate instead — anchored the same
-    // way as the signingConfig anchors above, throwing rather than silently
-    // appending in the wrong place if Expo's template moves it.
-    const guardAnchor = "// Apply static values from `gradle.properties` to the `android.packagingOptions`";
-    const guardAnchorAt = src.indexOf(guardAnchor);
-    if (guardAnchorAt === -1) {
-      throw new Error(
-        "[withReleaseSigning] could not find the `// Apply static values from " +
-          "\`gradle.properties\`...` anchor to insert the release-signing taskGraph guard " +
-          "before. The Expo template has changed — update this plugin's anchor.",
-      );
-    }
-    const guard = `// @generated withReleaseSigning-guard
+    cfg.modResults.contents = src;
+    return cfg;
+  });
+
+  // A release "successfully" signed with the debug key looks fine and
+  // installs nowhere useful (Android refuses to install an update whose cert
+  // doesn't match what's already on the device) — so refuse to run a release
+  // build at all when the real credentials aren't present, instead of
+  // letting the hasProperty guard above just quietly no-op.
+  //
+  // Lives in the ROOT build.gradle (via withProjectBuildGradle), not
+  // app/build.gradle: a first attempt anchored this in app/build.gradle
+  // right before Expo's trailing "// Apply static values from
+  // `gradle.properties`..." boilerplate comment, which (a) is itself
+  // movable template text a future Expo upgrade could relocate, and (b) had
+  // to dodge this project's Firebase/FCM requirement that
+  // `apply plugin: 'com.google.gms.google-services'` stay the literal last
+  // line of app/build.gradle (Google's own requirement). The root
+  // build.gradle has no such constraint and is the natural home for a
+  // project-wide lifecycle hook anyway — appending at its end is safe.
+  config = withProjectBuildGradle(config, (cfg) => {
+    if (cfg.modResults.language !== "groovy") return cfg;
+    let src = cfg.modResults.contents;
+
+    const guardMarker = "// @generated withReleaseSigning-guard";
+    if (src.includes(guardMarker)) return cfg;
+
+    src += `
+${guardMarker}
 gradle.taskGraph.whenReady { graph ->
     def releasing = graph.allTasks.any {
         it.name == 'assembleRelease' || it.name == 'packageRelease' || it.name == 'bundleRelease'
@@ -171,9 +177,7 @@ gradle.taskGraph.whenReady { graph ->
         )
     }
 }
-
 `;
-    src = src.slice(0, guardAnchorAt) + guard + src.slice(guardAnchorAt);
 
     cfg.modResults.contents = src;
     return cfg;
