@@ -22,6 +22,18 @@ import { fetchTripCities, dayCityLabel, resolveDayCity } from "@/lib/cities";
 import { fetchTripCompanionsWithUrls } from "@/lib/companions";
 import { useResearchJobs } from "@/lib/itemResearch";
 
+// Same semantics as lib/travelStats.ts's and lib/budget.ts's own copies of
+// this (inclusive of both endpoints, so a same-day trip is 1 day) — kept as
+// its own small copy here too rather than a shared import, matching how
+// those two already duplicate it rather than share it.
+function daysBetweenInclusive(startIso: string, endIso: string): number {
+  const [y1, m1, d1] = startIso.split("-").map(Number);
+  const [y2, m2, d2] = endIso.split("-").map(Number);
+  const a = Date.UTC(y1, m1 - 1, d1);
+  const b = Date.UTC(y2, m2 - 1, d2);
+  return Math.round((b - a) / 86400000) + 1;
+}
+
 // Past-trips list is already sorted most-recent-first before this runs, so
 // a Map (insertion-order) naturally yields years newest-first too, with each
 // year's own trips still in that same date order — no re-sort needed here.
@@ -163,7 +175,10 @@ function TripPhotoCard({ trip, showCountdown, onArchive }: { trip: Trip; showCou
       </ImageBackground>
       <View style={styles.tripCardBottom}>
         <View>
-          <Text style={styles.tripCardDates}>{formatDateDDMMYYYY(trip.start_date)} – {formatDateDDMMYYYY(trip.end_date)}</Text>
+          <Text style={styles.tripCardDates}>
+            {formatDateDDMMYYYY(trip.start_date)} – {formatDateDDMMYYYY(trip.end_date)}
+            {" "}({daysBetweenInclusive(trip.start_date, trip.end_date)}d)
+          </Text>
           {showCountdown && <TripCountdownInline tripId={trip.id} fallbackDateIso={trip.start_date} />}
         </View>
         <View style={styles.tripCardBottomRight}>
