@@ -61,31 +61,26 @@ function readCredentials(projectRoot) {
 }
 
 // Pure string transforms, kept separate from the Expo config-plugin wiring
-// below so they can be verified directly (e.g. "does re-running this against
-// the live android/app/build.gradle produce byte-identical output" — a cheap
-// drift check, since the plugin's own marker short-circuit means a plain
-// non-clean `expo prebuild` won't re-apply an edit to an already-generated
-// file, so the live file and this function's output can silently diverge if
-// android/ was ever hand-patched to bootstrap a change, as it was here more
-// than once). See scripts/verify-release-signing.js.
+// below so they can be verified directly. See scripts/verify-release-signing.js
+// — and read its own top comment before trusting "verified" here: an early
+// version of that script re-ran these functions against their own output and
+// called it a no-op check, but both functions short-circuit on their marker
+// BEFORE comparing anything, so a file with a STALE block (old text, marker
+// still present — exactly what a hand-patch gone wrong looks like) passes
+// that check cleanly. The three literals below (not just the functions) are
+// exported so the verify script can assert the live files contain this exact
+// text, not merely "the marker exists somewhere."
 
 const APP_MARKER = "// @generated withReleaseSigning";
 const GUARD_MARKER = "// @generated withReleaseSigning-guard";
 
-function patchAppBuildGradle(src) {
-  if (src.includes(APP_MARKER)) return src;
-
-  // Add a release signingConfig next to the debug one Expo generates.
-  // Wrapped in hasProperty — not just storeFile file(MANIFEST_RELEASE_STORE_FILE)
-  // unconditionally — because without it, a missing keystore.properties
-  // (so gradle.properties never gets these keys) blows up *every* Gradle
-  // invocation, debug builds included, with an opaque "Could not get
-  // unknown property" during project evaluation instead of the guard's
-  // actionable message at the point it actually matters (a release build).
-  src = src.replace(
-    /(signingConfigs\s*\{)/,
-    `$1
-        ${APP_MARKER}
+// Wrapped in hasProperty — not just storeFile file(MANIFEST_RELEASE_STORE_FILE)
+// unconditionally — because without it, a missing keystore.properties (so
+// gradle.properties never gets these keys) blows up *every* Gradle
+// invocation, debug builds included, with an opaque "Could not get unknown
+// property" during project evaluation instead of the guard's actionable
+// message at the point it actually matters (a release build).
+const APP_SIGNING_BLOCK = `${APP_MARKER}
         release {
             if (project.hasProperty('MANIFEST_RELEASE_STORE_FILE')) {
                 storeFile file(MANIFEST_RELEASE_STORE_FILE)
@@ -93,8 +88,44 @@ function patchAppBuildGradle(src) {
                 keyAlias MANIFEST_RELEASE_KEY_ALIAS
                 keyPassword MANIFEST_RELEASE_KEY_PASSWORD
             }
-        }`,
-  );
+        }`;
+
+const APP_BUILDTYPE_LINE = "signingConfig signingConfigs.release";
+
+// A release "successfully" signed with the debug key looks fine and installs
+// nowhere useful (Android refuses to install an update whose cert doesn't
+// match what's already on the device) — so refuse to run a release build at
+// all when the real credentials aren't present, instead of letting the
+// hasProperty guard above just quietly no-op.
+//
+// Lives in the ROOT build.gradle (via withProjectBuildGradle), not
+// app/build.gradle: a first attempt anchored this in app/build.gradle right
+// before Expo's trailing "// Apply static values from `gradle.properties`..."
+// boilerplate comment, which (a) is itself movable template text a future
+// Expo upgrade could relocate, and (b) had to dodge this project's
+// Firebase/FCM requirement that `apply plugin: 'com.google.gms.google-services'`
+// stay the literal last line of app/build.gradle (Google's own requirement).
+// The root build.gradle has no such constraint and is the natural home for a
+// project-wide lifecycle hook anyway — appending at its end is safe.
+const ROOT_GUARD_BLOCK = `${GUARD_MARKER}
+gradle.taskGraph.whenReady { graph ->
+    def releasing = graph.allTasks.any {
+        it.name == 'assembleRelease' || it.name == 'packageRelease' || it.name == 'bundleRelease'
+    }
+    if (releasing && !project.hasProperty('MANIFEST_RELEASE_STORE_FILE')) {
+        throw new GradleException(
+            "Release signing credentials are missing.\\n" +
+            "Expected android-keystore/keystore.properties (see android-keystore/KEYSTORE_INFO.txt).\\n" +
+            "Refusing to build a release that would be signed with the shared Android debug key."
+        )
+    }
+}`;
+
+function patchAppBuildGradle(src) {
+  if (src.includes(APP_MARKER)) return src;
+
+  // Add a release signingConfig next to the debug one Expo generates.
+  src = src.replace(/(signingConfigs\s*\{)/, `$1\n        ${APP_SIGNING_BLOCK}`);
 
   // Point the release buildType at it. Anchored on the exact default line so
   // that if Expo ever changes the template this throws instead of quietly
@@ -102,7 +133,7 @@ function patchAppBuildGradle(src) {
   const before = src;
   src = src.replace(
     /(buildTypes\s*\{[\s\S]*?release\s*\{[\s\S]*?)signingConfig signingConfigs\.debug/,
-    "$1signingConfig signingConfigs.release",
+    `$1${APP_BUILDTYPE_LINE}`,
   );
   if (src === before) {
     throw new Error(
@@ -117,41 +148,7 @@ function patchAppBuildGradle(src) {
 
 function patchRootBuildGradle(src) {
   if (src.includes(GUARD_MARKER)) return src;
-
-  // A release "successfully" signed with the debug key looks fine and
-  // installs nowhere useful (Android refuses to install an update whose cert
-  // doesn't match what's already on the device) — so refuse to run a release
-  // build at all when the real credentials aren't present, instead of
-  // letting the hasProperty guard above just quietly no-op.
-  //
-  // Lives in the ROOT build.gradle (via withProjectBuildGradle), not
-  // app/build.gradle: a first attempt anchored this in app/build.gradle
-  // right before Expo's trailing "// Apply static values from
-  // `gradle.properties`..." boilerplate comment, which (a) is itself
-  // movable template text a future Expo upgrade could relocate, and (b) had
-  // to dodge this project's Firebase/FCM requirement that
-  // `apply plugin: 'com.google.gms.google-services'` stay the literal last
-  // line of app/build.gradle (Google's own requirement). The root
-  // build.gradle has no such constraint and is the natural home for a
-  // project-wide lifecycle hook anyway — appending at its end is safe.
-  return (
-    src +
-    `
-${GUARD_MARKER}
-gradle.taskGraph.whenReady { graph ->
-    def releasing = graph.allTasks.any {
-        it.name == 'assembleRelease' || it.name == 'packageRelease' || it.name == 'bundleRelease'
-    }
-    if (releasing && !project.hasProperty('MANIFEST_RELEASE_STORE_FILE')) {
-        throw new GradleException(
-            "Release signing credentials are missing.\\n" +
-            "Expected android-keystore/keystore.properties (see android-keystore/KEYSTORE_INFO.txt).\\n" +
-            "Refusing to build a release that would be signed with the shared Android debug key."
-        )
-    }
-}
-`
-  );
+  return `${src}\n${ROOT_GUARD_BLOCK}\n`;
 }
 
 function withReleaseSigning(config) {
@@ -204,3 +201,6 @@ function withReleaseSigning(config) {
 module.exports = withReleaseSigning;
 module.exports.patchAppBuildGradle = patchAppBuildGradle;
 module.exports.patchRootBuildGradle = patchRootBuildGradle;
+module.exports.APP_SIGNING_BLOCK = APP_SIGNING_BLOCK;
+module.exports.APP_BUILDTYPE_LINE = APP_BUILDTYPE_LINE;
+module.exports.ROOT_GUARD_BLOCK = ROOT_GUARD_BLOCK;
