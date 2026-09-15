@@ -334,10 +334,18 @@ export default function DayView() {
             <View style={styles.itemTextCol}>
               <View style={styles.row1}>
                 <Text style={styles.typeTag}>{itemTypeTag(item.type)}</Text>
-                <Text style={styles.statusBadge}>{STATUS_LABEL[item.status]}</Text>
-                {readyResearchItemIds.has(item.id) && (
-                  <Icon name="research" size={13} color={colors.gold} />
-                )}
+                <View style={styles.row1Right}>
+                  {typeof item.custom_fields?.google_rating === "number" && (
+                    <View style={styles.ratingTag}>
+                      <Icon name="star" size={9} color={colors.gold} />
+                      <Text style={styles.ratingTagText}>{item.custom_fields.google_rating.toFixed(1)}</Text>
+                    </View>
+                  )}
+                  <Text style={styles.statusBadge}>{STATUS_LABEL[item.status]}</Text>
+                  {readyResearchItemIds.has(item.id) && (
+                    <Icon name="research" size={13} color={colors.gold} />
+                  )}
+                </View>
               </View>
               <Text style={styles.itemTitle}>{item.title}</Text>
             </View>
@@ -646,8 +654,11 @@ const styles = StyleSheet.create({
   itemIconCol: { alignItems: "center", justifyContent: "center" },
   itemTextCol: { flex: 1 },
   row1: { flexDirection: "row", alignItems: "center", gap: 6 },
+  row1Right: { flexDirection: "row", alignItems: "center", gap: 6, marginLeft: "auto" },
   typeTag: { fontFamily: "JetBrainsMono_600SemiBold", fontSize: 9, color: colors.lightBlue, fontWeight: "600" },
-  statusBadge: { fontSize: 9, color: colors.inkSoft, marginLeft: "auto" },
+  ratingTag: { flexDirection: "row", alignItems: "center", gap: 2 },
+  ratingTagText: { fontFamily: "JetBrainsMono_600SemiBold", fontSize: 9, color: colors.gold, fontWeight: "600" },
+  statusBadge: { fontSize: 9, color: colors.inkSoft },
   itemTitle: { color: colors.ink, fontWeight: "600", fontSize: 14, marginTop: 2 },
   empty: { textAlign: "center", color: colors.inkSoft, marginTop: 40 },
   dragHandle: { width: 34, alignItems: "center", justifyContent: "center", backgroundColor: colors.paper },
