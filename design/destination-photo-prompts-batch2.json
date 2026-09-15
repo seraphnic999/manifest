@@ -1,0 +1,1006 @@
+{
+  "purpose": "Prompts for externally generating Manifest's trip cover-photo pool (destination images) — batch 2, covering cities added to the catalog after the v18 batch that still have no cover photo. Paste the \"prompt\" field for any entry directly into an image generation tool. Style, dimensions, and fallback images are shared with the original destination-photo-prompts.json — see that file for fallback_beach / fallback_city / fallback_default; they don't need to be regenerated.",
+  "style_guide": "Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality.",
+  "dimensions": {
+    "aspect_ratio": "16:9 landscape",
+    "minimum_px": "1600x900",
+    "preferred_px": "2400x1350",
+    "midjourney": "append --ar 16:9 to the prompt",
+    "dalle3": "choose the landscape (1792x1024) size option",
+    "composition_note": "Keep the subject centered with margin above/below so the image still reads well if the app ever needs a tighter crop."
+  },
+  "destinations": [
+    {
+      "id": 101,
+      "city": "Abu Dhabi",
+      "country": "United Arab Emirates",
+      "region": "Middle East",
+      "subject": "Sheikh Zayed Grand Mosque at dusk",
+      "prompt": "Sheikh Zayed Grand Mosque at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 102,
+      "city": "Agra",
+      "country": "India",
+      "region": "Asia",
+      "subject": "The Taj Mahal at golden hour",
+      "prompt": "The Taj Mahal at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 103,
+      "city": "Amman",
+      "country": "Jordan",
+      "region": "Middle East",
+      "subject": "The Roman Theatre and citadel hill at dusk",
+      "prompt": "The Roman Theatre and citadel hill at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 104,
+      "city": "Andorra la Vella",
+      "country": "Andorra",
+      "region": "Europe",
+      "subject": "Snow-capped Pyrenees mountains framing the town at golden hour",
+      "prompt": "Snow-capped Pyrenees mountains framing the town at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 105,
+      "city": "Auckland",
+      "country": "New Zealand",
+      "region": "Oceania",
+      "subject": "Sky Tower over the harbor at dusk",
+      "prompt": "Sky Tower over the harbor at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 106,
+      "city": "Austin",
+      "country": "United States",
+      "region": "United States",
+      "subject": "The State Capitol dome at golden hour",
+      "prompt": "The State Capitol dome at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 107,
+      "city": "Baku",
+      "country": "Azerbaijan",
+      "region": "Asia",
+      "subject": "The Flame Towers illuminated over the old city at dusk",
+      "prompt": "The Flame Towers illuminated over the old city at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 108,
+      "city": "Bath",
+      "country": "United Kingdom",
+      "region": "Europe",
+      "subject": "The Roman Baths and abbey at golden hour",
+      "prompt": "The Roman Baths and abbey at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 109,
+      "city": "Beirut",
+      "country": "Lebanon",
+      "region": "Middle East",
+      "subject": "Pigeon Rocks sea arch at sunset",
+      "prompt": "Pigeon Rocks sea arch at sunset. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 110,
+      "city": "Bilbao",
+      "country": "Spain",
+      "region": "Europe",
+      "subject": "The Guggenheim Museum's titanium curves at dusk",
+      "prompt": "The Guggenheim Museum's titanium curves at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 111,
+      "city": "Bogota",
+      "country": "Colombia",
+      "region": "South America",
+      "subject": "Monserrate hilltop church overlooking the city at sunset",
+      "prompt": "Monserrate hilltop church overlooking the city at sunset. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 112,
+      "city": "Bologna",
+      "country": "Italy",
+      "region": "Europe",
+      "subject": "The Two Towers (Le Due Torri) at golden hour",
+      "prompt": "The Two Towers (Le Due Torri) at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 113,
+      "city": "Bordeaux",
+      "country": "France",
+      "region": "Europe",
+      "subject": "Place de la Bourse and its water mirror at dusk",
+      "prompt": "Place de la Bourse and its water mirror at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 114,
+      "city": "Bratislava",
+      "country": "Slovakia",
+      "region": "Europe",
+      "subject": "Bratislava Castle over the Danube at sunset",
+      "prompt": "Bratislava Castle over the Danube at sunset. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 115,
+      "city": "Brisbane",
+      "country": "Australia",
+      "region": "Oceania",
+      "subject": "The city skyline over the Brisbane River at dusk",
+      "prompt": "The city skyline over the Brisbane River at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 116,
+      "city": "Buenos Aires",
+      "country": "Argentina",
+      "region": "South America",
+      "subject": "The Obelisco on Avenida 9 de Julio at golden hour",
+      "prompt": "The Obelisco on Avenida 9 de Julio at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 117,
+      "city": "Busan",
+      "country": "South Korea",
+      "region": "Asia",
+      "subject": "Gamcheon Culture Village's colorful hillside at sunset",
+      "prompt": "Gamcheon Culture Village's colorful hillside at sunset. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 118,
+      "city": "Cagliari",
+      "country": "Italy",
+      "region": "Europe",
+      "subject": "The Castello district over the Gulf of Cagliari at dusk",
+      "prompt": "The Castello district over the Gulf of Cagliari at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 119,
+      "city": "Cairo",
+      "country": "Egypt",
+      "region": "Africa",
+      "subject": "The Pyramids of Giza at golden hour",
+      "prompt": "The Pyramids of Giza at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 120,
+      "city": "Cambridge",
+      "country": "United Kingdom",
+      "region": "Europe",
+      "subject": "King's College Chapel over the River Cam at golden hour",
+      "prompt": "King's College Chapel over the River Cam at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 121,
+      "city": "Cancun",
+      "country": "Mexico",
+      "region": "Caribbean",
+      "subject": "A turquoise Caribbean beach with palm trees at golden hour",
+      "prompt": "A turquoise Caribbean beach with palm trees at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 122,
+      "city": "Cape Town",
+      "country": "South Africa",
+      "region": "Africa",
+      "subject": "Table Mountain over the city and harbor at dusk",
+      "prompt": "Table Mountain over the city and harbor at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 123,
+      "city": "Cartagena",
+      "country": "Colombia",
+      "region": "South America",
+      "subject": "The colonial walled city skyline at sunset",
+      "prompt": "The colonial walled city skyline at sunset. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 124,
+      "city": "Casablanca",
+      "country": "Morocco",
+      "region": "Africa",
+      "subject": "The Hassan II Mosque on the Atlantic coast at dusk",
+      "prompt": "The Hassan II Mosque on the Atlantic coast at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 125,
+      "city": "Cebu",
+      "country": "Philippines",
+      "region": "Asia",
+      "subject": "A white-sand island beach with longtail boats at golden hour",
+      "prompt": "A white-sand island beach with longtail boats at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 126,
+      "city": "Cesky Krumlov",
+      "country": "Czech Republic",
+      "region": "Europe",
+      "subject": "The castle tower over the winding river and red rooftops at dusk",
+      "prompt": "The castle tower over the winding river and red rooftops at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 127,
+      "city": "Charleston",
+      "country": "United States",
+      "region": "United States",
+      "subject": "Rainbow Row's pastel houses at golden hour",
+      "prompt": "Rainbow Row's pastel houses at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 128,
+      "city": "Colombo",
+      "country": "Sri Lanka",
+      "region": "Asia",
+      "subject": "The Lotus Tower over the coastline at dusk",
+      "prompt": "The Lotus Tower over the coastline at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 129,
+      "city": "Corfu",
+      "country": "Greece",
+      "region": "Europe",
+      "subject": "The Old Fortress over the harbor at sunset",
+      "prompt": "The Old Fortress over the harbor at sunset. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 130,
+      "city": "Cusco",
+      "country": "Peru",
+      "region": "South America",
+      "subject": "Terracotta rooftops and Andean peaks at golden hour",
+      "prompt": "Terracotta rooftops and Andean peaks at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 131,
+      "city": "Delhi",
+      "country": "India",
+      "region": "Asia",
+      "subject": "The Red Fort at golden hour",
+      "prompt": "The Red Fort at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 132,
+      "city": "Denver",
+      "country": "United States",
+      "region": "United States",
+      "subject": "The Rocky Mountains skyline at dusk",
+      "prompt": "The Rocky Mountains skyline at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 133,
+      "city": "Doha",
+      "country": "Qatar",
+      "region": "Middle East",
+      "subject": "The West Bay skyline over the Corniche at dusk",
+      "prompt": "The West Bay skyline over the Corniche at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 134,
+      "city": "Eilat",
+      "country": "Israel",
+      "region": "Middle East",
+      "subject": "Red Sea coastline with desert mountains at golden hour",
+      "prompt": "Red Sea coastline with desert mountains at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 135,
+      "city": "Fes",
+      "country": "Morocco",
+      "region": "Africa",
+      "subject": "The ancient medina rooftops at golden hour",
+      "prompt": "The ancient medina rooftops at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 136,
+      "city": "Gdansk",
+      "country": "Poland",
+      "region": "Europe",
+      "subject": "Colorful merchant houses along the Motlawa river at dusk",
+      "prompt": "Colorful merchant houses along the Motlawa river at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 137,
+      "city": "Goa",
+      "country": "India",
+      "region": "Asia",
+      "subject": "A palm-lined Arabian Sea beach at golden hour",
+      "prompt": "A palm-lined Arabian Sea beach at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 138,
+      "city": "Granada",
+      "country": "Spain",
+      "region": "Europe",
+      "subject": "The Alhambra over the city with the Sierra Nevada behind it at sunset",
+      "prompt": "The Alhambra over the city with the Sierra Nevada behind it at sunset. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 139,
+      "city": "Hanoi",
+      "country": "Vietnam",
+      "region": "Asia",
+      "subject": "Hoan Kiem Lake and the Turtle Tower at golden hour",
+      "prompt": "Hoan Kiem Lake and the Turtle Tower at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 140,
+      "city": "Havana",
+      "country": "Cuba",
+      "region": "Caribbean",
+      "subject": "Classic cars along the Malecon seafront at sunset",
+      "prompt": "Classic cars along the Malecon seafront at sunset. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 141,
+      "city": "Heraklion",
+      "country": "Greece",
+      "region": "Europe",
+      "subject": "The Venetian fortress over the harbor at dusk",
+      "prompt": "The Venetian fortress over the harbor at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 142,
+      "city": "Ho Chi Minh City",
+      "country": "Vietnam",
+      "region": "Asia",
+      "subject": "The Notre-Dame Cathedral and skyline at dusk",
+      "prompt": "The Notre-Dame Cathedral and skyline at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 143,
+      "city": "Jaipur",
+      "country": "India",
+      "region": "Asia",
+      "subject": "The Hawa Mahal facade at golden hour",
+      "prompt": "The Hawa Mahal facade at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 144,
+      "city": "Jeddah",
+      "country": "Saudi Arabia",
+      "region": "Middle East",
+      "subject": "The King Fahd Fountain over the Red Sea corniche at dusk",
+      "prompt": "The King Fahd Fountain over the Red Sea corniche at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 145,
+      "city": "Jeju",
+      "country": "South Korea",
+      "region": "Asia",
+      "subject": "Seongsan Ilchulbong volcanic peak at golden hour",
+      "prompt": "Seongsan Ilchulbong volcanic peak at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 146,
+      "city": "Jerusalem",
+      "country": "Israel",
+      "region": "Middle East",
+      "subject": "The Old City walls and Dome of the Rock at golden hour",
+      "prompt": "The Old City walls and Dome of the Rock at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 147,
+      "city": "Johannesburg",
+      "country": "South Africa",
+      "region": "Africa",
+      "subject": "The city skyline at dusk",
+      "prompt": "The city skyline at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 148,
+      "city": "Kathmandu",
+      "country": "Nepal",
+      "region": "Asia",
+      "subject": "Swayambhunath stupa over the valley at golden hour",
+      "prompt": "Swayambhunath stupa over the valley at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 149,
+      "city": "Kuala Lumpur",
+      "country": "Malaysia",
+      "region": "Asia",
+      "subject": "The Petronas Towers at dusk",
+      "prompt": "The Petronas Towers at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 150,
+      "city": "Kuwait City",
+      "country": "Kuwait",
+      "region": "Middle East",
+      "subject": "The Kuwait Towers over the Gulf at dusk",
+      "prompt": "The Kuwait Towers over the Gulf at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 151,
+      "city": "Kyiv",
+      "country": "Ukraine",
+      "region": "Europe",
+      "subject": "St. Sophia's Cathedral golden domes at golden hour",
+      "prompt": "St. Sophia's Cathedral golden domes at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 152,
+      "city": "Langkawi",
+      "country": "Malaysia",
+      "region": "Asia",
+      "subject": "A tropical island beach with limestone cliffs at golden hour",
+      "prompt": "A tropical island beach with limestone cliffs at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 153,
+      "city": "Larnaca",
+      "country": "Cyprus",
+      "region": "Europe",
+      "subject": "A palm-lined Mediterranean seafront promenade at sunset",
+      "prompt": "A palm-lined Mediterranean seafront promenade at sunset. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 154,
+      "city": "Lima",
+      "country": "Peru",
+      "region": "South America",
+      "subject": "The Parque del Amor clifftop overlooking the Pacific at sunset",
+      "prompt": "The Parque del Amor clifftop overlooking the Pacific at sunset. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 155,
+      "city": "Liverpool",
+      "country": "United Kingdom",
+      "region": "Europe",
+      "subject": "The Royal Albert Dock waterfront at dusk",
+      "prompt": "The Royal Albert Dock waterfront at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 156,
+      "city": "Luxembourg City",
+      "country": "Luxembourg",
+      "region": "Europe",
+      "subject": "The old town fortifications over the Petrusse valley at golden hour",
+      "prompt": "The old town fortifications over the Petrusse valley at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 157,
+      "city": "Luxor",
+      "country": "Egypt",
+      "region": "Africa",
+      "subject": "The Karnak Temple columns at golden hour",
+      "prompt": "The Karnak Temple columns at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 158,
+      "city": "Malaga",
+      "country": "Spain",
+      "region": "Europe",
+      "subject": "The Alcazaba fortress over the harbor at sunset",
+      "prompt": "The Alcazaba fortress over the harbor at sunset. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 159,
+      "city": "Male",
+      "country": "Maldives",
+      "region": "Asia",
+      "subject": "An overwater bungalow lagoon at golden hour",
+      "prompt": "An overwater bungalow lagoon at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 160,
+      "city": "Manama",
+      "country": "Bahrain",
+      "region": "Middle East",
+      "subject": "The Bahrain World Trade Center skyline at dusk",
+      "prompt": "The Bahrain World Trade Center skyline at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 161,
+      "city": "Manchester",
+      "country": "United Kingdom",
+      "region": "Europe",
+      "subject": "The city skyline reflected in the canal at dusk",
+      "prompt": "The city skyline reflected in the canal at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 162,
+      "city": "Manila",
+      "country": "Philippines",
+      "region": "Asia",
+      "subject": "Manila Bay sunset over the skyline",
+      "prompt": "Manila Bay sunset over the skyline. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 163,
+      "city": "Marrakech",
+      "country": "Morocco",
+      "region": "Africa",
+      "subject": "The Koutoubia Mosque minaret at golden hour",
+      "prompt": "The Koutoubia Mosque minaret at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 164,
+      "city": "Marseille",
+      "country": "France",
+      "region": "Europe",
+      "subject": "Notre-Dame de la Garde overlooking the Old Port at sunset",
+      "prompt": "Notre-Dame de la Garde overlooking the Old Port at sunset. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 165,
+      "city": "Melbourne",
+      "country": "Australia",
+      "region": "Oceania",
+      "subject": "The city skyline over the Yarra River at dusk",
+      "prompt": "The city skyline over the Yarra River at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 166,
+      "city": "Mexico City",
+      "country": "Mexico",
+      "region": "North America",
+      "subject": "The Angel of Independence monument at dusk",
+      "prompt": "The Angel of Independence monument at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 167,
+      "city": "Monaco",
+      "country": "Monaco",
+      "region": "Europe",
+      "subject": "The harbor and hillside skyline at golden hour",
+      "prompt": "The harbor and hillside skyline at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 168,
+      "city": "Montreal",
+      "country": "Canada",
+      "region": "North America",
+      "subject": "Notre-Dame Basilica and Old Montreal at dusk",
+      "prompt": "Notre-Dame Basilica and Old Montreal at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 169,
+      "city": "Mumbai",
+      "country": "India",
+      "region": "Asia",
+      "subject": "The Gateway of India at golden hour",
+      "prompt": "The Gateway of India at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 170,
+      "city": "Muscat",
+      "country": "Oman",
+      "region": "Middle East",
+      "subject": "Sultan Qaboos Grand Mosque at dusk",
+      "prompt": "Sultan Qaboos Grand Mosque at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 171,
+      "city": "Nadi",
+      "country": "Fiji",
+      "region": "Oceania",
+      "subject": "A palm-fringed South Pacific beach at golden hour",
+      "prompt": "A palm-fringed South Pacific beach at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 172,
+      "city": "Nairobi",
+      "country": "Kenya",
+      "region": "Africa",
+      "subject": "The city skyline with Mount Kenya in the distance at dusk",
+      "prompt": "The city skyline with Mount Kenya in the distance at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 173,
+      "city": "Napa Valley",
+      "country": "United States",
+      "region": "United States",
+      "subject": "Rolling vineyard rows at golden hour",
+      "prompt": "Rolling vineyard rows at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 174,
+      "city": "Oxford",
+      "country": "United Kingdom",
+      "region": "Europe",
+      "subject": "The dreaming spires skyline at golden hour",
+      "prompt": "The dreaming spires skyline at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 175,
+      "city": "Palermo",
+      "country": "Italy",
+      "region": "Europe",
+      "subject": "The Cathedral and old town rooftops at sunset",
+      "prompt": "The Cathedral and old town rooftops at sunset. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 176,
+      "city": "Palm Springs",
+      "country": "United States",
+      "region": "United States",
+      "subject": "Mid-century architecture against desert mountains at golden hour",
+      "prompt": "Mid-century architecture against desert mountains at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 177,
+      "city": "Petra",
+      "country": "Jordan",
+      "region": "Middle East",
+      "subject": "The Treasury (Al-Khazneh) carved into the rock at golden hour",
+      "prompt": "The Treasury (Al-Khazneh) carved into the rock at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 178,
+      "city": "Philadelphia",
+      "country": "United States",
+      "region": "United States",
+      "subject": "Independence Hall at dusk",
+      "prompt": "Independence Hall at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 179,
+      "city": "Phnom Penh",
+      "country": "Cambodia",
+      "region": "Asia",
+      "subject": "The Royal Palace's golden spires at sunset",
+      "prompt": "The Royal Palace's golden spires at sunset. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 180,
+      "city": "Pisa",
+      "country": "Italy",
+      "region": "Europe",
+      "subject": "The Leaning Tower and cathedral at golden hour",
+      "prompt": "The Leaning Tower and cathedral at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 181,
+      "city": "Portland",
+      "country": "United States",
+      "region": "United States",
+      "subject": "Mount Hood over the city skyline at dusk",
+      "prompt": "Mount Hood over the city skyline at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 182,
+      "city": "Poznan",
+      "country": "Poland",
+      "region": "Europe",
+      "subject": "The colorful Renaissance town hall square at dusk",
+      "prompt": "The colorful Renaissance town hall square at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 183,
+      "city": "Quebec City",
+      "country": "Canada",
+      "region": "North America",
+      "subject": "Chateau Frontenac over the St. Lawrence River at sunset",
+      "prompt": "Chateau Frontenac over the St. Lawrence River at sunset. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 184,
+      "city": "Queenstown",
+      "country": "New Zealand",
+      "region": "Oceania",
+      "subject": "Lake Wakatipu framed by The Remarkables mountains at golden hour",
+      "prompt": "Lake Wakatipu framed by The Remarkables mountains at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 185,
+      "city": "Quito",
+      "country": "Ecuador",
+      "region": "South America",
+      "subject": "The colonial old town skyline with volcanoes behind it at sunset",
+      "prompt": "The colonial old town skyline with volcanoes behind it at sunset. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 186,
+      "city": "Rhodes",
+      "country": "Greece",
+      "region": "Europe",
+      "subject": "The medieval old town walls at golden hour",
+      "prompt": "The medieval old town walls at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 187,
+      "city": "Rio de Janeiro",
+      "country": "Brazil",
+      "region": "South America",
+      "subject": "Christ the Redeemer over Guanabara Bay at sunset",
+      "prompt": "Christ the Redeemer over Guanabara Bay at sunset. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 188,
+      "city": "Riyadh",
+      "country": "Saudi Arabia",
+      "region": "Middle East",
+      "subject": "The Kingdom Centre Tower skyline at dusk",
+      "prompt": "The Kingdom Centre Tower skyline at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 189,
+      "city": "San Juan",
+      "country": "Puerto Rico",
+      "region": "Caribbean",
+      "subject": "The colorful colonial streets of Old San Juan at golden hour",
+      "prompt": "The colorful colonial streets of Old San Juan at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 190,
+      "city": "San Sebastian",
+      "country": "Spain",
+      "region": "Europe",
+      "subject": "La Concha Bay's crescent beach at sunset",
+      "prompt": "La Concha Bay's crescent beach at sunset. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 191,
+      "city": "Santiago",
+      "country": "Chile",
+      "region": "South America",
+      "subject": "The Andes mountains framing the city skyline at dusk",
+      "prompt": "The Andes mountains framing the city skyline at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 192,
+      "city": "Sao Paulo",
+      "country": "Brazil",
+      "region": "South America",
+      "subject": "The Avenida Paulista skyline at dusk",
+      "prompt": "The Avenida Paulista skyline at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 193,
+      "city": "Savannah",
+      "country": "United States",
+      "region": "United States",
+      "subject": "Oak-lined, Spanish-moss-draped squares at golden hour",
+      "prompt": "Oak-lined, Spanish-moss-draped squares at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 194,
+      "city": "Siem Reap",
+      "country": "Cambodia",
+      "region": "Asia",
+      "subject": "Angkor Wat's temple towers at golden hour",
+      "prompt": "Angkor Wat's temple towers at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 195,
+      "city": "Strasbourg",
+      "country": "France",
+      "region": "Europe",
+      "subject": "The half-timbered Petite France district canals at golden hour",
+      "prompt": "The half-timbered Petite France district canals at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 196,
+      "city": "Sydney",
+      "country": "Australia",
+      "region": "Oceania",
+      "subject": "The Sydney Opera House and Harbour Bridge at dusk",
+      "prompt": "The Sydney Opera House and Harbour Bridge at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 197,
+      "city": "Taipei",
+      "country": "Taiwan",
+      "region": "Asia",
+      "subject": "Taipei 101 skyline at dusk",
+      "prompt": "Taipei 101 skyline at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 198,
+      "city": "Tbilisi",
+      "country": "Georgia",
+      "region": "Asia",
+      "subject": "Narikala Fortress over the old town at golden hour",
+      "prompt": "Narikala Fortress over the old town at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 199,
+      "city": "Tel Aviv",
+      "country": "Israel",
+      "region": "Middle East",
+      "subject": "The Mediterranean beachfront skyline at sunset",
+      "prompt": "The Mediterranean beachfront skyline at sunset. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 200,
+      "city": "Thessaloniki",
+      "country": "Greece",
+      "region": "Europe",
+      "subject": "The White Tower on the waterfront at sunset",
+      "prompt": "The White Tower on the waterfront at sunset. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 201,
+      "city": "Toronto",
+      "country": "Canada",
+      "region": "North America",
+      "subject": "The CN Tower over the skyline at dusk",
+      "prompt": "The CN Tower over the skyline at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 202,
+      "city": "Tulum",
+      "country": "Mexico",
+      "region": "North America",
+      "subject": "Clifftop Mayan ruins over a turquoise Caribbean beach at golden hour",
+      "prompt": "Clifftop Mayan ruins over a turquoise Caribbean beach at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 203,
+      "city": "Tunis",
+      "country": "Tunisia",
+      "region": "Africa",
+      "subject": "The blue-and-white streets of Sidi Bou Said at golden hour",
+      "prompt": "The blue-and-white streets of Sidi Bou Said at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 204,
+      "city": "Turin",
+      "country": "Italy",
+      "region": "Europe",
+      "subject": "The Mole Antonelliana with the Alps behind it at dusk",
+      "prompt": "The Mole Antonelliana with the Alps behind it at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 205,
+      "city": "Vancouver",
+      "country": "Canada",
+      "region": "North America",
+      "subject": "The skyline framed by mountains and harbor at dusk",
+      "prompt": "The skyline framed by mountains and harbor at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 206,
+      "city": "Verona",
+      "country": "Italy",
+      "region": "Europe",
+      "subject": "The Roman Arena and old town at golden hour",
+      "prompt": "The Roman Arena and old town at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 207,
+      "city": "Victoria Falls",
+      "country": "Zimbabwe",
+      "region": "Africa",
+      "subject": "The falls and rising mist at golden hour",
+      "prompt": "The falls and rising mist at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 208,
+      "city": "Wroclaw",
+      "country": "Poland",
+      "region": "Europe",
+      "subject": "The colorful Market Square town hall at dusk",
+      "prompt": "The colorful Market Square town hall at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 209,
+      "city": "Yerevan",
+      "country": "Armenia",
+      "region": "Asia",
+      "subject": "Mount Ararat framing the city skyline at golden hour",
+      "prompt": "Mount Ararat framing the city skyline at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 210,
+      "city": "Zanzibar",
+      "country": "Tanzania",
+      "region": "Africa",
+      "subject": "Stone Town's waterfront skyline at sunset",
+      "prompt": "Stone Town's waterfront skyline at sunset. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 211,
+      "city": "Southampton",
+      "country": "United Kingdom",
+      "region": "Europe",
+      "subject": "A cruise ship departing the historic docks at golden hour",
+      "prompt": "A cruise ship departing the historic docks at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 212,
+      "city": "Vigo",
+      "country": "Spain",
+      "region": "Europe",
+      "subject": "The Atlantic coastline and harbor at sunset",
+      "prompt": "The Atlantic coastline and harbor at sunset. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 213,
+      "city": "La Coruña",
+      "country": "Spain",
+      "region": "Europe",
+      "subject": "The Tower of Hercules lighthouse at golden hour",
+      "prompt": "The Tower of Hercules lighthouse at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 214,
+      "city": "Antwerp",
+      "country": "Belgium",
+      "region": "Europe",
+      "subject": "Antwerp Cathedral's spire over the Grote Markt at dusk",
+      "prompt": "Antwerp Cathedral's spire over the Grote Markt at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 215,
+      "city": "Basel",
+      "country": "Switzerland",
+      "region": "Europe",
+      "subject": "The Rhine river and old town skyline at golden hour",
+      "prompt": "The Rhine river and old town skyline at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 216,
+      "city": "Faro",
+      "country": "Portugal",
+      "region": "Europe",
+      "subject": "The Ria Formosa lagoon and old town at sunset",
+      "prompt": "The Ria Formosa lagoon and old town at sunset. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 217,
+      "city": "Belfast",
+      "country": "United Kingdom",
+      "region": "Europe",
+      "subject": "The Titanic Belfast museum on the harbor at dusk",
+      "prompt": "The Titanic Belfast museum on the harbor at dusk. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 218,
+      "city": "Sarajevo",
+      "country": "Bosnia and Herzegovina",
+      "region": "Europe",
+      "subject": "The old town and minarets framed by surrounding hills at golden hour",
+      "prompt": "The old town and minarets framed by surrounding hills at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 219,
+      "city": "Yellowstone National Park",
+      "country": "United States",
+      "region": "United States",
+      "subject": "The Grand Prismatic Spring and steaming geysers at golden hour",
+      "prompt": "The Grand Prismatic Spring and steaming geysers at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 220,
+      "city": "Yosemite National Park",
+      "country": "United States",
+      "region": "United States",
+      "subject": "El Capitan and Half Dome over the valley at golden hour",
+      "prompt": "El Capitan and Half Dome over the valley at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 221,
+      "city": "Key West",
+      "country": "United States",
+      "region": "United States",
+      "subject": "A pastel sunset over the Southernmost Point buoy",
+      "prompt": "A pastel sunset over the Southernmost Point buoy. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 222,
+      "city": "Maui",
+      "country": "United States",
+      "region": "United States",
+      "subject": "A palm-lined golden-sand beach with volcanic peaks at sunset",
+      "prompt": "A palm-lined golden-sand beach with volcanic peaks at sunset. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 223,
+      "city": "Anchorage",
+      "country": "United States",
+      "region": "United States",
+      "subject": "Snow-capped Chugach Mountains over the inlet at golden hour",
+      "prompt": "Snow-capped Chugach Mountains over the inlet at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    },
+    {
+      "id": 224,
+      "city": "Niagara Falls",
+      "country": "United States",
+      "region": "United States",
+      "subject": "The falls with rising mist at golden hour",
+      "prompt": "The falls with rising mist at golden hour. Professional travel photography, golden-hour lighting, dramatic warm sunset sky in soft pink, orange, and blue gradient tones, vibrant and slightly saturated color grading, wide-angle establishing shot, the landmark as a clear centered focal point with generous sky and environment around it, no people in the foreground, no text or watermarks, photorealistic, cinematic travel-magazine quality."
+    }
+  ]
+}
