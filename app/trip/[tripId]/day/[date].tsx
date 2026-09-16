@@ -13,6 +13,7 @@ import { categoryForDbType, mapIconForItem, itemTypeTag } from "@/lib/itemTypeMe
 import { fetchReadyResearchItemIds } from "@/lib/itemResearch";
 import ItemTypePickerModal from "@/components/ItemTypePickerModal";
 import KeeperPickerModal from "@/components/KeeperPickerModal";
+import QuickAddModal from "@/components/QuickAddModal";
 import TripScreenHeader from "@/components/TripScreenHeader";
 import TripTabBar from "@/components/TripTabBar";
 import { useTripHamburgerMenu } from "@/components/useTripHamburgerMenu";
@@ -121,6 +122,7 @@ export default function DayView() {
   const [dayColor, setDayColor] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [keeperPickerOpen, setKeeperPickerOpen] = useState(false);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
 
   // Unified day-edit modal (city + title + color), opened by tapping the
   // title block.
@@ -204,6 +206,16 @@ export default function DayView() {
   function handleSelectKeeper() {
     setPickerOpen(false);
     setKeeperPickerOpen(true);
+  }
+
+  function handleSelectQuickAdd() {
+    setPickerOpen(false);
+    setQuickAddOpen(true);
+  }
+
+  function handleQuickAddDone(itemId: string) {
+    setQuickAddOpen(false);
+    router.push(`/item/${itemId}`);
   }
 
   function handlePickedKeeper(keeper: Keeper) {
@@ -536,6 +548,7 @@ export default function DayView() {
         onClose={() => setPickerOpen(false)}
         onSelect={handleSelectCategory}
         onSelectKeeper={handleSelectKeeper}
+        onSelectQuickAdd={handleSelectQuickAdd}
       />
       <KeeperPickerModal
         visible={keeperPickerOpen}
@@ -543,6 +556,17 @@ export default function DayView() {
         city={{ cityId: effectiveCityPick.cityId, customName: effectiveCityPick.customName, label: isProposals ? null : effectiveCityLabel }}
         onSelect={handlePickedKeeper}
       />
+      {dayId && (
+        <QuickAddModal
+          visible={quickAddOpen}
+          onClose={() => setQuickAddOpen(false)}
+          tripId={tripId}
+          fallbackDayId={dayId}
+          tripStart={datedDays[0]?.date ?? ""}
+          tripEnd={datedDays[datedDays.length - 1]?.date ?? ""}
+          onDone={handleQuickAddDone}
+        />
+      )}
 
       <Modal visible={editModalOpen} transparent animationType="fade">
         <Pressable style={styles.modalBackdrop} onPress={() => setEditModalOpen(false)}>

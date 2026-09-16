@@ -9,8 +9,10 @@ import { colors, radius } from "@/lib/theme";
 import { categoryByKey } from "@/lib/itemTypeMeta";
 import { computeInsertSortOrder } from "@/lib/reorder";
 import { DateField, TimeField } from "@/components/DateTimeFields";
+import DayField from "@/components/DayField";
+import TripDayPickerModal from "@/components/TripDayPickerModal";
 import { computeDurationMinutes, formatDuration } from "@/lib/duration";
-import { Item, ItemStatus } from "@/lib/types";
+import { Day, Item, ItemStatus } from "@/lib/types";
 import { DEFAULT_REMINDER_MINUTES } from "@/lib/reminders";
 import { fetchKeeperById } from "@/lib/keepers";
 import { itemResearchEligible } from "@/lib/itemResearch";
@@ -31,7 +33,8 @@ export default function NewItem() {
   const [title, setTitle] = useState("");
   const [subtype, setSubtype] = useState(cat.dbTypes[0]);
   const [status, setStatus] = useState<ItemStatus>("planned");
-  const [itemDate, setItemDate] = useState(date ?? "");
+  const [selectedDay, setSelectedDay] = useState<Day | null>(null);
+  const [dayPickerOpen, setDayPickerOpen] = useState(false);
   const [time, setTime] = useState("");
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
@@ -57,6 +60,17 @@ export default function NewItem() {
   // Flight-specific (departure reuses itemDate/time above)
   const [arrivalDate, setArrivalDate] = useState("");
   const [arrivalTime, setArrivalTime] = useState("");
+
+  // Seeds the mandatory day field from the dayId every caller already
+  // passes (the day page's FAB, the trip overview FAB, Keeper "add to
+  // trip", duplicate) — fetched as a full Day row (not just carried as an
+  // id) so the field can show its date/Proposals label immediately.
+  useEffect(() => {
+    if (!dayId) return;
+    supabase.from("days").select("*").eq("id", dayId).single().then(({ data }) => {
+      if (data) setSelectedDay(data as Day);
+    });
+  }, [dayId]);
 
   // Duplicating an existing item: this screen is otherwise identical to a
   // blank "new item" form, so the copy only becomes a real row once Save is
@@ -88,7 +102,8 @@ export default function NewItem() {
         setCheckOutDate(src.end_date ?? "");
         setCheckOutTime(src.time_end ?? "");
       } else {
-        setItemDate(src.start_date ?? "");
+        // Day comes from the dayId param (already derived by the duplicate
+        // caller from the source item), not from src.start_date here.
         setTime(src.time_start ?? "");
         setArrivalDate(src.end_date ?? "");
         setArrivalTime(src.time_end ?? "");
@@ -116,7 +131,7 @@ export default function NewItem() {
     });
   }, [fromKeeperId]);
 
-  const durationMinutes = computeDurationMinutes(itemDate, time, arrivalDate, arrivalTime);
+  const durationMinutes = computeDurationMinutes(selectedDay?.date ?? "", time, arrivalDate, arrivalTime);
   const durationInvalid = durationMinutes !== null && durationMinutes < 0;
   const durationLabel = durationMinutes === null
     ? null
@@ -224,26 +239,16 @@ export default function NewItem() {
         }
       }
     } else {
-      let targetDayId = dayId;
-      if (itemDate && itemDate !== date) {
-        const { data: targetDay } = await supabase
-          .from("days").select("id").eq("trip_id", tripId).eq("date", itemDate).single();
-        if (!targetDay) {
-          setSaving(false);
-          Alert.alert("No such day", "That date is outside the trip's date range.");
-          return null;
-        }
-        targetDayId = targetDay.id;
-      }
-      if (!targetDayId) {
+      if (!selectedDay) {
         setSaving(false);
-        Alert.alert("Pick a date", "Enter a date so this item lands on the right day of the trip.");
+        Alert.alert("Pick a day", "Choose which day of the trip this item belongs to (Proposals if it's not scheduled yet).");
         return null;
       }
+      const targetDayId = selectedDay.id;
       const { data: newItem, error } = await supabase.from("items").insert({
         ...base,
         day_id: targetDayId,
-        start_date: itemDate || null,
+        start_date: selectedDay.date,
         time_start: time || null,
         end_date: has("flightTimes") ? (arrivalDate || null) : null,
         time_end: has("flightTimes") ? (arrivalTime || null) : null,
@@ -316,7 +321,7 @@ export default function NewItem() {
       ) : has("flightTimes") ? (
         <>
           <View style={styles.row}>
-            <DateField label="Departure date" value={itemDate} onChange={setItemDate} />
+            <DayField label="Departure day" day={selectedDay} onPress={() => setDayPickerOpen(true)} />
             <View style={{ width: 10 }} />
             <TimeField label="Departure time" value={time} onChange={setTime} />
           </View>
@@ -331,7 +336,7 @@ export default function NewItem() {
         </>
       ) : (
         <View style={styles.row}>
-          <DateField label="Date" value={itemDate} onChange={setItemDate} />
+          <DayField label="Day" day={selectedDay} onPress={() => setDayPickerOpen(true)} />
           <View style={{ width: 10 }} />
           <TimeField label="Time (optional)" value={time} onChange={setTime} />
         </View>
@@ -410,6 +415,15 @@ export default function NewItem() {
         </Pressable>
       )}
       </ScrollView>
+
+      <TripDayPickerModal
+        visible={dayPickerOpen}
+        onClose={() => setDayPickerOpen(false)}
+        tripId={tripId}
+        includeProposals
+        selectedDayId={selectedDay?.id}
+        onSelect={(day) => { setSelectedDay(day); setDayPickerOpen(false); }}
+      />
 
       {pendingIdentify && (
         <IdentifyCandidatesModal

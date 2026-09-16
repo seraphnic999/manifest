@@ -8,10 +8,12 @@ import { supabase } from "@/lib/supabase";
 import { colors, radius } from "@/lib/theme";
 import { categoryForDbType, categoryByKey, CONVERTIBLE_CATEGORIES, isConvertibleType, itemTypeTag, FieldKey } from "@/lib/itemTypeMeta";
 import { DateField, TimeField } from "@/components/DateTimeFields";
+import DayField from "@/components/DayField";
+import TripDayPickerModal from "@/components/TripDayPickerModal";
 import { computeInsertSortOrder } from "@/lib/reorder";
 import { computeDurationMinutes, formatDuration } from "@/lib/duration";
 import { useUnsavedChangesGuard } from "@/lib/useUnsavedChangesGuard";
-import { Item, ItemStatus, ItemType } from "@/lib/types";
+import { Day, Item, ItemStatus, ItemType } from "@/lib/types";
 import { DEFAULT_REMINDER_MINUTES } from "@/lib/reminders";
 import { linkItems, unlinkItems, fetchLinkedItems, LinkedItemSummary } from "@/lib/itemLinks";
 import { syncItemToKeeper, KeeperSyncFields } from "@/lib/keepers";
@@ -46,8 +48,9 @@ export default function EditItem() {
 
   const [title, setTitle] = useState("");
   const [status, setStatus] = useState<ItemStatus>("booked");
-  const [itemDate, setItemDate] = useState("");
-  const [origItemDate, setOrigItemDate] = useState("");
+  const [selectedDay, setSelectedDay] = useState<Day | null>(null);
+  const [origDayId, setOrigDayId] = useState("");
+  const [dayPickerOpen, setDayPickerOpen] = useState(false);
   // Whether the reminder needs re-arming (reminder_sent_at reset to null) on
   // save — only when the trigger time actually moved (start date/time or the
   // offset itself), not on every unrelated edit, or an already-sent
@@ -92,7 +95,7 @@ export default function EditItem() {
   const latestSnapshotRef = useRef("");
   function currentSnapshot() {
     return JSON.stringify({
-      title, status, itemType, itemDate, time, address, phone, vendor, flightNumber,
+      title, status, itemType, dayId: selectedDay?.id ?? "", time, address, phone, vendor, flightNumber,
       bookingSource, confirmationCode, link, googleMapsLink, latitude, longitude, mapIcon,
       reminderMinutes,
       checkInDate, checkInTime, checkOutDate, checkOutTime,
@@ -114,7 +117,7 @@ export default function EditItem() {
     () => latestSnapshotRef.current !== originalSnapshotRef.current
   );
 
-  const durationMinutes = computeDurationMinutes(itemDate, time, arrivalDate, arrivalTime);
+  const durationMinutes = computeDurationMinutes(selectedDay?.date ?? "", time, arrivalDate, arrivalTime);
   const durationInvalid = durationMinutes !== null && durationMinutes < 0;
   const durationLabel = durationMinutes === null
     ? null
@@ -138,8 +141,12 @@ export default function EditItem() {
       setStatus(item.status);
       setTime(item.time_start ?? "");
       setOrigTime(item.time_start ?? "");
-      setItemDate(item.start_date ?? "");
-      setOrigItemDate(item.start_date ?? "");
+      if (!item.is_stay_span && item.day_id) {
+        setOrigDayId(item.day_id);
+        supabase.from("days").select("*").eq("id", item.day_id).single().then(({ data: dayRow }) => {
+          if (dayRow) setSelectedDay(dayRow as Day);
+        });
+      }
       setAddress(item.address ?? "");
       setPhone(item.phone ?? "");
       setVendor(item.vendor ?? "");
@@ -166,7 +173,7 @@ export default function EditItem() {
       // plain string comparison.
       originalSnapshotRef.current = JSON.stringify({
         title: item.title, status: item.status, itemType: item.type,
-        itemDate: item.start_date ?? "", time: item.time_start ?? "",
+        dayId: item.is_stay_span ? "" : (item.day_id ?? ""), time: item.time_start ?? "",
         address: item.address ?? "", phone: item.phone ?? "", vendor: item.vendor ?? "",
         flightNumber: (item.custom_fields as any)?.flight_number ?? "",
         bookingSource: item.booking_source ?? "", confirmationCode: item.confirmation_code ?? "",
@@ -237,6 +244,10 @@ export default function EditItem() {
       Alert.alert("Missing info", "Check-in and check-out dates are required.");
       return false;
     }
+    if (!isStaySpan && !selectedDay) {
+      Alert.alert("Pick a day", "Choose which day of the trip this item belongs to (Proposals if it's not scheduled yet).");
+      return false;
+    }
     if (has("flightTimes") && durationInvalid) {
       Alert.alert("Check the times", "Arrival must be after departure.");
       return false;
@@ -254,7 +265,7 @@ export default function EditItem() {
     setSaving(true);
     const { data: current } = await supabase.from("items").select("trip_id, day_id").eq("id", itemId).single();
 
-    const newStartDate = isStaySpan ? checkInDate : (itemDate || null);
+    const newStartDate = isStaySpan ? checkInDate : (selectedDay?.date ?? null);
     const newTimeStart = isStaySpan ? (checkInTime || null) : (time || null);
     const newReminderMinutes = reminderMinutes ? parseInt(reminderMinutes, 10) || null : null;
     const reminderKeyChanged = [newStartDate, newTimeStart, newReminderMinutes].join("|") !== origReminderKeyRef.current;
@@ -307,8 +318,8 @@ export default function EditItem() {
     if (isStaySpan && (checkInDate !== origCheckInDate || checkOutDate !== origCheckOutDate)) {
       await moveCheckInOutChildren();
     }
-    if (!isStaySpan && itemDate && itemDate !== origItemDate && current) {
-      await moveToDay(current.trip_id, itemDate);
+    if (!isStaySpan && selectedDay && selectedDay.id !== origDayId) {
+      await moveToDay(selectedDay.id);
     } else if (!isStaySpan && time !== origTime && current?.day_id) {
       // Date (and so day_id) is unchanged, but the time moved — reslot the
       // item among its current day's siblings so the day view stays in
@@ -330,21 +341,17 @@ export default function EditItem() {
     if (await save()) proceed();
   }
 
-  // Moves a regular (non-span) item to the day matching its new date,
-  // slotting it chronologically among that day's items — same pattern as
-  // the lodging check-in/out mover below.
-  async function moveToDay(tripId: string, newDate: string) {
-    const { data: targetDay } = await supabase
-      .from("days").select("id").eq("trip_id", tripId).eq("date", newDate).single();
-    if (!targetDay) {
-      Alert.alert("No such day", "That date is outside the trip's date range — the item's date was saved, but it wasn't moved.");
-      return;
-    }
+  // Moves a regular (non-span) item to the newly-picked day (which may be
+  // Proposals), slotting it chronologically among that day's items — same
+  // pattern as the lodging check-in/out mover below. Takes the day id
+  // directly (from TripDayPickerModal) rather than looking one up by date,
+  // since Proposals has no date to look up by.
+  async function moveToDay(targetDayId: string) {
     const { data: siblings } = await supabase
       .from("items").select("id, sort_order, time_start")
-      .eq("day_id", targetDay.id).is("deleted_at", null);
+      .eq("day_id", targetDayId).is("deleted_at", null);
     const newSortOrder = computeInsertSortOrder(siblings ?? [], time || null);
-    await supabase.from("items").update({ day_id: targetDay.id, sort_order: newSortOrder }).eq("id", itemId);
+    await supabase.from("items").update({ day_id: targetDayId, sort_order: newSortOrder }).eq("id", itemId);
   }
 
   // Same-day counterpart to moveToDay: the date didn't change, but the time
@@ -446,7 +453,7 @@ export default function EditItem() {
       ) : has("flightTimes") ? (
         <>
           <View style={styles.row}>
-            <DateField label="Departure date" value={itemDate} onChange={setItemDate} />
+            <DayField label="Departure day" day={selectedDay} onPress={() => setDayPickerOpen(true)} />
             <View style={{ width: 10 }} />
             <TimeField label="Departure time" value={time} onChange={setTime} />
           </View>
@@ -461,7 +468,7 @@ export default function EditItem() {
         </>
       ) : (
         <View style={styles.row}>
-          <DateField label="Date" value={itemDate} onChange={setItemDate} />
+          <DayField label="Day" day={selectedDay} onPress={() => setDayPickerOpen(true)} />
           <View style={{ width: 10 }} />
           <TimeField label="Time (optional)" value={time} onChange={setTime} />
         </View>
@@ -590,6 +597,15 @@ export default function EditItem() {
       onSelect={handleLinkSelect}
       tripId={tripId}
       excludeIds={[itemId, ...linkedItems.map((li) => li.id)]}
+    />
+
+    <TripDayPickerModal
+      visible={dayPickerOpen}
+      onClose={() => setDayPickerOpen(false)}
+      tripId={tripId}
+      includeProposals
+      selectedDayId={selectedDay?.id}
+      onSelect={(day) => { setSelectedDay(day); setDayPickerOpen(false); }}
     />
 
     <Modal visible={promptVisible} transparent animationType="fade">

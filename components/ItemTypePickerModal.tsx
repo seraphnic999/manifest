@@ -4,7 +4,7 @@ import { ITEM_CATEGORIES, ItemCategory } from "@/lib/itemTypeMeta";
 import Icon from "@/components/icons/Icon";
 
 export default function ItemTypePickerModal({
-  visible, onClose, onSelect, onSelectKeeper, categories = ITEM_CATEGORIES, title = "Add item",
+  visible, onClose, onSelect, onSelectKeeper, onSelectQuickAdd, categories = ITEM_CATEGORIES, title = "Add item",
 }: {
   visible: boolean;
   onClose: () => void;
@@ -16,6 +16,10 @@ export default function ItemTypePickerModal({
    * this prop to leave the tile out entirely (e.g. the map's "add
    * proposal" picker has no day/city to match keepers against). */
   onSelectKeeper?: () => void;
+  /** Same idea as onSelectKeeper — "Quick add" (Maps link / natural
+   * language) isn't a category either, it opens QuickAddModal instead.
+   * Omit to leave the tile out. */
+  onSelectQuickAdd?: () => void;
   /** Defaults to every category (the "Add item" picker) — pass a filtered
    * subset for other uses, e.g. changing an existing item's type, which
    * excludes flight/lodging (see CONVERTIBLE_CATEGORIES). */
@@ -46,6 +50,14 @@ export default function ItemTypePickerModal({
                   <Icon name="star" size={26} color="#fff" />
                 </View>
                 <Text style={styles.tileLabel}>Keeper</Text>
+              </Pressable>
+            )}
+            {onSelectQuickAdd && (
+              <Pressable style={styles.tile} onPress={onSelectQuickAdd}>
+                <View style={[styles.iconCircle, { backgroundColor: colors.lightBlue }]}>
+                  <Icon name="research" size={26} color="#fff" />
+                </View>
+                <Text style={styles.tileLabel}>Quick add</Text>
               </Pressable>
             )}
           </ScrollView>

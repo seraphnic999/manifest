@@ -1,12 +1,13 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { View, Text, FlatList, StyleSheet, Pressable, ImageBackground, Image, ActivityIndicator } from "react-native";
 import { useLocalSearchParams, useRouter, Stack, useFocusEffect } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Alert } from "@/lib/alert";
 import { supabase } from "@/lib/supabase";
 import { colors, radius, fonts } from "@/lib/theme";
-import { Day, Item, Trip, TripCurrency, Expense, ItemType, tripStatus } from "@/lib/types";
+import { Day, Item, Trip, TripCurrency, Expense, ItemType, Keeper, tripStatus } from "@/lib/types";
 import Icon from "@/components/icons/Icon";
 import HamburgerMenu from "@/components/HamburgerMenu";
 import TripTabBar from "@/components/TripTabBar";
@@ -24,8 +25,11 @@ import { computeBudgetProgress } from "@/lib/budget";
 import { coverPhotoSource } from "@/lib/destinationPhotos";
 import { fetchDestinationForecast } from "@/lib/weather";
 import { weatherIconName } from "@/lib/weather";
-import { fetchTripCities, fetchAllCities, dayCityLabel, resolveDayCity, TripCityRow } from "@/lib/cities";
+import { fetchTripCities, fetchAllCities, dayCityLabel, resolveDayCity, resolveDayCityPick, TripCityRow } from "@/lib/cities";
 import { fetchTripCompanionsWithUrls, companionFullName } from "@/lib/companions";
+import ItemTypePickerModal from "@/components/ItemTypePickerModal";
+import KeeperPickerModal from "@/components/KeeperPickerModal";
+import QuickAddModal from "@/components/QuickAddModal";
 
 interface OverviewData {
   trip: Trip;
@@ -131,6 +135,58 @@ export default function TripOverview() {
   const companions = Array.isArray(data?.companions) ? data.companions : [];
   const lodgingGapDays = findLodgingGapDays(days, lodgings);
   const isCurrent = trip ? tripStatus(trip) === "current" : false;
+
+  // Add-item FAB — same entry point as the day page's, except there's no
+  // specific date to land on here, so a new item always starts on
+  // Proposals (its own day picker is where the user reassigns it).
+  const proposalsDay = days.find((d) => d.date === null) ?? null;
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [keeperPickerOpen, setKeeperPickerOpen] = useState(false);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+
+  function requireOnline(): boolean {
+    if (isOnline) return true;
+    Alert.alert("You're offline", "Connect to the internet to make changes.");
+    return false;
+  }
+
+  function openAddItem() {
+    if (!requireOnline()) return;
+    if (!proposalsDay) {
+      Alert.alert("Couldn't add item", "This trip's Proposals day wasn't found.");
+      return;
+    }
+    setPickerOpen(true);
+  }
+
+  function handleSelectCategory(categoryKey: string) {
+    setPickerOpen(false);
+    if (!proposalsDay) return;
+    router.push(`/item/new?tripId=${tripId}&dayId=${proposalsDay.id}&date=&category=${categoryKey}`);
+  }
+
+  function handleSelectKeeper() {
+    setPickerOpen(false);
+    setKeeperPickerOpen(true);
+  }
+
+  function handlePickedKeeper(keeper: Keeper) {
+    setKeeperPickerOpen(false);
+    if (!proposalsDay) return;
+    const category = categoryForDbType(keeper.item_type).key;
+    router.push(`/item/new?tripId=${tripId}&dayId=${proposalsDay.id}&date=&category=${category}&fromKeeperId=${keeper.id}`);
+  }
+
+  function handleSelectQuickAdd() {
+    if (!proposalsDay) return;
+    setPickerOpen(false);
+    setQuickAddOpen(true);
+  }
+
+  function handleQuickAddDone(itemId: string) {
+    setQuickAddOpen(false);
+    router.push(`/item/${itemId}`);
+  }
 
   // While the trip is under way, the hero should show the weather for
   // wherever the trip actually is today — which may differ from the trip's
@@ -402,6 +458,37 @@ export default function TripOverview() {
         ListFooterComponent={<View style={{ height: 12 }} />}
       />
 
+      <Pressable style={styles.fab} onPress={openAddItem}>
+        <Icon name="add" size={24} color="#fff" />
+      </Pressable>
+
+      <ItemTypePickerModal
+        visible={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onSelect={handleSelectCategory}
+        onSelectKeeper={handleSelectKeeper}
+        onSelectQuickAdd={handleSelectQuickAdd}
+      />
+      <KeeperPickerModal
+        visible={keeperPickerOpen}
+        onClose={() => setKeeperPickerOpen(false)}
+        city={proposalsDay
+          ? { ...resolveDayCityPick(proposalsDay, tripCities), label: null }
+          : { cityId: null, customName: null, label: null }}
+        onSelect={handlePickedKeeper}
+      />
+      {proposalsDay && trip && (
+        <QuickAddModal
+          visible={quickAddOpen}
+          onClose={() => setQuickAddOpen(false)}
+          tripId={tripId}
+          fallbackDayId={proposalsDay.id}
+          tripStart={trip.start_date}
+          tripEnd={trip.end_date}
+          onDone={handleQuickAddDone}
+        />
+      )}
+
       <TripTabBar tripId={tripId} active="overview" />
     </View>
   );
@@ -409,6 +496,11 @@ export default function TripOverview() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
+  fab: {
+    position: "absolute", bottom: 74, right: 16, width: 52, height: 52, borderRadius: 26,
+    backgroundColor: colors.ink, alignItems: "center", justifyContent: "center",
+    shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4,
+  },
   body: { paddingHorizontal: 16, paddingTop: 10 },
   loadingCenter: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
   loadingErrorTitle: { fontFamily: fonts.display, fontSize: 18, color: colors.ink, marginBottom: 8, textAlign: "center" },

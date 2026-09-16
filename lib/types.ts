@@ -332,6 +332,46 @@ export interface IdentifyCandidate {
   reasoning: string;
 }
 
+export interface EmailProposalFields {
+  type: ProposedField<ItemType>;
+  title: ProposedField<string>;
+  start_date: ProposedField<string>;
+  end_date: ProposedField<string>;
+  time_start: ProposedField<string>;
+  time_end: ProposedField<string>;
+  address: ProposedField<string>;
+  phone: ProposedField<string>;
+  vendor: ProposedField<string>;
+  booking_source: ProposedField<string>;
+  confirmation_code: ProposedField<string>;
+  link: ProposedField<string>;
+  notes: ProposedField<string>;
+  is_update_or_cancellation: boolean;
+  change_summary: string | null;
+  basis: string | null;
+}
+
+export type EmailProposalStatus = "pending" | "applied" | "rejected" | "failed";
+
+export interface EmailProposal {
+  id: string;
+  user_id: string;
+  raw_from: string | null;
+  raw_subject: string | null;
+  raw_body: string | null;
+  trip_id: string | null;
+  suggested_item_id: string | null;
+  match_reasoning: string | null;
+  proposal: EmailProposalFields | null;
+  status: EmailProposalStatus;
+  applied_item_id: string | null;
+  applied_action: "created" | "updated" | null;
+  error: string | null;
+  cost_usd: number | null;
+  created_at: string;
+  reviewed_at: string | null;
+}
+
 export function tripStatus(trip: Pick<Trip, "start_date" | "end_date">): TripStatus {
   const today = localIsoDate();
   if (today < trip.start_date) return "future";

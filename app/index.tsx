@@ -21,6 +21,7 @@ import { Alert } from "@/lib/alert";
 import { fetchTripCities, dayCityLabel, resolveDayCity } from "@/lib/cities";
 import { fetchTripCompanionsWithUrls } from "@/lib/companions";
 import { useResearchJobs } from "@/lib/itemResearch";
+import { useEmailProposals } from "@/lib/emailProposals";
 
 // Same semantics as lib/travelStats.ts's and lib/budget.ts's own copies of
 // this (inclusive of both endpoints, so a same-day trip is 1 day) — kept as
@@ -64,6 +65,7 @@ const NAV_ITEMS: { label: string; icon: IconName; danger?: boolean; onPress: (ct
   { label: "Keepers", icon: "star", onPress: ({ router }) => router.push("/keepers") },
   { label: "Travel Stats", icon: "stats", onPress: ({ router }) => router.push("/travelStats") },
   { label: "Research Queue", icon: "research", onPress: ({ router }) => router.push("/researchQueue") },
+  { label: "Email Proposals", icon: "research", onPress: ({ router }) => router.push("/emailProposals") },
 ];
 
 // Set once a current-trip redirect has been attempted this app session, so
@@ -236,6 +238,10 @@ export default function TripList() {
   // becomes ready or gets reviewed, not just on the next visit to Home.
   const { jobs: researchJobs } = useResearchJobs();
   const hasReadyResearch = researchJobs.some((j) => j.status === "ready");
+  // Same idea for booking-email proposals — a forwarded email that's
+  // already been parsed and is waiting on a human to apply/reject it.
+  const { proposals: emailProposals } = useEmailProposals();
+  const hasPendingEmailProposal = emailProposals.some((p) => p.status === "pending");
   useEffect(() => {
     const handle = setTimeout(() => setSearchQuery(searchInput.trim()), 300);
     return () => clearTimeout(handle);
@@ -381,6 +387,7 @@ export default function TripList() {
               <Pressable key={n.label} style={styles.navBtn} onPress={() => n.onPress({ router, setSearchOpen, signOut })} accessibilityLabel={n.label}>
                 <Icon name={n.icon} size={22} color={n.danger ? colors.coral : colors.blue} />
                 {n.label === "Research Queue" && hasReadyResearch && <View style={styles.navBtnDot} />}
+                {n.label === "Email Proposals" && hasPendingEmailProposal && <View style={styles.navBtnDot} />}
               </Pressable>
             ))}
           </View>
