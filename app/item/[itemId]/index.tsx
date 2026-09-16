@@ -26,7 +26,8 @@ import HomeButton from "@/components/HomeButton";
 import TripTabBar from "@/components/TripTabBar";
 import { useNetworkStatus } from "@/lib/useNetworkStatus";
 import OfflineBanner from "@/components/OfflineBanner";
-import { fetchFlightStatus, isFlightStatusConfigured, FlightStatus } from "@/lib/flightStatus";
+import { fetchFlightStatusForItem, refreshFlightStatus } from "@/lib/flightStatus";
+import FlightStatusCard from "@/components/FlightStatusCard";
 import AddToKeepersModal from "@/components/AddToKeepersModal";
 import IdentifyCandidatesModal from "@/components/IdentifyCandidatesModal";
 import ItemResearchReviewModal from "@/components/ItemResearchReviewModal";
@@ -94,10 +95,7 @@ export default function ItemDetails() {
   const [shoppingFormOpen, setShoppingFormOpen] = useState(false);
   const [editShoppingId, setEditShoppingId] = useState<string | null>(null);
   const [photoSourceOpen, setPhotoSourceOpen] = useState(false);
-  const [flightStatus, setFlightStatus] = useState<FlightStatus | null>(null);
-  const [flightStatusError, setFlightStatusError] = useState<string | null>(null);
-  const [flightStatusLoading, setFlightStatusLoading] = useState(false);
-  const [flightStatusCheckedAt, setFlightStatusCheckedAt] = useState<Date | null>(null);
+  const [flightStatusRefreshing, setFlightStatusRefreshing] = useState(false);
   const [keepersModalOpen, setKeepersModalOpen] = useState(false);
   const [identifyOpen, setIdentifyOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
@@ -123,6 +121,13 @@ export default function ItemDetails() {
   });
   const currencies = tripExtras?.currencies ?? [];
   const parties = tripExtras?.parties ?? [];
+
+  const itemIsFlight = item?.type === "flight" && !item?.is_stay_span;
+  const { data: flightStatusRow, refetch: refetchFlightStatus } = useQuery({
+    queryKey: ["flightStatus", itemId],
+    queryFn: () => fetchFlightStatusForItem(itemId),
+    enabled: itemIsFlight,
+  });
 
   useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
 
@@ -224,18 +229,15 @@ export default function ItemDetails() {
     router.push(`/item/new?${params.toString()}`);
   }
 
-  async function refreshFlightStatus(flightNum: string, dateIso: string) {
-    setFlightStatusLoading(true);
-    setFlightStatusError(null);
-    try {
-      const status = await fetchFlightStatus(flightNum, dateIso);
-      setFlightStatus(status);
-      setFlightStatusCheckedAt(new Date());
-    } catch (e: any) {
-      setFlightStatusError(e.message ?? "Couldn't fetch flight status.");
-    } finally {
-      setFlightStatusLoading(false);
+  async function handleRefreshFlightStatus() {
+    setFlightStatusRefreshing(true);
+    const { error } = await refreshFlightStatus(itemId);
+    setFlightStatusRefreshing(false);
+    if (error) {
+      Alert.alert("Couldn't refresh flight status", error);
+      return;
     }
+    refetchFlightStatus();
   }
 
   function deleteItem() {
@@ -471,50 +473,12 @@ export default function ItemDetails() {
         )
       )}
 
-      {isFlight && flightNumber && isFlightStatusConfigured() ? (
-        <View style={styles.flightStatusCard}>
-          <View style={styles.flightStatusHeader}>
-            <Text style={styles.sectionLabel}>Flight status</Text>
-            <Pressable
-              onPress={() => { if (item.start_date && requireOnline()) refreshFlightStatus(flightNumber, item.start_date); }}
-              disabled={flightStatusLoading}
-            >
-              {flightStatusLoading ? (
-                <ActivityIndicator size="small" color={colors.lightBlue} />
-              ) : (
-                <Icon name="refresh" size={22} color={colors.blue} />
-              )}
-            </Pressable>
-          </View>
-          {flightStatusError ? (
-            <Text style={styles.flightStatusError}>{flightStatusError}</Text>
-          ) : flightStatus ? (
-            <>
-              <Text style={styles.flightStatusValue}>{flightStatus.status ?? "Unknown"}</Text>
-              <View style={styles.fieldRow}>
-                <Text style={styles.fieldLabel}>Departure</Text>
-                <Text style={styles.fieldValue}>
-                  {(flightStatus.departure.revised?.local ?? flightStatus.departure.scheduled.local) ?? "—"}
-                  {flightStatus.departure.gate ? ` · Gate ${flightStatus.departure.gate}` : ""}
-                  {flightStatus.departure.terminal ? ` · T${flightStatus.departure.terminal}` : ""}
-                </Text>
-              </View>
-              <View style={styles.fieldRow}>
-                <Text style={styles.fieldLabel}>Arrival</Text>
-                <Text style={styles.fieldValue}>
-                  {(flightStatus.arrival.revised?.local ?? flightStatus.arrival.scheduled.local) ?? "—"}
-                  {flightStatus.arrival.gate ? ` · Gate ${flightStatus.arrival.gate}` : ""}
-                  {flightStatus.arrival.terminal ? ` · T${flightStatus.arrival.terminal}` : ""}
-                </Text>
-              </View>
-              {flightStatusCheckedAt && (
-                <Text style={styles.flightStatusChecked}>Last checked {flightStatusCheckedAt.toLocaleTimeString()}</Text>
-              )}
-            </>
-          ) : (
-            <Text style={styles.empty}>Tap refresh to check live status.</Text>
-          )}
-        </View>
+      {isFlight && flightNumber ? (
+        <FlightStatusCard
+          row={flightStatusRow}
+          loading={flightStatusRefreshing}
+          onRefresh={() => { if (requireOnline()) handleRefreshFlightStatus(); }}
+        />
       ) : null}
 
       <Text style={styles.sectionLabel}>Expenses</Text>
@@ -727,14 +691,6 @@ const styles = StyleSheet.create({
   },
   keeperButtonText: { color: colors.gold, fontWeight: "700" },
   keeperStars: { flexDirection: "row", gap: 1, marginLeft: 4 },
-  flightStatusCard: {
-    backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,
-    borderRadius: radius.md, padding: 12, marginTop: 16,
-  },
-  flightStatusHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  flightStatusValue: { color: colors.lightBlue, fontWeight: "700", fontSize: 14, marginBottom: 4 },
-  flightStatusError: { color: colors.coral, fontSize: 12, marginTop: 4 },
-  flightStatusChecked: { color: colors.inkSoft, fontSize: 11, fontStyle: "italic", marginTop: 6 },
   sectionLabel: {
     color: colors.inkSoft, fontWeight: "700", fontSize: 12,
     textTransform: "uppercase", letterSpacing: 1, marginTop: 20, marginBottom: 4,

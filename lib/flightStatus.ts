@@ -1,15 +1,13 @@
-// Live flight status via AeroDataBox (RapidAPI free tier). One lookup per
-// manual refresh — this app has no background server component to poll on
-// its own, so a stale-until-refreshed card is the deliberate design, not a
-// missing feature.
-//
-// Note: EXPO_PUBLIC_* vars are bundled into the client and are visible to
-// anyone who decompiles the APK, same as the existing Supabase anon key.
-// That's an acceptable tradeoff for a low-value, quota-limited free-tier
-// key on a single-user app; it would not be for a paid/high-value key.
+// Live flight status, tracked server-side. A scheduled Edge Function
+// (supabase/functions/poll-flight-status) starts polling AeroDataBox 4
+// hours before each flight's departure and keeps checking every ~20
+// minutes until it lands — this file just reads the resulting flight_status
+// row, plus a "refresh now" call that invokes the same function for one
+// flight on demand. The trip overview page and the item detail page both
+// read/write this one row, so a manual refresh from either screen updates
+// both without a second AeroDataBox call.
 
-const RAPIDAPI_HOST = "aerodatabox.p.rapidapi.com";
-const API_KEY = process.env.EXPO_PUBLIC_AERODATABOX_KEY;
+import { supabase } from "./supabase";
 
 export interface FlightStatusTime {
   utc: string | null;
@@ -35,79 +33,37 @@ export interface FlightStatus {
   };
 }
 
-function parseTime(t: any): FlightStatusTime {
-  return { utc: t?.utc ?? null, local: t?.local ?? null };
+export interface FlightStatusRow {
+  item_id: string;
+  trip_id: string;
+  flight_number: string;
+  status: string | null;
+  previous_status: string | null;
+  data: FlightStatus;
+  tracking_active: boolean;
+  last_error: string | null;
+  checked_at: string | null;
 }
 
-// AeroDataBox names the "revised" time differently depending on how
-// confirmed it is — actualTime once landed/departed, revisedTime once a
-// gate-level update exists, predictedTime as an earlier estimate — and
-// which of these is present varies per flight. Falls back through all
-// three rather than assuming one name, since a real response can use
-// either "revisedTime" (seen on departure) or "predictedTime" (seen on
-// arrival) for what's conceptually the same "updated time" concept.
-function parseBestTime(leg: any): FlightStatusTime | null {
-  const t = leg?.actualTime ?? leg?.revisedTime ?? leg?.predictedTime;
-  return t ? parseTime(t) : null;
+export async function fetchFlightStatusForItem(itemId: string): Promise<FlightStatusRow | null> {
+  const { data, error } = await supabase.from("flight_status").select("*").eq("item_id", itemId).maybeSingle();
+  if (error) throw error;
+  return (data as FlightStatusRow | null) ?? null;
 }
 
-/**
- * Looks up a flight by IATA/ICAO number and local departure date
- * (YYYY-MM-DD). Throws if no API key is configured, the flight isn't
- * found, or the request fails.
- */
-export async function fetchFlightStatus(flightNumber: string, dateIso: string): Promise<FlightStatus> {
-  if (!API_KEY) {
-    throw new Error("No AeroDataBox API key configured (EXPO_PUBLIC_AERODATABOX_KEY).");
-  }
-
-  const cleaned = flightNumber.replace(/\s+/g, "");
-  const url = `https://${RAPIDAPI_HOST}/flights/number/${encodeURIComponent(cleaned)}/${dateIso}`;
-
-  const res = await fetch(url, {
-    headers: {
-      "X-RapidAPI-Key": API_KEY,
-      "X-RapidAPI-Host": RAPIDAPI_HOST,
-    },
-  });
-
-  if (res.status === 204) {
-    throw new Error(`No flight found for ${cleaned} on ${dateIso}.`);
-  }
-  if (!res.ok) {
-    throw new Error(`Flight status lookup failed (${res.status}).`);
-  }
-
-  const data = await res.json();
-  const flights = Array.isArray(data) ? data : [];
-  if (flights.length === 0) {
-    throw new Error(`No flight found for ${cleaned} on ${dateIso}.`);
-  }
-
-  // Multiple legs can share a flight number across different days /
-  // codeshares — take the first, which AeroDataBox orders by relevance.
-  const f = flights[0];
-
-  return {
-    flightNumber: cleaned,
-    status: f.status ?? null,
-    departure: {
-      airport: f.departure?.airport?.iata ?? f.departure?.airport?.name ?? null,
-      scheduled: parseTime(f.departure?.scheduledTime),
-      revised: parseBestTime(f.departure),
-      terminal: f.departure?.terminal ?? null,
-      gate: f.departure?.gate ?? null,
-    },
-    arrival: {
-      airport: f.arrival?.airport?.iata ?? f.arrival?.airport?.name ?? null,
-      scheduled: parseTime(f.arrival?.scheduledTime),
-      revised: parseBestTime(f.arrival),
-      terminal: f.arrival?.terminal ?? null,
-      gate: f.arrival?.gate ?? null,
-    },
-  };
+export async function fetchFlightStatusForTrip(tripId: string): Promise<FlightStatusRow[]> {
+  const { data, error } = await supabase.from("flight_status").select("*").eq("trip_id", tripId);
+  if (error) throw error;
+  return (data ?? []) as FlightStatusRow[];
 }
 
-export function isFlightStatusConfigured(): boolean {
-  return !!API_KEY;
+/** Forces an immediate check for one flight item, regardless of its normal
+ * 4-hours-before tracking window — used by both screens' manual refresh
+ * button. Returns the updated row directly, so the caller can update its UI
+ * without a second read. */
+export async function refreshFlightStatus(itemId: string): Promise<{ row: FlightStatusRow | null; error: string | null }> {
+  const { data, error } = await supabase.functions.invoke("poll-flight-status", { body: { item_id: itemId } });
+  if (error) return { row: null, error: error.message ?? "Couldn't refresh flight status." };
+  if (data?.error) return { row: null, error: data.error };
+  return { row: (data?.row as FlightStatusRow) ?? null, error: null };
 }

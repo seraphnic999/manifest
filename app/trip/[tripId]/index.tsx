@@ -30,12 +30,15 @@ import { fetchTripCompanionsWithUrls, companionFullName } from "@/lib/companions
 import ItemTypePickerModal from "@/components/ItemTypePickerModal";
 import KeeperPickerModal from "@/components/KeeperPickerModal";
 import QuickAddModal from "@/components/QuickAddModal";
+import FlightStatusCard from "@/components/FlightStatusCard";
+import { fetchFlightStatusForTrip, refreshFlightStatus, FlightStatusRow } from "@/lib/flightStatus";
 
 interface OverviewData {
   trip: Trip;
   days: Day[];
   tripCities: TripCityRow[];
   flights: Item[];
+  flightStatuses: FlightStatusRow[];
   lodgings: Item[];
   currencies: TripCurrency[];
   expenses: Pick<Expense, "amount" | "currency_code" | "expense_date">[];
@@ -59,6 +62,7 @@ async function fetchOverviewData(tripId: string): Promise<OverviewData | null> {
   const { data: flights, error: flightsError } = await supabase
     .from("items").select("*").eq("trip_id", tripId).eq("type", "flight").is("deleted_at", null).order("start_date");
   if (flightsError) throw flightsError;
+  const flightStatuses = await fetchFlightStatusForTrip(tripId);
   const { data: lodgings, error: lodgingsError } = await supabase
     .from("items").select("*").eq("trip_id", tripId).eq("is_stay_span", true).is("deleted_at", null).order("start_date");
   if (lodgingsError) throw lodgingsError;
@@ -99,6 +103,7 @@ async function fetchOverviewData(tripId: string): Promise<OverviewData | null> {
     days: (days ?? []) as Day[],
     tripCities,
     flights: (flights ?? []) as Item[],
+    flightStatuses,
     lodgings: (lodgings ?? []) as Item[],
     currencies: (currencies ?? []) as TripCurrency[],
     expenses: expenses ?? [],
@@ -127,6 +132,18 @@ export default function TripOverview() {
   const days = Array.isArray(data?.days) ? data.days : [];
   const tripCities = Array.isArray(data?.tripCities) ? data.tripCities : [];
   const flights = Array.isArray(data?.flights) ? data.flights : [];
+  const flightStatuses = Array.isArray(data?.flightStatuses) ? data.flightStatuses : [];
+  const [refreshingFlightId, setRefreshingFlightId] = useState<string | null>(null);
+  async function handleRefreshFlight(itemId: string) {
+    setRefreshingFlightId(itemId);
+    const { error } = await refreshFlightStatus(itemId);
+    setRefreshingFlightId(null);
+    if (error) {
+      Alert.alert("Couldn't refresh flight status", error);
+      return;
+    }
+    refetch();
+  }
   const lodgings = Array.isArray(data?.lodgings) ? data.lodgings : [];
   const totalNis = data?.totalNis ?? null;
   const todayItems = Array.isArray(data?.todayItems) ? data.todayItems : [];
@@ -393,17 +410,35 @@ export default function TripOverview() {
                     const flightNumber = (f.custom_fields as any)?.flight_number as string | undefined;
                     const durationMinutes = computeDurationMinutes(f.start_date, f.time_start, f.end_date, f.time_end);
                     const durationText = durationMinutes !== null && durationMinutes >= 0 ? formatDuration(durationMinutes) : null;
+                    // A flight only gets the tracking bubble once it has a
+                    // flight_status row — i.e. it has entered its 4-hours-
+                    // before window (or someone manually checked it) — other
+                    // flights on the trip stay a plain row.
+                    const trackedStatus = flightStatuses.find((fs) => fs.item_id === f.id);
                     return (
-                      <Pressable key={f.id} style={styles.itemRow} onPress={() => router.push(`/item/${f.id}`)}>
-                        <View style={styles.itemIconCol}><Icon name="flight" size={28} color="#fff" /></View>
-                        <View style={styles.itemBody}>
-                          <Text style={styles.itemCat}>{flightNumber ?? "FLIGHT"}</Text>
-                          <Text style={styles.itemTitle}>{f.title}</Text>
-                          <Text style={styles.itemSub}>
-                            {[normalizeTimeHHMM(f.time_start), formatDateDDMMYYYY(f.start_date), durationText].filter(Boolean).join(" · ")}
-                          </Text>
-                        </View>
-                      </Pressable>
+                      <View key={f.id}>
+                        <Pressable
+                          style={[styles.itemRow, trackedStatus && styles.itemRowTracked]}
+                          onPress={() => router.push(`/item/${f.id}`)}
+                        >
+                          <View style={styles.itemIconCol}><Icon name="flight" size={28} color="#fff" /></View>
+                          <View style={styles.itemBody}>
+                            <Text style={styles.itemCat}>{flightNumber ?? "FLIGHT"}</Text>
+                            <Text style={styles.itemTitle}>{f.title}</Text>
+                            <Text style={styles.itemSub}>
+                              {[normalizeTimeHHMM(f.time_start), formatDateDDMMYYYY(f.start_date), durationText].filter(Boolean).join(" · ")}
+                            </Text>
+                          </View>
+                        </Pressable>
+                        {trackedStatus && (
+                          <FlightStatusCard
+                            row={trackedStatus}
+                            loading={refreshingFlightId === f.id}
+                            onRefresh={() => handleRefreshFlight(f.id)}
+                            compact
+                          />
+                        )}
+                      </View>
                     );
                   })}
                 </>
@@ -568,6 +603,9 @@ const styles = StyleSheet.create({
     flexDirection: "row", alignItems: "stretch", backgroundColor: colors.paperRaised,
     borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, marginTop: 6, overflow: "hidden",
   },
+  // A flight currently being live-tracked (see flightStatuses) — the accent
+  // border is the "highlight" the tracked flight gets over a plain row.
+  itemRowTracked: { borderColor: colors.blue, borderWidth: 2 },
   itemTimeCol: { width: 56, backgroundColor: colors.ink, alignItems: "center", justifyContent: "center" },
   itemTimeText: { fontFamily: fonts.mono, color: "#fff", fontSize: 11 },
   itemIconCol: { width: 56, backgroundColor: colors.ink, alignItems: "center", justifyContent: "center" },

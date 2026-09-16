@@ -79,6 +79,19 @@ export default function RootLayout() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  // Tapping a push notification (flight status changes, item research
+  // ready, etc.) navigates to whatever in-app route the sender put in
+  // data.route — a plain convention any notify()-style edge function can
+  // opt into, rather than one-off handling per notification kind.
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+      const route = response.notification.request.content.data?.route as string | undefined;
+      if (route) router.push(route as any);
+    });
+    return () => sub.remove();
+  }, []);
+
   useEffect(() => {
     if (session === undefined) return; // still loading
     const inAuthGroup = segments[0] === "(auth)";
