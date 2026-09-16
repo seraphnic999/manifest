@@ -50,9 +50,15 @@ interface Props {
   companionId: string;
   document: TravelDocument | null; // null = create mode
   onSaved: () => void;
+  /** Set when this modal was opened via the "Scan from gallery/camera"
+   * option on the add-document sheet (create mode only) — on open, goes
+   * straight into picking a photo from that source and scanning it, instead
+   * of waiting for the user to press "Add photo" then "Scan with AI"
+   * themselves. Manual entry (the default) leaves this unset. */
+  initialAction?: "gallery" | "camera";
 }
 
-export default function TravelDocumentEditModal({ visible, onClose, companionId, document, onSaved }: Props) {
+export default function TravelDocumentEditModal({ visible, onClose, companionId, document, onSaved, initialAction }: Props) {
   const [type, setType] = useState<DocumentType>("passport");
   const [documentNumber, setDocumentNumber] = useState("");
   const [issuingCountry, setIssuingCountry] = useState("");
@@ -131,15 +137,23 @@ export default function TravelDocumentEditModal({ visible, onClose, companionId,
     return fieldsSnapshot() !== initialSnapshotRef.current || photoChanged;
   }
 
-  async function pickPhoto() {
+  // Returns the document id the photo ended up attached to, or null if the
+  // user cancelled/it failed — callers that chain into scanWithAI need the
+  // real id up front rather than reading the `docId` state right back,
+  // since setDocId(id) above it hasn't necessarily committed yet.
+  async function pickPhoto(source: "gallery" | "camera" = "gallery"): Promise<string | null> {
     try {
-      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const perm = source === "camera"
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!perm.granted) {
-        Alert.alert("Permission needed", "Allow photo library access to pick a photo.");
-        return;
+        Alert.alert("Permission needed", source === "camera" ? "Allow camera access to take a photo." : "Allow photo library access to pick a photo.");
+        return null;
       }
-      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.85 });
-      if (result.canceled || result.assets.length === 0) return;
+      const result = source === "camera"
+        ? await ImagePicker.launchCameraAsync({ quality: 0.85 })
+        : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.85 });
+      if (result.canceled || result.assets.length === 0) return null;
 
       let id = docId;
       if (!id) {
@@ -154,17 +168,20 @@ export default function TravelDocumentEditModal({ visible, onClose, companionId,
       setPhotoChanged(true);
       setScanResult(null); // a replaced photo invalidates whatever the old one scanned to
       onSaved();
+      return id;
     } catch (e: any) {
       Alert.alert("Couldn't add photo", e.message ?? "Unknown error");
+      return null;
     }
   }
 
-  async function scanWithAI() {
-    if (!docId) return;
+  async function scanWithAI(idOverride?: string) {
+    const id = idOverride ?? docId;
+    if (!id) return;
     setScanning(true);
     setScanResult(null);
     try {
-      const { data, error } = await supabase.functions.invoke("parse-document", { body: { document_id: docId } });
+      const { data, error } = await supabase.functions.invoke("parse-document", { body: { document_id: id } });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       const extracted = data.extracted as ScanResult;
@@ -181,6 +198,23 @@ export default function TravelDocumentEditModal({ visible, onClose, companionId,
     }
     setScanning(false);
   }
+
+  // Drives the "Scan from gallery/camera" entry point: goes straight into
+  // the photo source and, once a photo lands, straight into the scan — no
+  // extra taps on "Add photo" / "Scan with AI" needed. Runs once per modal
+  // open (guarded by the ref, since `visible` alone doesn't change again
+  // while the sheet stays open).
+  const autoRanRef = useRef(false);
+  useEffect(() => {
+    if (!visible) { autoRanRef.current = false; return; }
+    if (!initialAction || document || autoRanRef.current) return;
+    autoRanRef.current = true;
+    (async () => {
+      const id = await pickPhoto(initialAction);
+      if (id) await scanWithAI(id);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, initialAction, document]);
 
   function applyScan() {
     if (!scanResult) return;
@@ -294,13 +328,13 @@ export default function TravelDocumentEditModal({ visible, onClose, companionId,
               <Image source={{ uri: photoUrl }} style={styles.photo} />
             </Pressable>
           ) : null}
-          <Pressable style={styles.photoBtn} onPress={pickPhoto}>
+          <Pressable style={styles.photoBtn} onPress={() => pickPhoto()}>
             <Icon name="camera" size={18} color={colors.blue} />
             <Text style={styles.photoBtnText}>{photoUrl ? "Replace photo" : "Add photo"}</Text>
           </Pressable>
 
           {photoUrl && !scanResult && (
-            <Pressable style={[styles.scanBtn, scanning && { opacity: 0.6 }]} onPress={scanWithAI} disabled={scanning}>
+            <Pressable style={[styles.scanBtn, scanning && { opacity: 0.6 }]} onPress={() => scanWithAI()} disabled={scanning}>
               {scanning ? <ActivityIndicator color={colors.blue} /> : <Icon name="research" size={18} color={colors.blue} />}
               <Text style={styles.scanBtnText}>{scanning ? "Reading photo…" : "Scan with AI"}</Text>
             </Pressable>

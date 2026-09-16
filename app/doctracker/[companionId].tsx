@@ -18,6 +18,7 @@ import { fetchDocumentsForCompanion, fetchDocumentPhotoUrl, documentTypeLabel, d
 import { buildCompanionExportText, shareCompanionText } from "@/lib/companionExport";
 import CompanionEditModal from "@/components/CompanionEditModal";
 import TravelDocumentEditModal from "@/components/TravelDocumentEditModal";
+import AddDocumentOptionsModal, { AddDocumentMode } from "@/components/AddDocumentOptionsModal";
 import PhotoLightbox from "@/components/PhotoLightbox";
 
 async function fetchDetail(companionId: string) {
@@ -57,7 +58,9 @@ export default function CompanionDetail() {
   const { data, refetch } = useQuery({ queryKey: ["companionDetail", companionId], queryFn: () => fetchDetail(companionId) });
 
   const [editOpen, setEditOpen] = useState(false);
+  const [addDocOptionsOpen, setAddDocOptionsOpen] = useState(false);
   const [docModalOpen, setDocModalOpen] = useState(false);
+  const [docInitialAction, setDocInitialAction] = useState<"gallery" | "camera" | undefined>(undefined);
   const [editingDoc, setEditingDoc] = useState<TravelDocument | null>(null);
   const [exportMode, setExportMode] = useState(false);
   const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set());
@@ -81,6 +84,7 @@ export default function CompanionDetail() {
   function openDocument(doc: TravelDocument) {
     if (exportMode) { toggleDocSelected(doc.id); return; }
     setEditingDoc(doc);
+    setDocInitialAction(undefined);
     setDocModalOpen(true);
   }
 
@@ -180,7 +184,7 @@ export default function CompanionDetail() {
 
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionLabel}>Travel Documents</Text>
-          <Pressable onPress={() => { setEditingDoc(null); setDocModalOpen(true); }}>
+          <Pressable onPress={() => setAddDocOptionsOpen(true)}>
             <Text style={styles.addDocText}>+ Add document</Text>
           </Pressable>
         </View>
@@ -220,11 +224,22 @@ export default function CompanionDetail() {
       </ScrollView>
 
       <CompanionEditModal visible={editOpen} onClose={() => setEditOpen(false)} companion={companion} onSaved={refetch} />
+      <AddDocumentOptionsModal
+        visible={addDocOptionsOpen}
+        onClose={() => setAddDocOptionsOpen(false)}
+        onSelect={(mode: AddDocumentMode) => {
+          setAddDocOptionsOpen(false);
+          setEditingDoc(null);
+          setDocInitialAction(mode === "manual" ? undefined : mode);
+          setDocModalOpen(true);
+        }}
+      />
       <TravelDocumentEditModal
         visible={docModalOpen}
         onClose={() => setDocModalOpen(false)}
         companionId={companion.id}
         document={editingDoc}
+        initialAction={docInitialAction}
         onSaved={refetch}
       />
       {lightbox && (
