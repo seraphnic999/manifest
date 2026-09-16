@@ -37,8 +37,8 @@ You are step one of two. A human will look at your candidates and quickly confir
 
 RULES
 
-1. Ground candidates in the given city/country and dates if that helps — a chain with one location in that city, a seasonal event, a neighborhood that fits the trip's other days.
-2. If the title names a well-known chain or brand, its name being unambiguous does NOT mean its location is. Use one web search to check how many locations it has in the destination city before answering — don't assume "one" from memory alone, that's exactly the case that goes wrong. If it turns out to have just one location there, proceed as rule 3. If it has more than one, list each distinct branch as its own candidate (its street/neighborhood as area_hint to tell them apart), most likely/central first, up to 4 — don't collapse a real multi-branch chain down to a single guessed address.
+1. Ground candidates in the given destination city/country and dates — a chain with one location in that city, a seasonal event, a neighborhood that fits the trip's other days. Destination match is a strong signal, not just a tiebreaker: see rule 2.
+2. If the title names a well-known chain or brand, its name being unambiguous does NOT mean its location is. Use one web search to check how many locations it has. If you know the item's destination city and the brand has a location there, that location IS the answer — return it alone as your one candidate (high confidence), even if the brand also has other locations in other cities. Do not pad the list with an out-of-destination branch just because the brand happens to have one elsewhere; the human is planning a trip to a specific place, not choosing between cities. Only list branches in multiple different cities when the destination is unknown, or the destination you were given doesn't have a location of this brand at all (in which case list its real locations elsewhere so the human can pick which one they actually meant).
 3. If the title is already a specific, unambiguous business name with only one location in the destination — confirmed via rule 2's search for a chain, or obviously a one-off place otherwise — return exactly one candidate at "high" confidence. Don't invent alternatives that don't exist just to fill the list.
 4. If the title is generic ("Dinner", "Museum visit", "Airport transfer") or which exact venue is meant is genuinely unclear for some other reason, return up to 4 real, named candidates, most likely first.
 5. Beyond rule 2's chain check, use at most one more web search, and only if you are genuinely unsure. Most items should still resolve quickly — this step exists to be fast, not to under-verify a chain name and hand back a confident guess.
@@ -108,6 +108,41 @@ function resolveCity(day: Json | null, tripCities: Json[]): { label: string | nu
   return { label: null, country: null };
 }
 
+// Quick add (Maps link / natural language) resolves an item's day purely
+// from a parsed date, without the user ever having been "on" that day's
+// page — so unlike the normal add-item/item-detail flows, the single city
+// the item's own day resolves to (via resolveCity above) can't be trusted
+// as the only relevant destination: for a multi-city trip, whichever city
+// that day falls in might not have a day-level override set at all, and
+// silently falls back to the trip's primary city regardless of where the
+// trip actually is on that date. This builds the full day-by-day
+// destination list instead, so the caller can point at the one matching
+// the item's own date and still show the rest as context.
+async function buildTripWideCityContext(
+  supabase: Json, tripId: string, itemDate: string | null
+): Promise<{ matched: { label: string; country: string | null } | null; distinctLabels: string[]; dayRows: { date: string; label: string }[] }> {
+  const [{ data: days }, { data: tripCities }] = await Promise.all([
+    supabase.from("days").select("date, city_id, custom_city_name").eq("trip_id", tripId).order("sort_order"),
+    supabase.from("trip_cities").select("city_id, custom_name, sort_order, city:cities(name, country)").eq("trip_id", tripId).order("sort_order"),
+  ]);
+
+  const dayRows: { date: string; label: string; country: string | null }[] = [];
+  for (const d of (days ?? []) as Json[]) {
+    if (!d.date) continue; // Proposals has no date to place in this list
+    const { label, country } = resolveCity(d, tripCities ?? []);
+    if (label) dayRows.push({ date: d.date, label, country });
+  }
+
+  const matchedRow = itemDate ? dayRows.find((r) => r.date === itemDate) ?? null : null;
+  const distinctLabels = [...new Set(dayRows.map((r) => r.label))];
+
+  return {
+    matched: matchedRow ? { label: matchedRow.label, country: matchedRow.country } : null,
+    distinctLabels,
+    dayRows: dayRows.map((r) => ({ date: r.date, label: r.label })),
+  };
+}
+
 async function callClaude(apiKey: string, messages: Json[]) {
   const res = await fetch(ANTHROPIC_URL, {
     method: "POST",
@@ -133,9 +168,11 @@ async function callClaude(apiKey: string, messages: Json[]) {
 
 Deno.serve(async (req) => {
   let itemId: string | undefined;
+  let tripWideCityContext = false;
   try {
     const body = await req.json();
     itemId = body?.item_id;
+    tripWideCityContext = !!body?.trip_wide_city_context;
   } catch { /* fall through */ }
   if (!itemId) {
     return new Response(JSON.stringify({ error: "item_id is required" }), { status: 400 });
@@ -158,18 +195,39 @@ Deno.serve(async (req) => {
       supabase.from("trip_cities").select("city_id, custom_name, sort_order, city:cities(name, country)").eq("trip_id", item.trip_id).order("sort_order"),
     ]);
 
-    const { label: cityLabel, country } = resolveCity(day, tripCities ?? []);
     const contextLines = [
       `Item title: "${item.title}"`,
       `Item type: ${item.type}`,
-      cityLabel ? `Destination: ${cityLabel}${country ? `, ${country}` : ""}` : null,
-      trip ? `Trip dates: ${trip.start_date} to ${trip.end_date}` : null,
-    ].filter(Boolean).join("\n");
+    ];
+
+    if (tripWideCityContext) {
+      const { matched, distinctLabels, dayRows } = await buildTripWideCityContext(supabase, item.trip_id, item.start_date ?? null);
+      if (matched) {
+        contextLines.push(`Destination on this item's date (${item.start_date}): ${matched.label}${matched.country ? `, ${matched.country}` : ""}`);
+      } else if (item.start_date) {
+        contextLines.push(`This item's date (${item.start_date}) doesn't fall within any of the trip's dated days — no destination could be pinned to it specifically.`);
+      } else {
+        contextLines.push(`This item has no date yet, so no single destination applies — use the trip's destinations below as general context only.`);
+      }
+      if (distinctLabels.length > 1) {
+        contextLines.push(
+          `This trip visits multiple destinations. Full day-by-day list:\n` +
+          dayRows.map((r) => `  ${r.date}: ${r.label}`).join("\n")
+        );
+      } else if (distinctLabels.length === 1 && !matched) {
+        contextLines.push(`Destination: ${distinctLabels[0]}`);
+      }
+    } else {
+      const { label: cityLabel, country } = resolveCity(day, tripCities ?? []);
+      if (cityLabel) contextLines.push(`Destination: ${cityLabel}${country ? `, ${country}` : ""}`);
+    }
+
+    if (trip) contextLines.push(`Trip dates: ${trip.start_date} to ${trip.end_date}`);
 
     const messages: Json[] = [
       {
         role: "user",
-        content: [{ type: "text", text: `${contextLines}\n\nIdentify which specific real-world place this item most likely refers to, then call propose_candidates.` }],
+        content: [{ type: "text", text: `${contextLines.filter(Boolean).join("\n")}\n\nIdentify which specific real-world place this item most likely refers to, then call propose_candidates.` }],
       },
     ];
 

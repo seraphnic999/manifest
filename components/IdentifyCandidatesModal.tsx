@@ -11,12 +11,16 @@ interface Props {
   onClose: () => void;
   item: Pick<Item, "id" | "title" | "trip_id">;
   onQueued: () => void;
+  /** See identifyItem's own doc — set true only from Quick Add, where the
+   * item's day was resolved from a parsed date rather than the user
+   * actually being on that day. */
+  tripWideCityContext?: boolean;
 }
 
 // Phase 1 of the research agent, shown inline while the user waits — this
 // call is deliberately kept fast and cheap (see identify-item's own budget),
 // so a plain loading spinner is the right amount of ceremony for it.
-export default function IdentifyCandidatesModal({ visible, onClose, item, onQueued }: Props) {
+export default function IdentifyCandidatesModal({ visible, onClose, item, onQueued, tripWideCityContext }: Props) {
   const [loading, setLoading] = useState(true);
   const [candidates, setCandidates] = useState<IdentifyCandidate[] | null>(null);
   const [queuing, setQueuing] = useState(false);
@@ -25,12 +29,12 @@ export default function IdentifyCandidatesModal({ visible, onClose, item, onQueu
     if (!visible) return;
     setLoading(true);
     setCandidates(null);
-    identifyItem(item.id).then(({ candidates: c, error }) => {
+    identifyItem(item.id, { tripWideCityContext }).then(({ candidates: c, error }) => {
       if (error) Alert.alert("Couldn't identify this item", error);
       setCandidates(c ?? []);
       setLoading(false);
     });
-  }, [visible, item.id]);
+  }, [visible, item.id, tripWideCityContext]);
 
   async function queue(name: string | null, context: Record<string, unknown> | null) {
     setQueuing(true);

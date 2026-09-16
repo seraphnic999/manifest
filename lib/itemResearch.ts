@@ -18,11 +18,28 @@ export function itemResearchEligible(type: ItemType): boolean {
   return ELIGIBLE_TYPES.includes(type);
 }
 
-export async function identifyItem(itemId: string): Promise<{
+export async function identifyItem(
+  itemId: string,
+  options?: {
+    /** Quick add resolves an item's day purely from a parsed date, without
+     * the user ever being "on" that day — so for a multi-city trip, the
+     * single city that day happens to resolve to can't be trusted as the
+     * only destination in play (a day with no override silently falls back
+     * to the trip's primary city). Set this to have identify-item look at
+     * every day's destination instead and match the item's own date
+     * against them, rather than assuming one city. The normal add-item/
+     * item-detail "Fill in details" flow leaves this unset — there the
+     * item's day was placed there by the user directly, so that day's own
+     * resolved city is already correct. */
+    tripWideCityContext?: boolean;
+  }
+): Promise<{
   candidates: IdentifyCandidate[] | null;
   error: string | null;
 }> {
-  const { data, error } = await supabase.functions.invoke("identify-item", { body: { item_id: itemId } });
+  const { data, error } = await supabase.functions.invoke("identify-item", {
+    body: { item_id: itemId, trip_wide_city_context: options?.tripWideCityContext ?? false },
+  });
   if (error) return { candidates: null, error: error.message ?? "Couldn't identify this item." };
   if (data?.error) return { candidates: null, error: data.error };
   return { candidates: (data?.candidates ?? []) as IdentifyCandidate[], error: null };

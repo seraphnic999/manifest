@@ -125,6 +125,7 @@ export default function QuickAddModal({ visible, onClose, tripId, fallbackDayId,
         <IdentifyCandidatesModal
           visible
           item={pendingIdentify}
+          tripWideCityContext
           onClose={() => { const id = pendingIdentify.id; setPendingIdentify(null); onDone(id); }}
           onQueued={() => { const id = pendingIdentify.id; setPendingIdentify(null); onDone(id); }}
         />
