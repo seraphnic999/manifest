@@ -453,11 +453,23 @@ export default function DayView() {
       <NestableScrollContainer contentContainerStyle={{ paddingBottom: 90 }}>
         <View style={styles.themeRow}>
           <Pressable style={styles.themeMain} onPress={openEditModal}>
-            <Text style={effectiveCityLabel ? styles.themeText : styles.themePlaceholder}>
-              {effectiveCityLabel || "Add a destination\u2026"}
-            </Text>
-            {theme && (
-              <Text style={styles.dayTitleSecondary} numberOfLines={1}>{theme}</Text>
+            {isProposals ? (
+              // Proposals isn't tied to one destination the way a real day
+              // is, so it never shows a city here \u2014 even though it still
+              // resolves to the trip's primary city under the hood (for
+              // Keepers filtering etc) whenever nothing else is picked.
+              <Text style={theme ? styles.themeText : styles.themePlaceholder}>
+                {theme || "Add a title\u2026"}
+              </Text>
+            ) : (
+              <>
+                <Text style={effectiveCityLabel ? styles.themeText : styles.themePlaceholder}>
+                  {effectiveCityLabel || "Add a destination\u2026"}
+                </Text>
+                {theme && (
+                  <Text style={styles.dayTitleSecondary} numberOfLines={1}>{theme}</Text>
+                )}
+              </>
             )}
           </Pressable>
           <Pressable
@@ -528,20 +540,24 @@ export default function DayView() {
       <KeeperPickerModal
         visible={keeperPickerOpen}
         onClose={() => setKeeperPickerOpen(false)}
-        city={{ cityId: effectiveCityPick.cityId, customName: effectiveCityPick.customName, label: effectiveCityLabel }}
+        city={{ cityId: effectiveCityPick.cityId, customName: effectiveCityPick.customName, label: isProposals ? null : effectiveCityLabel }}
         onSelect={handlePickedKeeper}
       />
 
       <Modal visible={editModalOpen} transparent animationType="fade">
         <Pressable style={styles.modalBackdrop} onPress={() => setEditModalOpen(false)}>
           <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
-            <Text style={styles.modalLabel}>City</Text>
-            <Pressable style={styles.editCityRow} onPress={() => setCityPickerOpen(true)}>
-              <Text style={styles.editCityRowText}>
-                {editCityPick?.label || dayCityLabel({ city_id: null, custom_city_name: null }, tripCities) || "Pick a city\u2026"}
-              </Text>
-              <Icon name="edit" size={14} color={colors.blue} />
-            </Pressable>
+            {!isProposals && (
+              <>
+                <Text style={styles.modalLabel}>City</Text>
+                <Pressable style={styles.editCityRow} onPress={() => setCityPickerOpen(true)}>
+                  <Text style={styles.editCityRowText}>
+                    {editCityPick?.label || dayCityLabel({ city_id: null, custom_city_name: null }, tripCities) || "Pick a city\u2026"}
+                  </Text>
+                  <Icon name="edit" size={14} color={colors.blue} />
+                </Pressable>
+              </>
+            )}
 
             <Text style={[styles.modalLabel, { marginTop: 16 }]}>Day title</Text>
             <TextInput

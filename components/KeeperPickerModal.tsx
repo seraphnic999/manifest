@@ -39,6 +39,8 @@ export default function KeeperPickerModal({ visible, onClose, city, onSelect }: 
               <Text style={styles.empty}>
                 {city.label
                   ? `No keepers saved in ${city.label} yet.`
+                  : city.cityId || city.customName
+                  ? "No keepers saved for this city yet."
                   : "This day has no city set yet, so keepers can't be matched."}
               </Text>
             )}
