@@ -1,12 +1,11 @@
 // Manifest — parse-booking-email Edge Function
 //
-// Public webhook: an inbound-email provider (CloudMailin, or a Mailgun/
-// Postmark route on an owned domain — see design/email-intake-setup.md)
-// POSTs a forwarded booking-confirmation email here. This extracts a
-// proposed item add/edit and drops it into email_proposals for review —
-// nothing ever gets written to `items` directly from this function. The
-// user gets a push notification and applies (or rejects) it from the
-// Email Proposals screen, same "propose, never write" shape as the
+// Public webhook: SendGrid's Inbound Parse (see design/email-intake-setup.md)
+// POSTs a forwarded booking-confirmation email here as multipart/form-data.
+// This extracts a proposed item add/edit and drops it into email_proposals
+// for review — nothing ever gets written to `items` directly from this
+// function. The user gets a push notification and applies (or rejects) it
+// from the Email Proposals screen, same "propose, never write" shape as the
 // item-research agent.
 //
 // Public means unauthenticated by Supabase's own verify_jwt (an inbound
@@ -80,15 +79,32 @@ const field = (value: unknown, confidence: unknown, basis?: unknown) => ({
   basis: (basis as string) || null,
 });
 
-// CloudMailin's default JSON POST shape (and a couple of fallbacks for other
-// providers) — see design/email-intake-setup.md for the exact contract once
-// the chosen provider is confirmed; this defensively tries several common
-// field names rather than assuming one exact shape sight-unseen.
+// SendGrid Inbound Parse's default (parsed) POST fields are `from`,
+// `subject`, `text` (plain body), `html`, `to`, `envelope`, `headers` — a
+// couple of other field-name fallbacks are kept defensively in case the
+// provider ever changes. See design/email-intake-setup.md for the exact
+// contract.
 function extractEmailFields(body: Json): { from: string; subject: string; plainBody: string } {
-  const from = body.envelope?.from ?? body.headers?.from ?? body.from ?? "";
-  const subject = body.headers?.subject ?? body.subject ?? "";
-  const plainBody = body.plain ?? body.text ?? body.body_plain ?? "";
+  const from = body.from ?? body.envelope?.from ?? body.headers?.from ?? "";
+  const subject = body.subject ?? body.headers?.subject ?? "";
+  const plainBody = body.text ?? body.plain ?? body.body_plain ?? "";
   return { from: String(from), subject: String(subject), plainBody: String(plainBody).slice(0, 20_000) };
+}
+
+// SendGrid Inbound Parse posts multipart/form-data by default (not JSON) —
+// parse whichever content-type actually arrives rather than assuming one,
+// so a future provider change (or a manual JSON curl test) still works.
+async function parseRequestBody(req: Request): Promise<Json> {
+  const contentType = req.headers.get("content-type") ?? "";
+  if (contentType.includes("multipart/form-data") || contentType.includes("application/x-www-form-urlencoded")) {
+    const form = await req.formData();
+    const obj: Json = {};
+    for (const [key, value] of form.entries()) {
+      if (typeof value === "string") obj[key] = value;
+    }
+    return obj;
+  }
+  return await req.json();
 }
 
 async function notify(supabase: Json, userId: string, title: string, body: string, proposalId: string) {
@@ -122,7 +138,7 @@ Deno.serve(async (req) => {
 
   let body: Json;
   try {
-    body = await req.json();
+    body = await parseRequestBody(req);
   } catch {
     return new Response(JSON.stringify({ error: "Invalid request body." }), { status: 400 });
   }
