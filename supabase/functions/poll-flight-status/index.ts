@@ -3,14 +3,18 @@
 // Two callers, one function:
 //  1. pg_cron (see the cron.schedule job registered alongside this
 //     function's deploy — not in a migration file, same as send-reminders)
-//     fires this on a fixed interval with no body. It sweeps every flight
+//     fires this every 10 minutes with no body — the finest cadence this
+//     needs (see PRE_DEPARTURE_INTERVAL_MIN below). It sweeps every flight
 //     item that's within its tracking window (departure - 4h, up to a
 //     safety cutoff after departure) and not already at a terminal status,
-//     and checks each one against AeroDataBox.
+//     and checks each one against AeroDataBox that's actually due for a
+//     check — the cron frequency is just the upper bound on precision, not
+//     the real per-flight cadence.
 //  2. The app calls it with { item_id } for a manual "refresh now" tap —
 //     from the trip overview page or the item detail page. This always
-//     checks regardless of the window, and returns the updated row
-//     directly so the caller doesn't need a second round trip.
+//     checks regardless of the window or per-flight cadence, and returns
+//     the updated row directly so the caller doesn't need a second round
+//     trip.
 //
 // Either way, the result lands in the flight_status table — the single
 // source of truth both screens read from, so a manual refresh on one
@@ -31,15 +35,26 @@ const RAPIDAPI_HOST = "aerodatabox.p.rapidapi.com";
 const API_KEY = Deno.env.get("AERODATABOX_KEY");
 
 // AeroDataBox's free RapidAPI tier is 2,400 requests/month (600 "units") at
-// 1 req/sec — see design notes. 4 hours of tracking at a 20-minute cadence
-// is 12 checks per flight, comfortably inside that even for a busy month of
-// travel, while still surfacing a gate/delay change reasonably promptly.
+// 1 req/sec — see design notes. Checking every 10 min for the 4h before
+// departure (24 checks) then every 30 min until landing (say ~3h for a
+// typical flight, 6 more checks) is ~30 checks/flight — comfortably inside
+// that even for a busy month of travel, while staying responsive to gate/
+// delay changes pre-departure and backing off once there's nothing to do
+// but wait for it to land.
 const TRACKING_WINDOW_HOURS = 4;
+const PRE_DEPARTURE_INTERVAL_MIN = 10;
+const POST_DEPARTURE_INTERVAL_MIN = 30;
 // Keep polling up to this long after scheduled departure even if no
 // terminal status was ever seen (a missed/odd API response shouldn't poll
 // forever) — comfortably longer than any real flight plus taxi/baggage time.
 const SAFETY_CUTOFF_HOURS = 20;
 const TERMINAL_STATUSES = new Set(["Arrived", "Landed", "Canceled", "Cancelled", "Diverted"]);
+// Any status AeroDataBox has returned that means the aircraft has actually
+// left the ground — not just "on schedule" — is what flips a flight from
+// the pre- to the post-departure cadence. Until the first successful check
+// comes back, there's no status to go on yet, so hasLikelyDeparted() falls
+// back to comparing against the flight's own scheduled departure time.
+const DEPARTED_LIKE_STATUSES = new Set(["EnRoute", "Departed", "Approaching", ...TERMINAL_STATUSES]);
 // Stay under AeroDataBox's 1 req/sec rate limit when a sweep checks several
 // flights in one run.
 const THROTTLE_MS = 1100;
@@ -99,6 +114,11 @@ async function lookupFlight(flightNumber: string, dateIso: string): Promise<Flig
       gate: f.arrival?.gate ?? null,
     },
   };
+}
+
+function hasLikelyDeparted(existingStatus: string | null, departureUtc: DateTime, now: DateTime): boolean {
+  if (existingStatus && DEPARTED_LIKE_STATUSES.has(existingStatus)) return true;
+  return now >= departureUtc;
 }
 
 async function notifyStatusChange(supabase: Json, userId: string, tripId: string, itemTitle: string, flightNumber: string, status: string | null) {
@@ -166,7 +186,13 @@ Deno.serve(async (req) => {
     const withinWindow = now >= departureUtc.minus({ hours: TRACKING_WINDOW_HOURS }) && now <= departureUtc.plus({ hours: SAFETY_CUTOFF_HOURS });
     const alreadyTerminal = !!(existing?.status && TERMINAL_STATUSES.has(existing.status));
     const isForced = forcedItemId === item.id;
-    if (!isForced && (!withinWindow || alreadyTerminal || existing?.tracking_active === false)) continue;
+
+    const departed = hasLikelyDeparted(existing?.status ?? null, departureUtc, now);
+    const requiredIntervalMin = departed ? POST_DEPARTURE_INTERVAL_MIN : PRE_DEPARTURE_INTERVAL_MIN;
+    const dueForCheck = !existing?.checked_at
+      || now.diff(DateTime.fromISO(existing.checked_at), "minutes").minutes >= requiredIntervalMin;
+
+    if (!isForced && (!withinWindow || alreadyTerminal || existing?.tracking_active === false || !dueForCheck)) continue;
 
     if (checked > 0) await new Promise((r) => setTimeout(r, THROTTLE_MS));
     checked++;
