@@ -59,7 +59,13 @@ async function geocodeCustomName(name: string): Promise<{ latitude: number | nul
  * Custom-named picks get geocoded here (once) so the travel-stats map can
  * plot a pin for them — reusing this trip's existing coordinates for a name
  * that was already geocoded, so re-saving the same picker selection doesn't
- * re-hit the geocoding service every time. */
+ * re-hit the geocoding service every time.
+ *
+ * Any day whose own city override pointed at a destination that just got
+ * dropped from this list has that override cleared, so it falls back to the
+ * (possibly new) primary city again — resolveDayCityPick's "still valid even
+ * once removed from the trip" behavior only applies to a city that's merely
+ * no longer picked, not one the user just explicitly took off this trip. */
 export async function saveTripCities(
   tripId: string,
   picks: { cityId: string | null; customName: string | null }[]
@@ -85,9 +91,20 @@ export async function saveTripCities(
     })
   );
 
+  const keptCityIds = new Set(picks.map((p) => p.cityId).filter((id): id is string => !!id));
+  const keptCustomNames = new Set(picks.map((p) => p.customName).filter((n): n is string => !!n));
+  const removedCityIds = existing.map((r) => r.city_id).filter((id): id is string => !!id && !keptCityIds.has(id));
+  const removedCustomNames = existing.map((r) => r.custom_name).filter((n): n is string => !!n && !keptCustomNames.has(n));
+
   await supabase.from("trip_cities").delete().eq("trip_id", tripId);
-  if (rows.length === 0) return;
-  await supabase.from("trip_cities").insert(rows);
+  if (rows.length > 0) await supabase.from("trip_cities").insert(rows);
+
+  if (removedCityIds.length > 0) {
+    await supabase.from("days").update({ city_id: null }).eq("trip_id", tripId).in("city_id", removedCityIds);
+  }
+  if (removedCustomNames.length > 0) {
+    await supabase.from("days").update({ custom_city_name: null }).eq("trip_id", tripId).in("custom_city_name", removedCustomNames);
+  }
 }
 
 /** The trip's primary destination (lowest sort_order) — null if none picked
@@ -106,12 +123,12 @@ export function resolveDayCityPick(
   tripCities: TripCityRow[]
 ): { cityId: string | null; customName: string | null; label: string | null } {
   if (day.city_id) {
-    // Falls back to the module-level cities cache (populated by any earlier
-    // fetchAllCities() call, e.g. opening a city picker) for the case where
-    // the day's city was since removed from the trip's own destination
-    // list — city_id references cities(id) directly, not trip_cities, so
-    // the override itself is still valid even though it's no longer among
-    // this trip's picked destinations.
+    // saveTripCities clears a day's override as soon as its city is removed
+    // from the trip's list, so this shouldn't normally point at a city
+    // outside tripCities — this cache fallback just covers data saved before
+    // that existed, or a save that's still in flight, rather than being a
+    // designed "stays valid after removal" behavior.
+
     const label = tripCities.find((r) => r.city_id === day.city_id)?.city?.name
       ?? citiesCache?.find((c) => c.id === day.city_id)?.name
       ?? null;
