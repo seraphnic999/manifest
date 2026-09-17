@@ -147,6 +147,14 @@ export default function TripOverview() {
   const lodgings = Array.isArray(data?.lodgings) ? data.lodgings : [];
   const totalNis = data?.totalNis ?? null;
   const todayItems = Array.isArray(data?.todayItems) ? data.todayItems : [];
+  // A flight the poller currently considers "in its tracking window" (4h
+  // before departure, through landing) gets forced into Today regardless of
+  // where it'd otherwise rank — the point of this whole feature is that a
+  // departing/in-progress flight is the most time-critical thing on the
+  // screen, not just whichever item happens to be chronologically next.
+  const trackedFlights = flights.filter((f) => flightStatuses.some((fs) => fs.item_id === f.id && fs.tracking_active));
+  const trackedFlightIds = new Set(trackedFlights.map((f) => f.id));
+  const otherTodayItems = todayItems.filter((it) => !trackedFlightIds.has(it.id));
   const overviewExpenses = Array.isArray(data?.expenses) ? data.expenses : [];
   const overviewCurrencies = Array.isArray(data?.currencies) ? data.currencies : [];
   const companions = Array.isArray(data?.companions) ? data.companions : [];
@@ -373,17 +381,41 @@ export default function TripOverview() {
               {isCurrent && (
                 <>
                   <Text style={styles.sectionLabel}>Today</Text>
-                  {todayItems.length > 0 ? (
+                  {/* A flight in its tracking window is forced in here — even
+                      ahead of whatever the plain time-sort below would put
+                      first — since a departing/in-progress flight is the
+                      most time-critical thing on the screen on a travel day. */}
+                  {trackedFlights.map((f) => {
+                    const trackedStatus = flightStatuses.find((fs) => fs.item_id === f.id)!;
+                    return (
+                      <View key={f.id}>
+                        <Pressable style={styles.nextCard} onPress={() => router.push(`/item/${f.id}`)}>
+                          <Icon name="flight" size={28} color="#fff" />
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.nextLabel}>Flight</Text>
+                            <Text style={styles.nextTitle}>{f.title}</Text>
+                            {f.time_start && <Text style={styles.nextMeta}>{normalizeTimeHHMM(f.time_start)}</Text>}
+                          </View>
+                        </Pressable>
+                        <FlightStatusCard
+                          row={trackedStatus}
+                          loading={refreshingFlightId === f.id}
+                          onRefresh={() => handleRefreshFlight(f.id)}
+                        />
+                      </View>
+                    );
+                  })}
+                  {otherTodayItems.length > 0 ? (
                     <>
-                      <Pressable style={styles.nextCard} onPress={() => router.push(`/item/${todayItems[0].id}`)}>
-                        <Icon name={categoryForDbType(todayItems[0].type).icon} size={28} color="#fff" />
+                      <Pressable style={styles.nextCard} onPress={() => router.push(`/item/${otherTodayItems[0].id}`)}>
+                        <Icon name={categoryForDbType(otherTodayItems[0].type).icon} size={28} color="#fff" />
                         <View style={{ flex: 1 }}>
                           <Text style={styles.nextLabel}>Next</Text>
-                          <Text style={styles.nextTitle}>{todayItems[0].title}</Text>
-                          {todayItems[0].time_start && <Text style={styles.nextMeta}>{normalizeTimeHHMM(todayItems[0].time_start)}</Text>}
+                          <Text style={styles.nextTitle}>{otherTodayItems[0].title}</Text>
+                          {otherTodayItems[0].time_start && <Text style={styles.nextMeta}>{normalizeTimeHHMM(otherTodayItems[0].time_start)}</Text>}
                         </View>
                       </Pressable>
-                      {todayItems.slice(1).map((it) => (
+                      {otherTodayItems.slice(1).map((it) => (
                         <Pressable key={it.id} style={styles.itemRow} onPress={() => router.push(`/item/${it.id}`)}>
                           <View style={styles.itemTimeCol}>
                             <Text style={styles.itemTimeText}>{normalizeTimeHHMM(it.time_start) || "—"}</Text>
@@ -397,9 +429,9 @@ export default function TripOverview() {
                         </Pressable>
                       ))}
                     </>
-                  ) : (
+                  ) : trackedFlights.length === 0 ? (
                     <View style={styles.doneCard}><Text style={styles.doneText}>Nothing left for today.</Text></View>
-                  )}
+                  ) : null}
                 </>
               )}
 
@@ -410,35 +442,17 @@ export default function TripOverview() {
                     const flightNumber = (f.custom_fields as any)?.flight_number as string | undefined;
                     const durationMinutes = computeDurationMinutes(f.start_date, f.time_start, f.end_date, f.time_end);
                     const durationText = durationMinutes !== null && durationMinutes >= 0 ? formatDuration(durationMinutes) : null;
-                    // A flight only gets the tracking bubble once it has a
-                    // flight_status row — i.e. it has entered its 4-hours-
-                    // before window (or someone manually checked it) — other
-                    // flights on the trip stay a plain row.
-                    const trackedStatus = flightStatuses.find((fs) => fs.item_id === f.id);
                     return (
-                      <View key={f.id}>
-                        <Pressable
-                          style={[styles.itemRow, trackedStatus && styles.itemRowTracked]}
-                          onPress={() => router.push(`/item/${f.id}`)}
-                        >
-                          <View style={styles.itemIconCol}><Icon name="flight" size={28} color="#fff" /></View>
-                          <View style={styles.itemBody}>
-                            <Text style={styles.itemCat}>{flightNumber ?? "FLIGHT"}</Text>
-                            <Text style={styles.itemTitle}>{f.title}</Text>
-                            <Text style={styles.itemSub}>
-                              {[normalizeTimeHHMM(f.time_start), formatDateDDMMYYYY(f.start_date), durationText].filter(Boolean).join(" · ")}
-                            </Text>
-                          </View>
-                        </Pressable>
-                        {trackedStatus && (
-                          <FlightStatusCard
-                            row={trackedStatus}
-                            loading={refreshingFlightId === f.id}
-                            onRefresh={() => handleRefreshFlight(f.id)}
-                            compact
-                          />
-                        )}
-                      </View>
+                      <Pressable key={f.id} style={styles.itemRow} onPress={() => router.push(`/item/${f.id}`)}>
+                        <View style={styles.itemIconCol}><Icon name="flight" size={28} color="#fff" /></View>
+                        <View style={styles.itemBody}>
+                          <Text style={styles.itemCat}>{flightNumber ?? "FLIGHT"}</Text>
+                          <Text style={styles.itemTitle}>{f.title}</Text>
+                          <Text style={styles.itemSub}>
+                            {[normalizeTimeHHMM(f.time_start), formatDateDDMMYYYY(f.start_date), durationText].filter(Boolean).join(" · ")}
+                          </Text>
+                        </View>
+                      </Pressable>
                     );
                   })}
                 </>
@@ -603,9 +617,6 @@ const styles = StyleSheet.create({
     flexDirection: "row", alignItems: "stretch", backgroundColor: colors.paperRaised,
     borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, marginTop: 6, overflow: "hidden",
   },
-  // A flight currently being live-tracked (see flightStatuses) — the accent
-  // border is the "highlight" the tracked flight gets over a plain row.
-  itemRowTracked: { borderColor: colors.blue, borderWidth: 2 },
   itemTimeCol: { width: 56, backgroundColor: colors.ink, alignItems: "center", justifyContent: "center" },
   itemTimeText: { fontFamily: fonts.mono, color: "#fff", fontSize: 11 },
   itemIconCol: { width: 56, backgroundColor: colors.ink, alignItems: "center", justifyContent: "center" },
