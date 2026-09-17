@@ -4,8 +4,13 @@ import { radius, fonts, ColorTokens } from "@/lib/theme";
 import { useThemeColors } from "@/lib/ThemeContext";
 import Icon from "@/components/icons/Icon";
 import { Alert } from "@/lib/alert";
-import { FieldConfidence, ItemResearchJob, ProposedField } from "@/lib/types";
+import { supabase } from "@/lib/supabase";
+import { FieldConfidence, ItemResearchJob, ProposedField, ItemType, Day } from "@/lib/types";
 import { ResearchDraft, acceptResearchJob, draftFromProposal, rejectResearchJob, deleteResearchJob } from "@/lib/itemResearch";
+import { categoryForDbType, categoryByKey, CONVERTIBLE_CATEGORIES, isConvertibleType } from "@/lib/itemTypeMeta";
+import { formatDateDDMMYYYY } from "@/lib/dateFormat";
+import ItemTypePickerModal from "@/components/ItemTypePickerModal";
+import TripDayPickerModal from "@/components/TripDayPickerModal";
 
 // Confidence shown as a word, not a fake percentage — "Guessed" tells you
 // what to do about a field, "82%" would just imply a precision the agent
@@ -67,16 +72,49 @@ interface Props {
   onChanged: () => void;
 }
 
+interface ItemMeta { type: ItemType; day_id: string | null; start_date: string | null; trip_id: string }
+
 export default function ItemResearchReviewModal({ visible, onClose, job, onChanged }: Props) {
   const [draft, setDraft] = useState<ResearchDraft | null>(null);
   const [saving, setSaving] = useState(false);
+  // The proposal below only ever carries place-detail fields (address,
+  // hours, ratings, ...) — never touches the item's own type or day (see
+  // acceptResearchJob). For an item that came in with neither set yet (a
+  // Quick Add from a Google Maps link at the trip level, say — created as
+  // a plain "Other" sitting in Proposals with no date) that left "what
+  // does Apply actually do" genuinely ambiguous. This card shows — and
+  // lets you fix — those two independently of the proposal, so there's
+  // never a mystery about where the item itself is headed.
+  const [itemMeta, setItemMeta] = useState<ItemMeta | null>(null);
+  const [typePickerOpen, setTypePickerOpen] = useState(false);
+  const [dayPickerOpen, setDayPickerOpen] = useState(false);
 
   useEffect(() => {
-    if (visible) setDraft(draftFromProposal(job.proposal));
+    if (!visible) return;
+    setDraft(draftFromProposal(job.proposal));
+    supabase.from("items").select("type, day_id, start_date, trip_id").eq("id", job.item_id).single()
+      .then(({ data }) => setItemMeta((data as ItemMeta) ?? null));
   }, [visible, job]);
 
   const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+
+  async function handlePickType(categoryKey: string) {
+    setTypePickerOpen(false);
+    const newType = categoryByKey(categoryKey).dbTypes[0];
+    const { error } = await supabase.from("items").update({ type: newType }).eq("id", job.item_id);
+    if (error) { Alert.alert("Couldn't change type", error.message); return; }
+    setItemMeta((m) => (m ? { ...m, type: newType } : m));
+    onChanged();
+  }
+
+  async function handlePickDay(day: Day) {
+    setDayPickerOpen(false);
+    const { error } = await supabase.from("items").update({ day_id: day.id, start_date: day.date }).eq("id", job.item_id);
+    if (error) { Alert.alert("Couldn't change day", error.message); return; }
+    setItemMeta((m) => (m ? { ...m, day_id: day.id, start_date: day.date } : m));
+    onChanged();
+  }
 
   if (!draft) return null;
   const p = job.proposal;
@@ -147,6 +185,35 @@ export default function ItemResearchReviewModal({ visible, onClose, job, onChang
           <Pressable onPress={onClose} hitSlop={10}><Text style={styles.cancel}>Close</Text></Pressable>
         </View>
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+          {itemMeta && (
+            <View style={styles.destinationCard}>
+              <Text style={styles.destinationLabel}>Where this item will land</Text>
+              <Text style={styles.destinationHint}>
+                Applying below only fills in place details (address, hours, ratings…) — it never changes these.
+              </Text>
+              <Pressable
+                style={styles.destinationRow}
+                onPress={() => isConvertibleType(itemMeta.type) && setTypePickerOpen(true)}
+                disabled={!isConvertibleType(itemMeta.type)}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.destinationRowLabel}>Type</Text>
+                  <Text style={styles.destinationRowValue}>{categoryForDbType(itemMeta.type).label}</Text>
+                </View>
+                {isConvertibleType(itemMeta.type) && <Text style={styles.destinationChange}>Change</Text>}
+              </Pressable>
+              <Pressable style={styles.destinationRow} onPress={() => setDayPickerOpen(true)}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.destinationRowLabel}>Day</Text>
+                  <Text style={styles.destinationRowValue}>
+                    {itemMeta.start_date ? formatDateDDMMYYYY(itemMeta.start_date) : "Proposals — not scheduled yet"}
+                  </Text>
+                </View>
+                <Text style={styles.destinationChange}>Change</Text>
+              </Pressable>
+            </View>
+          )}
+
           {!!p?.unresolved && (
             <View style={styles.unresolved}>
               <Text style={styles.unresolvedLabel}>Could not establish</Text>
@@ -201,6 +268,24 @@ export default function ItemResearchReviewModal({ visible, onClose, job, onChang
           </Pressable>
         </ScrollView>
       </View>
+
+      <ItemTypePickerModal
+        visible={typePickerOpen}
+        onClose={() => setTypePickerOpen(false)}
+        onSelect={handlePickType}
+        categories={CONVERTIBLE_CATEGORIES}
+        title="Change type"
+      />
+      {itemMeta && (
+        <TripDayPickerModal
+          visible={dayPickerOpen}
+          onClose={() => setDayPickerOpen(false)}
+          tripId={itemMeta.trip_id}
+          onSelect={handlePickDay}
+          includeProposals
+          selectedDayId={itemMeta.day_id}
+        />
+      )}
     </Modal>
   );
 }
@@ -216,6 +301,20 @@ const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   unresolved: {
     backgroundColor: colors.goldSoft, borderRadius: radius.md, padding: 12, marginBottom: 16,
   },
+  destinationCard: {
+    backgroundColor: colors.blueSoft, borderRadius: radius.md, padding: 12, marginBottom: 16,
+  },
+  destinationLabel: {
+    color: colors.ink, fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5,
+  },
+  destinationHint: { color: colors.inkSoft, fontSize: 12, lineHeight: 16, marginTop: 3, marginBottom: 10 },
+  destinationRow: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    backgroundColor: colors.paperRaised, borderRadius: radius.sm, padding: 10, marginTop: 6,
+  },
+  destinationRowLabel: { color: colors.inkSoft, fontSize: 10.5, textTransform: "uppercase", letterSpacing: 0.5 },
+  destinationRowValue: { color: colors.ink, fontFamily: fonts.bodySemi, fontSize: 14, marginTop: 2 },
+  destinationChange: { color: colors.blue, fontFamily: fonts.bodySemi, fontSize: 13 },
   subheading: {
     fontFamily: fonts.bodySemi, fontSize: 13, color: colors.inkSoft,
     textTransform: "uppercase", letterSpacing: 0.5,
