@@ -169,16 +169,70 @@ const field = (value: unknown, confidence: unknown, basis?: unknown, source?: un
   source: (source as string) || null,
 });
 
-function resolveCity(day: Json | null, tripCities: Json[]): { label: string | null; country: string | null } {
+// Only the item's OWN day, deliberately with no trip-primary fallback baked
+// in here — see resolveLocator below for why. Mirrors identify-item's
+// resolveCity/resolveDayCity split (reimplemented rather than imported;
+// this Deno function has no access to the app's own TS modules).
+function resolveDayCity(day: Json | null, tripCities: Json[]): { label: string; country: string | null } | null {
   if (day?.city_id) {
     const row = tripCities.find((r) => r.city_id === day.city_id);
     if (row?.city) return { label: row.city.name, country: row.city.country };
   }
   if (day?.custom_city_name) return { label: day.custom_city_name, country: null };
+  return null;
+}
+
+function tripPrimaryCity(tripCities: Json[]): { label: string; country: string | null } | null {
   const primary = tripCities[0];
   if (primary?.city) return { label: primary.city.name, country: primary.city.country };
   if (primary?.custom_name) return { label: primary.custom_name, country: null };
-  return { label: null, country: null };
+  return null;
+}
+
+function distinctCityLabels(days: Json[], tripCities: Json[]): string[] {
+  const labels = new Set<string>();
+  for (const d of days) {
+    const c = resolveDayCity(d, tripCities);
+    if (c) labels.add(c.label);
+  }
+  return [...labels];
+}
+
+// An item sitting in Proposals (no day assigned yet) has no day-level city
+// at all — resolveDayCity returns null and there's nothing here to build a
+// locator from. That's exactly the situation identify-item's own
+// trip-wide-context mode exists for, and by the time research-item runs,
+// phase 1 has usually already worked out (via its own web search) which of
+// the trip's cities the confirmed place is actually in — stored in
+// job.identified_context.area_hint. Silently falling back to the trip's
+// primary/first city instead of using that, on a multi-city trip, is how a
+// correctly-identified Berlin restaurant ended up being researched as if it
+// were in Paris purely because Paris happened to be trip_cities[0] — phase 2
+// re-derived its own (wrong) location instead of trusting phase 1's already-
+// correct one. Only once neither signal exists does this fall back to the
+// trip's primary city, and even then — if the trip genuinely visits more
+// than one place — it hands Claude the full set rather than asserting a
+// single possibly-wrong city as fact.
+async function resolveLocator(
+  supabase: Json, item: Json, day: Json | null, tripCities: Json[], identifiedContext: Json | null
+): Promise<{ locator: string | null; multiCityNote: string | null }> {
+  const dayCity = resolveDayCity(day, tripCities);
+  if (dayCity) return { locator: [dayCity.label, dayCity.country].filter(Boolean).join(", "), multiCityNote: null };
+
+  const areaHint = identifiedContext?.area_hint as string | undefined | null;
+  if (areaHint) return { locator: areaHint, multiCityNote: null };
+
+  const { data: allDays } = await supabase.from("days").select("city_id, custom_city_name").eq("trip_id", item.trip_id);
+  const distinct = distinctCityLabels((allDays ?? []) as Json[], tripCities);
+  if (distinct.length > 1) {
+    return {
+      locator: null,
+      multiCityNote: `This trip visits multiple destinations and no single one is pinned to this item: ${distinct.join(", ")}. Use the place's confirmed name/area and your own judgment (a web search if needed) to find which of these it's actually in — do not assume it's the first one listed.`,
+    };
+  }
+
+  const primary = tripPrimaryCity(tripCities);
+  return { locator: primary ? [primary.label, primary.country].filter(Boolean).join(", ") : null, multiCityNote: null };
 }
 
 // Deliberately a search-style link, not a coordinate pin — matches every
@@ -305,13 +359,19 @@ async function research(jobId: string) {
       supabase.from("trip_cities").select("city_id, custom_name, sort_order, city:cities(name, country)").eq("trip_id", item.trip_id).order("sort_order"),
     ]);
 
-    const { label: cityLabel, country } = resolveCity(day, tripCities ?? []);
-    const locator = [cityLabel, country].filter(Boolean).join(", ") || null;
+    const identifiedContext = (job.identified_context ?? null) as Json | null;
+    const { locator, multiCityNote } = await resolveLocator(supabase, item, day, tripCities ?? [], identifiedContext);
     const anchorName = job.identified_name || item.title;
 
     const contextLines = [
       `Place to research: "${anchorName}"`,
       locator ? `Location: ${locator}` : null,
+      multiCityNote,
+      // Whatever phase 1 already worked out (often from its own web search)
+      // about why this is the right place — trust it as a starting point
+      // rather than re-deriving location from scratch and second-guessing a
+      // correct answer.
+      identifiedContext?.reasoning ? `Note from initial identification: ${identifiedContext.reasoning}` : null,
       `Item type: ${item.type}`,
       trip ? `Trip dates: ${trip.start_date} to ${trip.end_date}` : null,
       item.address ? `Already on file: ${item.address}` : null,

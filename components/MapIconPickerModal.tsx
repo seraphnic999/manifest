@@ -74,6 +74,11 @@ const makeStyles = (colors: ColorTokens) => StyleSheet.create({
     fontSize: 18, marginBottom: 16, textAlign: "center",
   },
   grid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", gap: 10 },
+  // The tile itself is a fixed dark slate regardless of theme (a chip
+  // floating on the sheet below, not the page's own light/dark surface —
+  // same reasoning as a photo overlay), so its label is fixed light too,
+  // deliberately NOT colors.paper: that token flips to navy in dark mode,
+  // which would put dark text on this same dark tile.
   tile: {
     width: TILE_SIZE, backgroundColor: "#2A3B4D", borderRadius: radius.lg,
     paddingVertical: 18, alignItems: "center", marginBottom: 10,
@@ -83,5 +88,5 @@ const makeStyles = (colors: ColorTokens) => StyleSheet.create({
     marginBottom: 10, backgroundColor: colors.blue,
   },
   iconCircleActive: { borderWidth: 3, borderColor: colors.gold },
-  tileLabel: { color: colors.paper, fontSize: 13, fontWeight: "600" },
+  tileLabel: { color: "#F7F9FC", fontSize: 13, fontWeight: "600" },
 });
