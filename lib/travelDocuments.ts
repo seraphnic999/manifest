@@ -9,6 +9,37 @@ import { readUriAsArrayBuffer } from "./fileBytes";
 const BUCKET = "travel-documents";
 const SIGNED_URL_TTL = 3600;
 
+type Confidence = "high" | "medium" | "low" | "none";
+
+export interface DocumentScanResult {
+  document_type: DocumentType;
+  document_type_confidence: Confidence;
+  document_number: string | null;
+  document_number_confidence: Confidence;
+  full_name: string | null;
+  full_name_confidence: Confidence;
+  issuing_country: string | null;
+  issuing_country_confidence: Confidence;
+  issue_date: string | null;
+  issue_date_confidence: Confidence;
+  expiry_date: string | null;
+  expiry_date_confidence: Confidence;
+  used_mrz: boolean;
+  unresolved: string | null;
+}
+
+/** Reads a document photo with parse-document — either an existing
+ * document's own photo (documentId) or a not-yet-attached one sitting at a
+ * pending path (photoPath, see uploadPendingDocumentPhoto). Exactly one of
+ * the two should be passed. */
+export async function scanDocument(target: { documentId: string } | { photoPath: string }): Promise<DocumentScanResult> {
+  const body = "documentId" in target ? { document_id: target.documentId } : { photo_path: target.photoPath };
+  const { data, error } = await supabase.functions.invoke("parse-document", { body });
+  if (error) throw error;
+  if (data?.error) throw new Error(data.error);
+  return data.extracted as DocumentScanResult;
+}
+
 export const DOCUMENT_TYPE_OPTIONS: { value: DocumentType; label: string; icon: IconName }[] = [
   { value: "passport", label: "Passport", icon: "document" },
   { value: "national_id", label: "National ID", icon: "user" },
@@ -88,6 +119,53 @@ export async function setDocumentPhoto(
   const { error } = await supabase.from("travel_documents").update({ photo_path: path }).eq("id", doc.id);
   if (error) throw error;
   return path;
+}
+
+/** Uploads a document photo before any travel_documents row exists yet —
+ * the Doc Tracker main-page "Add document" flow scans a photo to identify
+ * which companion it belongs to (or whether a new one is needed) before a
+ * document (or companion) id is available to hang a normal upload off of.
+ * The path is still scoped under the owner's own folder (the only thing
+ * this bucket's RLS actually checks), just with a placeholder "_pending"
+ * segment instead of a real document id. */
+export async function uploadPendingDocumentPhoto(
+  asset: { uri: string; fileName?: string | null; mimeType?: string | null }
+): Promise<string> {
+  const { data: userData } = await supabase.auth.getUser();
+  const userId = userData.user?.id;
+  if (!userId) throw new Error("Not signed in");
+
+  const ext = extensionFromAsset(asset);
+  const path = `${userId}/_pending/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const bytes = await readUriAsArrayBuffer(asset.uri);
+  const { error } = await supabase.storage
+    .from(BUCKET).upload(path, bytes, { contentType: asset.mimeType || "application/octet-stream" });
+  if (error) throw error;
+  return path;
+}
+
+/** Cleans up a pending photo the user never turned into a real document
+ * (cancelled the scan, discarded the review, etc.). */
+export async function deletePendingDocumentPhoto(path: string): Promise<void> {
+  await supabase.storage.from(BUCKET).remove([path]);
+}
+
+/** Creates a document already pointing at a photo that's been uploaded —
+ * the pending-photo counterpart to createDocument() + setDocumentPhoto():
+ * the photo is already sitting in storage (from uploadPendingDocumentPhoto),
+ * so this just points the new row at it directly instead of uploading a
+ * second time. */
+export async function createDocumentWithPhoto(companionId: string, fields: DocumentFields, photoPath: string): Promise<TravelDocument> {
+  const { data: existing } = await supabase
+    .from("travel_documents").select("sort_order").eq("companion_id", companionId)
+    .order("sort_order", { ascending: false }).limit(1);
+  const nextOrder = existing && existing.length > 0 ? existing[0].sort_order + 1 : 0;
+  const { data, error } = await supabase
+    .from("travel_documents")
+    .insert({ companion_id: companionId, sort_order: nextOrder, photo_path: photoPath, ...fields })
+    .select().single();
+  if (error) throw error;
+  return data as TravelDocument;
 }
 
 export async function fetchDocumentPhotoUrl(path: string | null): Promise<string | null> {

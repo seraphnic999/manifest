@@ -95,13 +95,24 @@ function toBase64(bytes: Uint8Array): string {
 }
 
 Deno.serve(async (req) => {
+  // Two ways to point this at a photo:
+  //  - document_id: the normal case — a travel_documents row already exists
+  //    (created from a companion's own "+ Add document"), its photo_path is
+  //    read from there.
+  //  - photo_path: the Doc Tracker main-page "Add" flow, which scans a photo
+  //    before any document (or even companion) row exists yet — the client
+  //    uploads to a per-user "_pending" path first (see
+  //    lib/travelDocuments.ts's uploadPendingDocumentPhoto) and passes that
+  //    path directly, skipping the DB lookup below entirely.
   let documentId: string | undefined;
+  let photoPath: string | undefined;
   try {
     const body = await req.json();
     documentId = body?.document_id;
+    photoPath = body?.photo_path;
   } catch { /* fall through */ }
-  if (!documentId) {
-    return new Response(JSON.stringify({ error: "document_id is required" }), { status: 400 });
+  if (!documentId && !photoPath) {
+    return new Response(JSON.stringify({ error: "document_id or photo_path is required" }), { status: 400 });
   }
 
   const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
@@ -112,15 +123,18 @@ Deno.serve(async (req) => {
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
   try {
-    const { data: doc, error: docError } = await supabase.from("travel_documents").select("*").eq("id", documentId).single();
-    if (docError || !doc) throw new Error("Document not found.");
-    if (!doc.photo_path) throw new Error("This document has no photo to read.");
+    if (documentId) {
+      const { data: doc, error: docError } = await supabase.from("travel_documents").select("*").eq("id", documentId).single();
+      if (docError || !doc) throw new Error("Document not found.");
+      if (!doc.photo_path) throw new Error("This document has no photo to read.");
+      photoPath = doc.photo_path;
+    }
 
-    const { data: file, error: downloadError } = await supabase.storage.from("travel-documents").download(doc.photo_path);
+    const { data: file, error: downloadError } = await supabase.storage.from("travel-documents").download(photoPath!);
     if (downloadError || !file) throw new Error(`Could not load the document photo: ${downloadError?.message ?? "unknown error"}`);
 
     const bytes = new Uint8Array(await file.arrayBuffer());
-    const mediaType = mediaTypeFromPath(doc.photo_path);
+    const mediaType = mediaTypeFromPath(photoPath!);
     const base64 = toBase64(bytes);
 
     const messages: Json[] = [
@@ -180,7 +194,7 @@ Deno.serve(async (req) => {
       { headers: { "content-type": "application/json" } }
     );
   } catch (e) {
-    console.error("parse-document failed", documentId, e);
+    console.error("parse-document failed", documentId ?? photoPath, e);
     return new Response(
       JSON.stringify({ error: String(e instanceof Error ? e.message : e).slice(0, 300) }),
       { status: 500, headers: { "content-type": "application/json" } }

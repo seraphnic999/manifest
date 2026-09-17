@@ -10,6 +10,8 @@ import {
   fetchCompanions, ensureSelfCompanion, relationshipGroup, relationshipLabel, companionFullName, CompanionGroup,
   fetchCompanionProfileUrl,
 } from "@/lib/companions";
+import DocTrackerAddOptionsModal, { DocTrackerAddChoice } from "@/components/DocTrackerAddOptionsModal";
+import ScanDocumentModal from "@/components/ScanDocumentModal";
 
 interface Section {
   key: "self" | CompanionGroup;
@@ -69,8 +71,22 @@ export default function DocTracker() {
   const router = useRouter();
   const { data, refetch } = useQuery({ queryKey: ["docTrackerCompanions"], queryFn: fetchSections });
   const sections = data ?? [];
+  const [addOptionsOpen, setAddOptionsOpen] = useState(false);
+  const [scanModal, setScanModal] = useState<{ source: "camera" | "gallery" } | null>(null);
 
   useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
+
+  function handleAddChoice(choice: DocTrackerAddChoice) {
+    setAddOptionsOpen(false);
+    if (choice === "companion") router.push("/doctracker/new");
+    else setScanModal({ source: choice === "scan-camera" ? "camera" : "gallery" });
+  }
+
+  function handleScanDone(companionId: string) {
+    setScanModal(null);
+    refetch();
+    router.push(`/doctracker/${companionId}`);
+  }
 
   return (
     <View style={styles.container}>
@@ -89,9 +105,23 @@ export default function DocTracker() {
           </View>
         )}
       />
-      <Pressable style={styles.fab} onPress={() => router.push("/doctracker/new")}>
+      <Pressable style={styles.fab} onPress={() => setAddOptionsOpen(true)}>
         <Icon name="add" size={24} color="#fff" />
       </Pressable>
+
+      <DocTrackerAddOptionsModal
+        visible={addOptionsOpen}
+        onClose={() => setAddOptionsOpen(false)}
+        onSelect={handleAddChoice}
+      />
+      {scanModal && (
+        <ScanDocumentModal
+          visible
+          source={scanModal.source}
+          onClose={() => setScanModal(null)}
+          onDone={handleScanDone}
+        />
+      )}
     </View>
   );
 }

@@ -44,6 +44,49 @@ export function companionFullName(c: Pick<Companion, "first_name" | "last_name">
   return [c.first_name, c.last_name].filter(Boolean).join(" ");
 }
 
+function nameTokens(name: string): Set<string> {
+  return new Set(name.toUpperCase().replace(/[^A-Z\s]/g, " ").split(/\s+/).filter(Boolean));
+}
+
+/** Best-effort match for the Doc Tracker main-page scan flow: does a name
+ * read off a document (often MRZ-cased, sometimes surname-first) look like
+ * one of the user's existing companions? A plain token-overlap score — good
+ * enough to suggest the right person most of the time, never applied
+ * without the user confirming it on the review screen, so a wrong guess
+ * costs nothing. Returns null when nothing clears the bar (a new companion
+ * is suggested instead) or when there's no name to go on at all. */
+export function matchCompanionByName(fullName: string | null, companions: Companion[]): Companion | null {
+  if (!fullName) return null;
+  const scanTokens = nameTokens(fullName);
+  if (scanTokens.size === 0) return null;
+
+  let best: Companion | null = null;
+  let bestScore = 0;
+  for (const c of companions) {
+    const compTokens = nameTokens(companionFullName(c));
+    if (compTokens.size === 0) continue;
+    const overlap = [...scanTokens].filter((t) => compTokens.has(t)).length;
+    const score = overlap / Math.max(scanTokens.size, compTokens.size);
+    if (score > bestScore) { bestScore = score; best = c; }
+  }
+  return bestScore >= 0.5 ? best : null;
+}
+
+/** Splits a document's printed full name into a first/last guess to
+ * pre-fill the "create new companion" form — a starting point for the user
+ * to correct, not a confident parse (passports print names in varying
+ * orders, MRZ names run surname-first with no reliable separator). */
+export function guessNameSplit(fullName: string | null): { firstName: string; lastName: string } {
+  if (!fullName) return { firstName: "", lastName: "" };
+  if (fullName.includes(",")) {
+    const [last, first] = fullName.split(",").map((s) => s.trim());
+    return { firstName: first ?? "", lastName: last ?? "" };
+  }
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length <= 1) return { firstName: parts[0] ?? "", lastName: "" };
+  return { firstName: parts.slice(0, -1).join(" "), lastName: parts[parts.length - 1] };
+}
+
 export async function fetchCompanions(): Promise<Companion[]> {
   const { data, error } = await supabase
     .from("companions").select("*")

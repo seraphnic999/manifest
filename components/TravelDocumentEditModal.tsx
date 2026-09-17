@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { View, Text, Pressable, StyleSheet, Modal, TextInput, ScrollView, Image, ActivityIndicator } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import { supabase } from "@/lib/supabase";
 import { colors, radius, fonts } from "@/lib/theme";
 import Icon from "@/components/icons/Icon";
 import Checkbox from "@/components/Checkbox";
@@ -10,28 +9,13 @@ import { DocumentType, TravelDocument } from "@/lib/types";
 import {
   DOCUMENT_TYPE_OPTIONS, createDocument, saveDocument, deleteDocument,
   setDocumentPhoto, fetchDocumentPhotoUrl, DocumentFields, documentTypeLabel,
+  scanDocument, DocumentScanResult,
 } from "@/lib/travelDocuments";
 import { DateField } from "@/components/DateTimeFields";
 import PhotoLightbox from "@/components/PhotoLightbox";
 
 type Confidence = "high" | "medium" | "low" | "none";
-
-interface ScanResult {
-  document_type: DocumentType;
-  document_type_confidence: Confidence;
-  document_number: string | null;
-  document_number_confidence: Confidence;
-  full_name: string | null;
-  full_name_confidence: Confidence;
-  issuing_country: string | null;
-  issuing_country_confidence: Confidence;
-  issue_date: string | null;
-  issue_date_confidence: Confidence;
-  expiry_date: string | null;
-  expiry_date_confidence: Confidence;
-  used_mrz: boolean;
-  unresolved: string | null;
-}
+type ScanResult = DocumentScanResult;
 
 type ScanFieldKey = "document_type" | "document_number" | "issuing_country" | "issue_date" | "expiry_date";
 
@@ -181,10 +165,7 @@ export default function TravelDocumentEditModal({ visible, onClose, companionId,
     setScanning(true);
     setScanResult(null);
     try {
-      const { data, error } = await supabase.functions.invoke("parse-document", { body: { document_id: id } });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      const extracted = data.extracted as ScanResult;
+      const extracted = await scanDocument({ documentId: id });
       setScanResult(extracted);
       setScanSelected({
         document_type: extracted.document_type_confidence === "high" || extracted.document_type_confidence === "medium",
