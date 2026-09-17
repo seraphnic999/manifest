@@ -19,6 +19,11 @@ export interface ColorTokens {
   blueSoft: string;
   gold: string;
   goldSoft: string;
+  /** Accent text specifically for the handful of elements whose OWN
+   * background is `ink` (a filled "hero" card, not the page) — see the
+   * comment above `goldOnInk` in each palette for why this can't just be
+   * `gold`. */
+  goldOnInk: string;
   lightBlue: string;
   lightBlueSoft: string;
   coral: string;
@@ -37,6 +42,7 @@ export const lightColors: ColorTokens = {
   blueSoft: "#E1E7F4",
   gold: "#C9962E",
   goldSoft: "#F7ECD6",
+  goldOnInk: "#F7ECD6", // = goldSoft here — a pale cream reads well on ink's navy
   lightBlue: "#3E82D6",
   lightBlueSoft: "#DCEAFA",
   coral: "#D8503A",
@@ -65,6 +71,13 @@ export const darkColors: ColorTokens = {
   blueSoft: "#1D3462",
   gold: "#D9A94A", // brightened slightly for the same reason
   goldSoft: "#4A3A1C",
+  // NOT the same brightening trick as the other tokens above: `ink` itself
+  // is off-white in dark mode, so anything with `backgroundColor: ink`
+  // (e.g. the trip Overview "Today" card) is a LIGHT surface here, not a
+  // dark one — a brightened gold (readable on navy) would vanish on it.
+  // This token is for exactly that handful of ink-background elements, so
+  // it goes the opposite direction: a dark amber that reads on near-white.
+  goldOnInk: "#8A6218",
   lightBlue: "#6FA3E8",
   lightBlueSoft: "#1B3055",
   coral: "#E8735E", // brightened for contrast on navy

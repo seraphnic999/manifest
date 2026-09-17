@@ -32,36 +32,39 @@ export default function Settings() {
       <Stack.Screen options={{ headerShown: false }} />
       <SubpageHeader title="Settings" />
 
-      <Text style={styles.sectionLabel}>Appearance</Text>
-      <View style={styles.row}>
-        <View style={styles.rowIcon}>
-          <Icon name="settings" size={20} color={colors.blue} />
+      <View style={styles.body}>
+        <Text style={styles.sectionLabel}>Appearance</Text>
+        <View style={styles.row}>
+          <View style={styles.rowIcon}>
+            <Icon name="settings" size={20} color={colors.blue} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.rowLabel}>Dark mode</Text>
+            <Text style={styles.rowSub}>Applies across the whole app</Text>
+          </View>
+          <Switch
+            value={isDark}
+            onValueChange={toggleMode}
+            trackColor={{ false: colors.line, true: colors.blue }}
+            thumbColor={colors.paperRaised}
+          />
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.rowLabel}>Dark mode</Text>
-          <Text style={styles.rowSub}>Applies across the whole app</Text>
-        </View>
-        <Switch
-          value={isDark}
-          onValueChange={toggleMode}
-          trackColor={{ false: colors.line, true: colors.blue }}
-          thumbColor={colors.paperRaised}
-        />
-      </View>
 
-      <Text style={styles.sectionLabel}>Account</Text>
-      <Pressable style={[styles.row, styles.signOutRow]} onPress={signOut}>
-        <View style={styles.rowIcon}>
-          <Icon name="signOut" size={20} color={colors.coral} />
-        </View>
-        <Text style={[styles.rowLabel, { color: colors.coral }]}>Sign out</Text>
-      </Pressable>
+        <Text style={styles.sectionLabel}>Account</Text>
+        <Pressable style={[styles.row, styles.signOutRow]} onPress={signOut}>
+          <View style={styles.rowIcon}>
+            <Icon name="signOut" size={20} color={colors.coral} />
+          </View>
+          <Text style={[styles.rowLabel, { color: colors.coral }]}>Sign out</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
 
 const makeStyles = (colors: ColorTokens) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.paper, padding: 16 },
+  container: { flex: 1, backgroundColor: colors.paper },
+  body: { padding: 16 },
   sectionLabel: {
     color: colors.inkSoft, fontFamily: fonts.bodyBold, fontSize: 11.5, textTransform: "uppercase",
     letterSpacing: 1, marginBottom: 8, marginTop: 16,

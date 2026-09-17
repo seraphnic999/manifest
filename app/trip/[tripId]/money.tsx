@@ -445,11 +445,11 @@ const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   segTextOn: { color: "#fff" },
 
   summaryCard: { backgroundColor: colors.ink, borderRadius: radius.lg, padding: 18, marginBottom: 14 },
-  totalLabel: { fontFamily: fonts.mono, fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: colors.gold },
+  totalLabel: { fontFamily: fonts.mono, fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: colors.goldOnInk },
   totalAmt: { fontFamily: fonts.display, fontSize: 32, color: colors.paper, marginVertical: 4 },
-  owedRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 6, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.15)" },
+  owedRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 6, borderTopWidth: 1, borderTopColor: colors.line },
   owedLabel: { color: colors.paper, fontSize: 12 },
-  owedAmt: { color: colors.gold, fontFamily: fonts.bodyBold, fontSize: 12 },
+  owedAmt: { color: colors.goldOnInk, fontFamily: fonts.bodyBold, fontSize: 12 },
   sectionLabel: { color: colors.ink, fontFamily: fonts.display, fontSize: 16, marginBottom: 8 },
   noBudgetCard: {
     backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line, borderStyle: "dashed",

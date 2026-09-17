@@ -611,9 +611,9 @@ const makeStyles = (colors: ColorTokens) => StyleSheet.create({
     backgroundColor: colors.ink, borderRadius: radius.lg, padding: 14,
     flexDirection: "row", alignItems: "center", gap: 12,
   },
-  nextLabel: { color: colors.gold, fontFamily: fonts.bodyBold, fontSize: 9, textTransform: "uppercase", letterSpacing: 1 },
+  nextLabel: { color: colors.goldOnInk, fontFamily: fonts.bodyBold, fontSize: 9, textTransform: "uppercase", letterSpacing: 1 },
   nextTitle: { color: colors.paper, fontFamily: fonts.display, fontSize: 16, marginTop: 3 },
-  nextMeta: { color: colors.gold, fontFamily: fonts.mono, fontSize: 11, marginTop: 2 },
+  nextMeta: { color: colors.goldOnInk, fontFamily: fonts.mono, fontSize: 11, marginTop: 2 },
   doneCard: { backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, padding: 14, alignItems: "center" },
   doneText: { color: colors.inkSoft, fontSize: 13, fontStyle: "italic" },
 
