@@ -75,6 +75,20 @@ export default function EditItem() {
   const [mapIcon, setMapIcon] = useState<IconName | null>(null);
   const [mapIconPickerOpen, setMapIconPickerOpen] = useState(false);
 
+  // Research-derived fields (see lib/itemResearch.ts's acceptResearchJob) —
+  // live in custom_fields alongside flight_number, not their own columns.
+  // Editable here for the same reason flight_number already was: without
+  // this, saving the form would silently wipe them (see save()'s custom_
+  // fields merge below — the bug this was added to fix).
+  const [shortDescription, setShortDescription] = useState("");
+  const [googleRating, setGoogleRating] = useState("");
+  const [googleRatingCount, setGoogleRatingCount] = useState("");
+  const [reviewHighlights, setReviewHighlights] = useState(""); // one per line in the UI, array in storage
+  const [awardBadges, setAwardBadges] = useState(""); // one per line in the UI, array in storage
+  const [openingHours, setOpeningHours] = useState("");
+  const [reservationLeadTime, setReservationLeadTime] = useState("");
+  const [priceRange, setPriceRange] = useState("");
+
   // Lodging span only
   const [checkInDate, setCheckInDate] = useState("");
   const [checkInTime, setCheckInTime] = useState("");
@@ -100,6 +114,8 @@ export default function EditItem() {
       reminderMinutes,
       checkInDate, checkInTime, checkOutDate, checkOutTime,
       arrivalDate, arrivalTime,
+      shortDescription, googleRating, googleRatingCount, reviewHighlights, awardBadges,
+      openingHours, reservationLeadTime, priceRange,
     });
   }
   useEffect(() => { latestSnapshotRef.current = currentSnapshot(); });
@@ -150,7 +166,16 @@ export default function EditItem() {
       setAddress(item.address ?? "");
       setPhone(item.phone ?? "");
       setVendor(item.vendor ?? "");
-      setFlightNumber((item.custom_fields as any)?.flight_number ?? "");
+      const cf = (item.custom_fields as Record<string, unknown>) ?? {};
+      setFlightNumber((cf.flight_number as string) ?? "");
+      setShortDescription(typeof cf.short_description === "string" ? cf.short_description : "");
+      setGoogleRating(typeof cf.google_rating === "number" ? String(cf.google_rating) : "");
+      setGoogleRatingCount(typeof cf.google_rating_count === "number" ? String(cf.google_rating_count) : "");
+      setReviewHighlights(Array.isArray(cf.review_highlights) ? (cf.review_highlights as string[]).join("\n") : "");
+      setAwardBadges(Array.isArray(cf.award_badges) ? (cf.award_badges as string[]).join("\n") : "");
+      setOpeningHours(typeof cf.opening_hours === "string" ? cf.opening_hours : "");
+      setReservationLeadTime(typeof cf.reservation_lead_time === "string" ? cf.reservation_lead_time : "");
+      setPriceRange(typeof cf.price_range === "string" ? cf.price_range : "");
       setBookingSource(item.booking_source ?? "");
       setConfirmationCode(item.confirmation_code ?? "");
       setLink(item.link ?? "");
@@ -186,6 +211,14 @@ export default function EditItem() {
         checkInDate: item.start_date ?? "", checkInTime: item.time_start ?? "",
         checkOutDate: item.end_date ?? "", checkOutTime: item.time_end ?? "",
         arrivalDate: item.end_date ?? "", arrivalTime: item.time_end ?? "",
+        shortDescription: typeof cf.short_description === "string" ? cf.short_description : "",
+        googleRating: typeof cf.google_rating === "number" ? String(cf.google_rating) : "",
+        googleRatingCount: typeof cf.google_rating_count === "number" ? String(cf.google_rating_count) : "",
+        reviewHighlights: Array.isArray(cf.review_highlights) ? (cf.review_highlights as string[]).join("\n") : "",
+        awardBadges: Array.isArray(cf.award_badges) ? (cf.award_badges as string[]).join("\n") : "",
+        openingHours: typeof cf.opening_hours === "string" ? cf.opening_hours : "",
+        reservationLeadTime: typeof cf.reservation_lead_time === "string" ? cf.reservation_lead_time : "",
+        priceRange: typeof cf.price_range === "string" ? cf.price_range : "",
       });
       setTripId(item.trip_id);
       setKeeperId(item.keeper_id);
@@ -263,12 +296,42 @@ export default function EditItem() {
       return false;
     }
     setSaving(true);
-    const { data: current } = await supabase.from("items").select("trip_id, day_id").eq("id", itemId).single();
+    const { data: current } = await supabase.from("items").select("trip_id, day_id, custom_fields").eq("id", itemId).single();
 
     const newStartDate = isStaySpan ? checkInDate : (selectedDay?.date ?? null);
     const newTimeStart = isStaySpan ? (checkInTime || null) : (time || null);
     const newReminderMinutes = reminderMinutes ? parseInt(reminderMinutes, 10) || null : null;
     const reminderKeyChanged = [newStartDate, newTimeStart, newReminderMinutes].join("|") !== origReminderKeyRef.current;
+
+    // Merge into whatever's already there — anything this form doesn't know
+    // about (e.g. a future research field) survives untouched — rather than
+    // replacing custom_fields wholesale, which used to silently wipe every
+    // research-derived field (short_description, ratings, etc.) the moment
+    // someone saved a plain edit.
+    const customFields = { ...((current?.custom_fields as Record<string, unknown>) ?? {}) };
+    const setOrDelete = (key: string, value: string | null) => {
+      if (value) customFields[key] = value; else delete customFields[key];
+    };
+    setOrDelete("flight_number", flightNumber.trim() || null);
+    setOrDelete("short_description", shortDescription.trim() || null);
+    setOrDelete("opening_hours", openingHours.trim() || null);
+    setOrDelete("reservation_lead_time", reservationLeadTime.trim() || null);
+    setOrDelete("price_range", priceRange.trim() || null);
+    const ratingNum = googleRating.trim() ? Number(googleRating) : null;
+    const ratingCountNum = googleRatingCount.trim() ? Number(googleRatingCount) : null;
+    // A lone rating with no count (or vice versa) is close to meaningless —
+    // same rule research-item itself follows when proposing these fields.
+    if (ratingNum !== null && !Number.isNaN(ratingNum) && ratingCountNum !== null && !Number.isNaN(ratingCountNum)) {
+      customFields.google_rating = ratingNum;
+      customFields.google_rating_count = ratingCountNum;
+    } else {
+      delete customFields.google_rating;
+      delete customFields.google_rating_count;
+    }
+    const highlightsList = reviewHighlights.split("\n").map((l) => l.trim()).filter(Boolean);
+    if (highlightsList.length) customFields.review_highlights = highlightsList; else delete customFields.review_highlights;
+    const badgesList = awardBadges.split("\n").map((l) => l.trim()).filter(Boolean);
+    if (badgesList.length) customFields.award_badges = badgesList; else delete customFields.award_badges;
 
     const { error } = await supabase.from("items").update({
       title, status,
@@ -289,7 +352,7 @@ export default function EditItem() {
       map_icon: mapIcon,
       reminder_minutes_before: newReminderMinutes,
       ...(reminderKeyChanged ? { reminder_sent_at: null } : {}),
-      custom_fields: flightNumber ? { flight_number: flightNumber } : {},
+      custom_fields: customFields,
     }).eq("id", itemId);
     setSaving(false);
     if (error) { Alert.alert("Couldn't save", error.message); return false; }
@@ -538,6 +601,45 @@ export default function EditItem() {
         <Icon name="forward" size={16} color={colors.blue} />
       </Pressable>
 
+      <Text style={styles.sectionLabel}>Ratings & reviews</Text>
+      <Text style={styles.hint}>Filled in automatically by research — edit or clear as needed.</Text>
+
+      <Text style={styles.label}>Short description</Text>
+      <TextInput style={[styles.input, styles.inputMulti]} value={shortDescription} onChangeText={setShortDescription} multiline placeholder="Not found" />
+
+      <View style={styles.row}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.label}>Google rating</Text>
+          <TextInput style={styles.input} value={googleRating} onChangeText={setGoogleRating} keyboardType="numbers-and-punctuation" placeholder="e.g. 4.4" />
+        </View>
+        <View style={{ width: 10 }} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.label}>Rating count</Text>
+          <TextInput style={styles.input} value={googleRatingCount} onChangeText={setGoogleRatingCount} keyboardType="number-pad" placeholder="e.g. 2992" />
+        </View>
+      </View>
+
+      <Text style={styles.label}>Review highlights (one per line)</Text>
+      <TextInput style={[styles.input, styles.inputMulti]} value={reviewHighlights} onChangeText={setReviewHighlights} multiline placeholder="Not found" />
+
+      <Text style={styles.label}>Award badges (one per line)</Text>
+      <TextInput style={[styles.input, styles.inputMulti]} value={awardBadges} onChangeText={setAwardBadges} multiline placeholder="Not applicable" />
+
+      <Text style={styles.label}>Opening hours</Text>
+      <TextInput style={[styles.input, styles.inputMulti]} value={openingHours} onChangeText={setOpeningHours} multiline placeholder="Not found" />
+
+      <View style={styles.row}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.label}>Reservation lead time</Text>
+          <TextInput style={styles.input} value={reservationLeadTime} onChangeText={setReservationLeadTime} placeholder="Not applicable" />
+        </View>
+        <View style={{ width: 10 }} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.label}>Price range</Text>
+          <TextInput style={styles.input} value={priceRange} onChangeText={setPriceRange} placeholder="€ – €€€€" />
+        </View>
+      </View>
+
       <Text style={styles.label}>Remind me (minutes before, optional)</Text>
       <TextInput
         style={styles.input}
@@ -632,10 +734,12 @@ export default function EditItem() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   label: { color: colors.inkSoft, fontSize: 12, fontWeight: "600", marginTop: 16, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 },
+  sectionLabel: { color: colors.ink, fontSize: 15, fontWeight: "800", marginTop: 28 },
   input: {
     backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,
     borderRadius: radius.md, padding: 12, fontSize: 15, color: colors.ink,
   },
+  inputMulti: { minHeight: 60, textAlignVertical: "top" },
   hint: { color: colors.inkSoft, fontSize: 11, marginTop: 6, fontStyle: "italic" },
   hintError: { color: colors.coral, fontStyle: "normal", fontWeight: "600" },
   row: { flexDirection: "row" },

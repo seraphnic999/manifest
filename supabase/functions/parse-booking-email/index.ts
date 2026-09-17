@@ -2,11 +2,15 @@
 //
 // Public webhook: SendGrid's Inbound Parse (see design/email-intake-setup.md)
 // POSTs a forwarded booking-confirmation email here as multipart/form-data.
-// This extracts a proposed item add/edit and drops it into email_proposals
-// for review — nothing ever gets written to `items` directly from this
-// function. The user gets a push notification and applies (or rejects) it
-// from the Email Proposals screen, same "propose, never write" shape as the
-// item-research agent.
+// One email can contain more than one booking — a round-trip has an
+// outbound and a return flight, a bundled Expedia-style itinerary can carry
+// a flight, a hotel, and a car rental in one message — so this extracts a
+// list of proposed items, one per distinct booking, and drops each into its
+// own email_proposals row for review. Nothing ever gets written to `items`
+// directly from this function. The user gets one push notification covering
+// the whole email and applies (or rejects) each row individually from the
+// Review Queue, same "propose, never write" shape as the item-research
+// agent.
 //
 // Public means unauthenticated by Supabase's own verify_jwt (an inbound
 // mail provider can't send a Supabase user JWT) — a shared secret in the
@@ -27,11 +31,13 @@ const ITEM_TYPES = [
   "meal", "bar", "cafe", "bakery", "ice_cream", "sightseeing", "attraction", "shopping", "work", "other",
 ];
 
-const SYSTEM = `You extract a trip-planning item from a forwarded booking-confirmation email (flight, hotel, car rental, restaurant reservation, activity/tour, etc.).
+const SYSTEM = `You extract trip-planning items from a forwarded booking-confirmation email (flight, hotel, car rental, restaurant reservation, activity/tour, etc.).
 
 Be honest about what the email actually says — a blank field costs the user nothing, a confident wrong one costs them a plan built on bad information.
 
-RULES
+An email can contain more than one distinct booking — a round-trip has an outbound AND a return flight; a bundled itinerary (e.g. an Expedia/travel-agent confirmation) can include a flight, a hotel, and a car rental all in one message. Find every distinct booking in the email and return one entry per booking, in the order they appear. Do NOT merge separate bookings into one entry. Do NOT split a single booking into multiple entries either — one flight number's one leg (even with a layover) is one entry; a multi-night hotel stay is one entry with check-in/check-out dates, not one entry per night.
+
+RULES (apply to each entry)
 
 1. type must be exactly one of: ${ITEM_TYPES.join(", ")}.
 2. title: a short, clear name for the item — the venue/airline/property name, not the whole email subject.
@@ -40,34 +46,44 @@ RULES
 5. confidence per field: "high" only if the email states it plainly and unambiguously; "medium" if inferred/implied; "none" if not found — never invent a value to fill a field.
 6. basis: a short quote or paraphrase of where in the email each non-null field came from.
 
-Call propose_booking_item exactly once. No prose.`;
+Call propose_booking_items exactly once, with one entry per distinct booking. No prose.`;
 
 const PROPOSE_TOOL = {
-  name: "propose_booking_item",
-  description: "Return the extracted booking item.",
+  name: "propose_booking_items",
+  description: "Return the extracted booking items — one entry per distinct booking found in the email.",
   input_schema: {
     type: "object",
     properties: {
-      type: { type: "string", enum: ITEM_TYPES },
-      title: { type: "string" },
-      title_confidence: { type: "string", enum: ["high", "medium", "none"] },
-      start_date: { type: ["string", "null"] },
-      end_date: { type: ["string", "null"] },
-      time_start: { type: ["string", "null"] },
-      time_end: { type: ["string", "null"] },
-      date_confidence: { type: "string", enum: ["high", "medium", "none"] },
-      address: { type: ["string", "null"] },
-      phone: { type: ["string", "null"] },
-      vendor: { type: ["string", "null"] },
-      booking_source: { type: ["string", "null"] },
-      confirmation_code: { type: ["string", "null"] },
-      link: { type: ["string", "null"] },
-      notes: { type: ["string", "null"], description: "Anything else worth keeping that doesn't fit another field." },
-      is_update_or_cancellation: { type: "boolean" },
-      change_summary: { type: ["string", "null"] },
-      basis: { type: "string", description: "Overall short note on where the key facts came from." },
+      items: {
+        type: "array",
+        minItems: 1,
+        items: {
+          type: "object",
+          properties: {
+            type: { type: "string", enum: ITEM_TYPES },
+            title: { type: "string" },
+            title_confidence: { type: "string", enum: ["high", "medium", "none"] },
+            start_date: { type: ["string", "null"] },
+            end_date: { type: ["string", "null"] },
+            time_start: { type: ["string", "null"] },
+            time_end: { type: ["string", "null"] },
+            date_confidence: { type: "string", enum: ["high", "medium", "none"] },
+            address: { type: ["string", "null"] },
+            phone: { type: ["string", "null"] },
+            vendor: { type: ["string", "null"] },
+            booking_source: { type: ["string", "null"] },
+            confirmation_code: { type: ["string", "null"] },
+            link: { type: ["string", "null"] },
+            notes: { type: ["string", "null"], description: "Anything else worth keeping that doesn't fit another field." },
+            is_update_or_cancellation: { type: "boolean" },
+            change_summary: { type: ["string", "null"] },
+            basis: { type: "string", description: "Overall short note on where the key facts came from." },
+          },
+          required: ["type", "title", "title_confidence", "start_date", "end_date", "date_confidence", "is_update_or_cancellation", "basis"],
+        },
+      },
     },
-    required: ["type", "title", "title_confidence", "start_date", "end_date", "date_confidence", "is_update_or_cancellation", "basis"],
+    required: ["items"],
   },
 };
 
@@ -107,11 +123,11 @@ async function parseRequestBody(req: Request): Promise<Json> {
   return await req.json();
 }
 
-async function notify(supabase: Json, userId: string, title: string, body: string, proposalId: string) {
+async function notify(supabase: Json, userId: string, title: string, body: string) {
   const { data: tokens } = await supabase.from("push_tokens").select("expo_push_token").eq("user_id", userId);
   if (!tokens?.length) return;
   const messages = tokens.map((t: Json) => ({
-    to: t.expo_push_token, title, body, sound: "default", data: { route: "/reviewQueue", emailProposalId: proposalId },
+    to: t.expo_push_token, title, body, sound: "default", data: { route: "/reviewQueue" },
   }));
   try {
     await fetch("https://exp.host/--/api/v2/push/send", {
@@ -122,6 +138,62 @@ async function notify(supabase: Json, userId: string, title: string, body: strin
   } catch (e) {
     console.error("push send failed", e);
   }
+}
+
+// Best-effort trip match for one extracted item: does its start_date fall
+// within (or near) any of this user's trips? A couple of days' slack on
+// each side covers a flight the day before a trip "officially" starts, etc.
+// Runs once per extracted item, independently — a round-trip's outbound and
+// return legs, or a flight+hotel bundle, can each land on (or update) a
+// different existing item even though they came from the same email.
+async function matchTrip(supabase: Json, ownerId: string, p: Json): Promise<{ tripId: string | null; suggestedItemId: string | null; matchReasoning: string | null }> {
+  if (!p.start_date) return { tripId: null, suggestedItemId: null, matchReasoning: null };
+
+  const { data: trips } = await supabase
+    .from("trips").select("id, name, start_date, end_date")
+    .eq("user_id", ownerId).is("deleted_at", null)
+    .lte("start_date", p.start_date)
+    .gte("end_date", p.start_date);
+  const candidates = trips && trips.length > 0 ? trips : (
+    await supabase.from("trips").select("id, name, start_date, end_date")
+      .eq("user_id", ownerId).is("deleted_at", null)
+  ).data?.filter((t: Json) => {
+    const d = new Date(p.start_date).getTime();
+    return d >= new Date(t.start_date).getTime() - 3 * 86400000 && d <= new Date(t.end_date).getTime() + 3 * 86400000;
+  }) ?? [];
+
+  if (candidates.length > 1) {
+    return { tripId: null, suggestedItemId: null, matchReasoning: `${candidates.length} trips overlap this date — pick one on the review screen.` };
+  }
+  if (candidates.length !== 1) return { tripId: null, suggestedItemId: null, matchReasoning: null };
+
+  const tripId = candidates[0].id;
+
+  // Cheap deterministic candidate-item match — no extra AI call. Scored,
+  // not applied: the review screen always shows this as a suggestion the
+  // user can accept or swap for "create new instead".
+  const { data: items } = await supabase
+    .from("items").select("id, title, type, start_date, vendor, confirmation_code")
+    .eq("trip_id", tripId).eq("type", p.type).is("deleted_at", null);
+  let best: Json | null = null;
+  let bestScore = 0;
+  for (const it of items ?? []) {
+    let score = 0;
+    if (p.confirmation_code && it.confirmation_code && it.confirmation_code.toLowerCase() === String(p.confirmation_code).toLowerCase()) score += 10;
+    if (p.vendor && it.vendor && it.vendor.toLowerCase() === String(p.vendor).toLowerCase()) score += 3;
+    const titleWords = String(p.title).toLowerCase().split(/\s+/).filter((w: string) => w.length > 2);
+    const itTitleLower = String(it.title).toLowerCase();
+    score += titleWords.filter((w: string) => itTitleLower.includes(w)).length;
+    if (it.start_date && p.start_date) {
+      const days = Math.abs(new Date(it.start_date).getTime() - new Date(p.start_date).getTime()) / 86400000;
+      if (days <= 1) score += 2;
+    }
+    if (score > bestScore) { bestScore = score; best = it; }
+  }
+  if (best && bestScore >= 3) {
+    return { tripId, suggestedItemId: best.id, matchReasoning: `Matched against existing item "${best.title}" (score ${bestScore}).` };
+  }
+  return { tripId, suggestedItemId: null, matchReasoning: null };
 }
 
 Deno.serve(async (req) => {
@@ -164,11 +236,11 @@ Deno.serve(async (req) => {
       headers: { Authorization: `Bearer ${apiKey}`, "anthropic-version": "2023-06-01", "content-type": "application/json" },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 1500,
+        max_tokens: 2500,
         system: SYSTEM,
         messages: [{ role: "user", content: [{ type: "text", text: `Subject: ${subject}\nFrom: ${from}\n\n${plainBody}` }] }],
         tools: [PROPOSE_TOOL],
-        tool_choice: { type: "tool", name: "propose_booking_item" },
+        tool_choice: { type: "tool", name: "propose_booking_items" },
       }),
     });
     if (!res.ok) {
@@ -177,106 +249,69 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ accepted: true }), { status: 200 });
     }
     const json = await res.json();
-    const call = (json.content ?? []).find((c: Json) => c.type === "tool_use" && c.name === "propose_booking_item");
-    if (!call) {
-      await insertFailed("The model didn't return a usable extraction.");
+    const call = (json.content ?? []).find((c: Json) => c.type === "tool_use" && c.name === "propose_booking_items");
+    const items: Json[] = call?.input?.items ?? [];
+    if (!call || items.length === 0) {
+      await insertFailed("The model didn't find a usable booking in this email.");
       return new Response(JSON.stringify({ accepted: true }), { status: 200 });
     }
-    const p = call.input;
     const usage = json.usage ?? {};
-    const cost_usd = Number(((usage.input_tokens ?? 0) * USD_PER_INPUT_TOKEN + (usage.output_tokens ?? 0) * USD_PER_OUTPUT_TOKEN).toFixed(4));
+    // One Claude call covers every item in the email — split its cost
+    // evenly across the rows it produced rather than recording the whole
+    // call's cost on each one.
+    const totalCost = (usage.input_tokens ?? 0) * USD_PER_INPUT_TOKEN + (usage.output_tokens ?? 0) * USD_PER_OUTPUT_TOKEN;
+    const cost_usd = Number((totalCost / items.length).toFixed(4));
 
-    // Best-effort trip match: does the extracted start_date fall within (or
-    // near) any of this user's trips? A couple of days' slack on each side
-    // covers a flight the day before a trip "officially" starts, etc.
-    let tripId: string | null = null;
-    let suggestedItemId: string | null = null;
-    let matchReasoning: string | null = null;
+    let insertedCount = 0;
+    const insertedTitles: string[] = [];
+    let anyUpdateOrCancellation = false;
 
-    if (p.start_date) {
-      const { data: trips } = await supabase
-        .from("trips").select("id, name, start_date, end_date")
-        .eq("user_id", ownerId).is("deleted_at", null)
-        .lte("start_date", p.start_date)
-        .gte("end_date", p.start_date);
-      // Widen slightly if a tight match found nothing (flight the day
-      // before check-in, etc.) rather than leaving it unresolved.
-      const candidates = trips && trips.length > 0 ? trips : (
-        await supabase.from("trips").select("id, name, start_date, end_date")
-          .eq("user_id", ownerId).is("deleted_at", null)
-      ).data?.filter((t: Json) => {
-        const d = new Date(p.start_date).getTime();
-        return d >= new Date(t.start_date).getTime() - 3 * 86400000 && d <= new Date(t.end_date).getTime() + 3 * 86400000;
-      }) ?? [];
+    for (const p of items) {
+      const { tripId, suggestedItemId, matchReasoning } = await matchTrip(supabase, ownerId, p);
 
-      if (candidates.length === 1) {
-        tripId = candidates[0].id;
+      const proposal = {
+        type: field(p.type, "high"),
+        title: field(p.title, p.title_confidence),
+        start_date: field(p.start_date, p.date_confidence),
+        end_date: field(p.end_date, p.date_confidence),
+        time_start: field(p.time_start, p.date_confidence),
+        time_end: field(p.time_end, p.date_confidence),
+        address: field(p.address, p.address ? "medium" : "none"),
+        phone: field(p.phone, p.phone ? "medium" : "none"),
+        vendor: field(p.vendor, p.vendor ? "medium" : "none"),
+        booking_source: field(p.booking_source, p.booking_source ? "medium" : "none"),
+        confirmation_code: field(p.confirmation_code, p.confirmation_code ? "high" : "none"),
+        link: field(p.link, p.link ? "medium" : "none"),
+        notes: field(p.notes, p.notes ? "medium" : "none"),
+        is_update_or_cancellation: !!p.is_update_or_cancellation,
+        change_summary: p.change_summary ?? null,
+        basis: p.basis ?? null,
+      };
 
-        // Cheap deterministic candidate-item match — no extra AI call.
-        // Scored, not applied: the review screen always shows this as a
-        // suggestion the user can accept or swap for "create new instead".
-        const { data: items } = await supabase
-          .from("items").select("id, title, type, start_date, vendor, confirmation_code")
-          .eq("trip_id", tripId).eq("type", p.type).is("deleted_at", null);
-        let best: Json | null = null;
-        let bestScore = 0;
-        for (const it of items ?? []) {
-          let score = 0;
-          if (p.confirmation_code && it.confirmation_code && it.confirmation_code.toLowerCase() === String(p.confirmation_code).toLowerCase()) score += 10;
-          if (p.vendor && it.vendor && it.vendor.toLowerCase() === String(p.vendor).toLowerCase()) score += 3;
-          const titleWords = String(p.title).toLowerCase().split(/\s+/).filter((w: string) => w.length > 2);
-          const itTitleLower = String(it.title).toLowerCase();
-          score += titleWords.filter((w: string) => itTitleLower.includes(w)).length;
-          if (it.start_date && p.start_date) {
-            const days = Math.abs(new Date(it.start_date).getTime() - new Date(p.start_date).getTime()) / 86400000;
-            if (days <= 1) score += 2;
-          }
-          if (score > bestScore) { bestScore = score; best = it; }
-        }
-        if (best && bestScore >= 3) {
-          suggestedItemId = best.id;
-          matchReasoning = `Matched against existing item "${best.title}" (score ${bestScore}).`;
-        }
-      } else if (candidates.length > 1) {
-        matchReasoning = `${candidates.length} trips overlap this date — pick one on the review screen.`;
+      const { data: inserted } = await supabase.from("email_proposals").insert({
+        user_id: ownerId, raw_from: from, raw_subject: subject, raw_body: plainBody.slice(0, 5000),
+        trip_id: tripId, suggested_item_id: suggestedItemId, match_reasoning: matchReasoning,
+        proposal, status: "pending", cost_usd,
+      }).select().single();
+
+      if (inserted) {
+        insertedCount++;
+        insertedTitles.push(String(p.title || subject));
+        if (p.is_update_or_cancellation) anyUpdateOrCancellation = true;
       }
     }
 
-    const proposal = {
-      type: field(p.type, "high"),
-      title: field(p.title, p.title_confidence),
-      start_date: field(p.start_date, p.date_confidence),
-      end_date: field(p.end_date, p.date_confidence),
-      time_start: field(p.time_start, p.date_confidence),
-      time_end: field(p.time_end, p.date_confidence),
-      address: field(p.address, p.address ? "medium" : "none"),
-      phone: field(p.phone, p.phone ? "medium" : "none"),
-      vendor: field(p.vendor, p.vendor ? "medium" : "none"),
-      booking_source: field(p.booking_source, p.booking_source ? "medium" : "none"),
-      confirmation_code: field(p.confirmation_code, p.confirmation_code ? "high" : "none"),
-      link: field(p.link, p.link ? "medium" : "none"),
-      notes: field(p.notes, p.notes ? "medium" : "none"),
-      is_update_or_cancellation: !!p.is_update_or_cancellation,
-      change_summary: p.change_summary ?? null,
-      basis: p.basis ?? null,
-    };
-
-    const { data: inserted } = await supabase.from("email_proposals").insert({
-      user_id: ownerId, raw_from: from, raw_subject: subject, raw_body: plainBody.slice(0, 5000),
-      trip_id: tripId, suggested_item_id: suggestedItemId, match_reasoning: matchReasoning,
-      proposal, status: "pending", cost_usd,
-    }).select().single();
-
-    if (inserted) {
-      await notify(
-        supabase, ownerId,
-        p.is_update_or_cancellation ? "Booking update ready to review" : "New booking ready to review",
-        `${p.title || subject} — tap to review and apply.`,
-        inserted.id
-      );
+    if (insertedCount > 0) {
+      const title = insertedCount === 1
+        ? (anyUpdateOrCancellation ? "Booking update ready to review" : "New booking ready to review")
+        : `${insertedCount} bookings ready to review`;
+      const notifBody = insertedCount === 1
+        ? `${insertedTitles[0]} — tap to review and apply.`
+        : `${insertedTitles.join(", ")} — tap to review and apply.`;
+      await notify(supabase, ownerId, title, notifBody);
     }
 
-    return new Response(JSON.stringify({ accepted: true }), { status: 200, headers: { "content-type": "application/json" } });
+    return new Response(JSON.stringify({ accepted: true, items: insertedCount }), { status: 200, headers: { "content-type": "application/json" } });
   } catch (e) {
     await insertFailed(String(e instanceof Error ? e.message : e).slice(0, 500));
     return new Response(JSON.stringify({ accepted: true }), { status: 200 });
