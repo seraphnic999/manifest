@@ -17,6 +17,7 @@ import {
 } from "@/lib/companions";
 import { fetchDocumentsForCompanion, fetchDocumentPhotoUrl, documentTypeLabel, documentTypeIcon } from "@/lib/travelDocuments";
 import { buildCompanionExportText, shareCompanionText } from "@/lib/companionExport";
+import { useDocumentExpiryWarnings, dismissExpiryWarning } from "@/lib/documentExpiry";
 import CompanionEditModal from "@/components/CompanionEditModal";
 import TravelDocumentEditModal from "@/components/TravelDocumentEditModal";
 import AddDocumentOptionsModal, { AddDocumentMode } from "@/components/AddDocumentOptionsModal";
@@ -71,8 +72,15 @@ export default function CompanionDetail() {
   const [lightbox, setLightbox] = useState<{ urls: string[]; index: number } | null>(null);
   const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { warnings: expiryWarnings, reload: reloadExpiryWarnings } = useDocumentExpiryWarnings();
 
   useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
+
+  async function handleDismissExpiry(documentId: string) {
+    const error = await dismissExpiryWarning(documentId);
+    if (error) { Alert.alert("Couldn't dismiss", error); return; }
+    reloadExpiryWarnings();
+  }
 
   if (!data) return null;
   const { companion, documents, profileUrl, photos, docPhotoMap } = data;
@@ -199,6 +207,7 @@ export default function CompanionDetail() {
         {documents.map((doc) => {
           const photoUrl = docPhotoMap[doc.id];
           const checked = selectedDocIds.has(doc.id);
+          const expiryWarning = expiryWarnings.find((w) => w.document_id === doc.id);
           return (
             <Pressable key={doc.id} style={[styles.docCard, exportMode && checked && styles.docCardSelected]} onPress={() => openDocument(doc)}>
               <View style={styles.docHeaderRow}>
@@ -206,6 +215,20 @@ export default function CompanionDetail() {
                 <Icon name={documentTypeIcon(doc.type)} size={20} color={colors.blue} />
                 <Text style={styles.docType}>{documentTypeLabel(doc.type)}</Text>
               </View>
+              {expiryWarning && (
+                <View style={styles.expiryWarning}>
+                  <Icon name="warning" size={16} color={colors.gold} />
+                  <Text style={styles.expiryWarningText}>
+                    Expires {formatDateDDMMYYYY(expiryWarning.expiry_date)}
+                  </Text>
+                  <Pressable
+                    hitSlop={8}
+                    onPress={(e) => { e.stopPropagation(); handleDismissExpiry(doc.id); }}
+                  >
+                    <Text style={styles.expiryWarningDismiss}>Dismiss</Text>
+                  </Pressable>
+                </View>
+              )}
               <CopyRow label="Number" value={doc.document_number} />
               <CopyRow label="Issuing country" value={doc.issuing_country} />
               <CopyRow label="Issued" value={doc.issue_date ? formatDateDDMMYYYY(doc.issue_date) : null} />
@@ -285,6 +308,12 @@ const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   docCardSelected: { borderColor: colors.blue, borderWidth: 2 },
   docHeaderRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 },
   docType: { color: colors.ink, fontFamily: fonts.bodyBold, fontSize: 14 },
+  expiryWarning: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    backgroundColor: colors.goldSoft, borderRadius: radius.sm, padding: 8, marginBottom: 8,
+  },
+  expiryWarningText: { flex: 1, color: colors.ink, fontSize: 12.5, fontWeight: "600" },
+  expiryWarningDismiss: { color: colors.coral, fontFamily: fonts.bodySemi, fontSize: 12.5 },
   docThumb: { width: "100%", height: 140, borderRadius: radius.md, marginTop: 8, backgroundColor: colors.paper },
   deleteBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, padding: 14, marginTop: 18 },
   deleteBtnText: { color: colors.coral, fontWeight: "600", fontSize: 14.5 },

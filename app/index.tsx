@@ -23,6 +23,8 @@ import { fetchTripCities, dayCityLabel, resolveDayCity } from "@/lib/cities";
 import { fetchTripCompanionsWithUrls } from "@/lib/companions";
 import { useResearchJobs } from "@/lib/itemResearch";
 import { useEmailProposals } from "@/lib/emailProposals";
+import { useDocumentExpiryWarnings } from "@/lib/documentExpiry";
+import DocumentExpiryBubble from "@/components/DocumentExpiryBubble";
 import { getHasCheckedLaunchRedirect, setHasCheckedLaunchRedirect } from "@/lib/launchRedirect";
 
 // Same semantics as lib/travelStats.ts's and lib/budget.ts's own copies of
@@ -237,6 +239,7 @@ export default function TripList() {
   const { jobs: researchJobs } = useResearchJobs();
   const { proposals: emailProposals } = useEmailProposals();
   const hasPendingReview = researchJobs.some((j) => j.status === "ready") || emailProposals.some((p) => p.status === "pending");
+  const { warnings: expiryWarnings } = useDocumentExpiryWarnings();
   useEffect(() => {
     const handle = setTimeout(() => setSearchQuery(searchInput.trim()), 300);
     return () => clearTimeout(handle);
@@ -375,6 +378,7 @@ export default function TripList() {
         )}
       </View>
       <OfflineBanner dataUpdatedAt={!isOnline ? dataUpdatedAt : undefined} />
+      <DocumentExpiryBubble warnings={expiryWarnings} />
 
       {searching ? (
         <FlatList
