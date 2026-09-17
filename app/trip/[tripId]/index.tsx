@@ -401,6 +401,7 @@ export default function TripOverview() {
                           row={trackedStatus}
                           loading={refreshingFlightId === f.id}
                           onRefresh={() => handleRefreshFlight(f.id)}
+                          onOpenLog={() => router.push(`/item/${f.id}/flight-log`)}
                         />
                       </View>
                     );

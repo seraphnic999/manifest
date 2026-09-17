@@ -482,6 +482,7 @@ export default function ItemDetails() {
           row={flightStatusRow}
           loading={flightStatusRefreshing}
           onRefresh={() => { if (requireOnline()) handleRefreshFlightStatus(); }}
+          onOpenLog={() => router.push(`/item/${itemId}/flight-log`)}
         />
       ) : null}
 

@@ -245,6 +245,13 @@ new trip at any time from the trip Edit screen).
   section, Photos/attachments (photo or PDF via `expo-document-picker`),
   flight status lookup (AeroDataBox API) for flight-type items, a bottom
   trip tab bar so Overview/Map/etc. are reachable directly from here too.
+  Every real status change while a flight is in its tracking window (4h
+  before departure through landing) — the same moment a push notification
+  fires — is also appended to a permanent per-flight log
+  (`flight_status_log`, migration_041), viewable read-only via "View full
+  history" on the flight status bubble (both on the trip overview's Today
+  card and here) or by tapping the push notification itself; the log page
+  live-updates via a realtime subscription while open.
 - **Money (Expenses) screen**: total spent (converted to NIS), owed-by-
   party rollup, budget pace, add/edit/delete with the full split-
   allocation UI, refunds, a standalone currency converter screen.

@@ -7,6 +7,10 @@ interface Props {
   row: FlightStatusRow | null | undefined;
   loading: boolean;
   onRefresh: () => void;
+  /** Opens the permanent status-change log for this flight. Shown as a
+   * footer link on the card — omit to hide it (there's nothing to show a
+   * log for before the item has ever been tracked). */
+  onOpenLog?: () => void;
   /** Trip overview's per-flight rows are more cramped than the item detail
    * page's full-width card — trims the vertical padding a touch. */
   compact?: boolean;
@@ -15,7 +19,7 @@ interface Props {
 /** The "live flight status" bubble — same shape on the item detail page and
  * under a tracked flight on the trip overview page, both reading the same
  * flight_status row so a refresh from either place shows up on both. */
-export default function FlightStatusCard({ row, loading, onRefresh, compact }: Props) {
+export default function FlightStatusCard({ row, loading, onRefresh, onOpenLog, compact }: Props) {
   const status = row?.data;
 
   return (
@@ -56,6 +60,13 @@ export default function FlightStatusCard({ row, loading, onRefresh, compact }: P
       ) : (
         <Text style={styles.empty}>Tap refresh to check live status.</Text>
       )}
+
+      {onOpenLog && row && (
+        <Pressable style={styles.logLink} onPress={onOpenLog} hitSlop={8}>
+          <Text style={styles.logLinkText}>View full history</Text>
+          <Icon name="forward" size={14} color={colors.blue} />
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -78,4 +89,9 @@ const styles = StyleSheet.create({
   checked: { color: colors.inkSoft, fontSize: 11, fontStyle: "italic", marginTop: 6 },
   error: { color: colors.coral, fontSize: 12, marginTop: 4 },
   empty: { color: colors.inkSoft, fontSize: 12, fontStyle: "italic", marginTop: 6 },
+  logLink: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4,
+    marginTop: 10, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.line,
+  },
+  logLinkText: { color: colors.blue, fontWeight: "700", fontSize: 12.5 },
 });

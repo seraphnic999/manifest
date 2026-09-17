@@ -121,7 +121,7 @@ function hasLikelyDeparted(existingStatus: string | null, departureUtc: DateTime
   return now >= departureUtc;
 }
 
-async function notifyStatusChange(supabase: Json, userId: string, tripId: string, itemTitle: string, flightNumber: string, status: string | null) {
+async function notifyStatusChange(supabase: Json, userId: string, itemId: string, itemTitle: string, flightNumber: string, status: string | null) {
   const { data: tokens } = await supabase.from("push_tokens").select("expo_push_token").eq("user_id", userId);
   if (!tokens?.length) return;
   const messages = tokens.map((t: Json) => ({
@@ -129,7 +129,7 @@ async function notifyStatusChange(supabase: Json, userId: string, tripId: string
     title: `Flight ${flightNumber} update`,
     body: `${status ?? "Status changed"} — ${itemTitle}`,
     sound: "default",
-    data: { route: `/trip/${tripId}` },
+    data: { route: `/item/${itemId}/flight-log` },
   }));
   try {
     await fetch("https://exp.host/--/api/v2/push/send", {
@@ -219,7 +219,19 @@ Deno.serve(async (req) => {
       if (isForced) forcedRow = saved ?? upsertRow;
 
       if (changed) {
-        await notifyStatusChange(supabase, trip.user_id, item.trip_id, item.title, flightNumber, status.status);
+        // One log row per real change — deliberately the same condition
+        // that fires the push notification below, not one per poll. This
+        // is the permanent history the dedicated log page reads, separate
+        // from flight_status which only ever holds the latest snapshot.
+        await supabase.from("flight_status_log").insert({
+          item_id: item.id,
+          trip_id: item.trip_id,
+          flight_number: flightNumber,
+          status: status.status,
+          previous_status: prevStatus,
+          data: status,
+        });
+        await notifyStatusChange(supabase, trip.user_id, item.id, item.title, flightNumber, status.status);
         notified++;
       }
     } catch (e) {
