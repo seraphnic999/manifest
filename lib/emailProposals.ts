@@ -168,6 +168,7 @@ export async function applyEmailProposal(
     booking_source: draft.booking_source || null, confirmation_code: draft.confirmation_code || null,
     link: draft.link || null,
     sort_order: sortOrder,
+    custom_fields: { origin: "email" },
   }).select().single();
   if (error || !newItem) return { error: error?.message ?? "Couldn't create the item." };
 

@@ -250,7 +250,7 @@ async function notify(supabase: Json, userId: string, title: string, body: strin
     title,
     body,
     sound: "default",
-    data: { jobId },
+    data: { route: "/reviewQueue", jobId },
   }));
 
   const res = await fetch("https://exp.host/--/api/v2/push/send", {

@@ -15,6 +15,7 @@ import { uploadItemPhoto, uploadItemDocument, fetchItemPhotosWithUrls, deleteIte
 import { downloadAttachment } from "@/lib/downloadAttachment";
 import { fetchLinkedItems, LinkedItemSummary } from "@/lib/itemLinks";
 import { categoryForDbType, itemTypeTag } from "@/lib/itemTypeMeta";
+import { itemOrigin, ITEM_ORIGIN_LABEL } from "@/lib/itemOrigin";
 import { computeDurationMinutes, formatDuration } from "@/lib/duration";
 import { formatDateDDMMYYYY, formatDateDDMM } from "@/lib/dateFormat";
 import { normalizeTimeHHMM } from "@/lib/timeFormat";
@@ -291,6 +292,8 @@ export default function ItemDetails() {
   // Ratings & reviews — proposed by item research, applied into custom_fields
   // the same way opening_hours/price_range already are (see lib/itemResearch.ts).
   const cf = (item.custom_fields as Record<string, unknown>) ?? {};
+  const origin = itemOrigin(cf);
+  const originLabel = origin ? ITEM_ORIGIN_LABEL[origin] : null;
   const googleRating = typeof cf.google_rating === "number" ? cf.google_rating : null;
   const googleRatingCount = typeof cf.google_rating_count === "number" ? cf.google_rating_count : null;
   const shortDescription = typeof cf.short_description === "string" ? cf.short_description : null;
@@ -369,6 +372,7 @@ export default function ItemDetails() {
       <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
       <Text style={styles.typeTag}>{itemTypeTag(item.type)}</Text>
       <Text style={styles.title}>{item.title}</Text>
+      {originLabel && <Text style={styles.originBadge}>{originLabel}</Text>}
 
       {fields.map(([label, value]) =>
         value ? (
@@ -670,6 +674,7 @@ const styles = StyleSheet.create({
   headerTitleText: { fontSize: 17, fontWeight: "700", color: colors.ink },
   typeTag: { fontFamily: "JetBrainsMono_600SemiBold", color: colors.lightBlue, fontWeight: "600", fontSize: 11 },
   title: { color: colors.ink, fontWeight: "800", fontSize: 22, marginVertical: 6 },
+  originBadge: { color: colors.inkSoft, fontSize: 12, fontStyle: "italic", marginTop: -2, marginBottom: 6 },
   fieldRow: { paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.line },
   fieldLabel: { color: colors.inkSoft, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5 },
   fieldValue: { color: colors.ink, fontSize: 15, marginTop: 2 },

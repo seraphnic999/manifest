@@ -64,8 +64,7 @@ const NAV_ITEMS: { label: string; icon: IconName; danger?: boolean; onPress: (ct
   { label: "Packing Templates", icon: "packing", onPress: ({ router }) => router.push("/packingTemplates") },
   { label: "Keepers", icon: "star", onPress: ({ router }) => router.push("/keepers") },
   { label: "Travel Stats", icon: "stats", onPress: ({ router }) => router.push("/travelStats") },
-  { label: "Research Queue", icon: "research", onPress: ({ router }) => router.push("/researchQueue") },
-  { label: "Email Proposals", icon: "research", onPress: ({ router }) => router.push("/emailProposals") },
+  { label: "Review Queue", icon: "research", onPress: ({ router }) => router.push("/reviewQueue") },
 ];
 
 // Set once a current-trip redirect has been attempted this app session, so
@@ -233,15 +232,13 @@ export default function TripList() {
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Cross-trip, realtime-subscribed (see useResearchJobs) — the red dot on
-  // the Research Queue nav icon should appear/disappear the moment a job
-  // becomes ready or gets reviewed, not just on the next visit to Home.
+  // Cross-trip, realtime-subscribed (see useResearchJobs/useEmailProposals)
+  // — the red dot on the Review Queue nav icon should appear/disappear the
+  // moment either a research job becomes ready or an email proposal arrives,
+  // not just on the next visit to Home.
   const { jobs: researchJobs } = useResearchJobs();
-  const hasReadyResearch = researchJobs.some((j) => j.status === "ready");
-  // Same idea for booking-email proposals — a forwarded email that's
-  // already been parsed and is waiting on a human to apply/reject it.
   const { proposals: emailProposals } = useEmailProposals();
-  const hasPendingEmailProposal = emailProposals.some((p) => p.status === "pending");
+  const hasPendingReview = researchJobs.some((j) => j.status === "ready") || emailProposals.some((p) => p.status === "pending");
   useEffect(() => {
     const handle = setTimeout(() => setSearchQuery(searchInput.trim()), 300);
     return () => clearTimeout(handle);
@@ -386,8 +383,7 @@ export default function TripList() {
             {NAV_ITEMS.map((n) => (
               <Pressable key={n.label} style={styles.navBtn} onPress={() => n.onPress({ router, setSearchOpen, signOut })} accessibilityLabel={n.label}>
                 <Icon name={n.icon} size={22} color={n.danger ? colors.coral : colors.blue} />
-                {n.label === "Research Queue" && hasReadyResearch && <View style={styles.navBtnDot} />}
-                {n.label === "Email Proposals" && hasPendingEmailProposal && <View style={styles.navBtnDot} />}
+                {n.label === "Review Queue" && hasPendingReview && <View style={styles.navBtnDot} />}
               </Pressable>
             ))}
           </View>

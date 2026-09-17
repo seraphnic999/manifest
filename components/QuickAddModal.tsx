@@ -55,6 +55,7 @@ export default function QuickAddModal({ visible, onClose, tripId, fallbackDayId,
       const { id, error: createErr } = await createQuickAddItem({
         tripId, fallbackDayId, title: result.title, itemType: "other" as ItemType,
         date: null, time: null, latitude: result.latitude, longitude: result.longitude,
+        origin: "google_link",
       });
       setLoading(false);
       if (!id) { setError(createErr ?? "Couldn't create the item."); return; }
@@ -66,6 +67,7 @@ export default function QuickAddModal({ visible, onClose, tripId, fallbackDayId,
       const { id, error: createErr } = await createQuickAddItem({
         tripId, fallbackDayId, title: result.title, itemType: result.item_type,
         date: result.date, time: result.time,
+        origin: "natural_language",
       });
       setLoading(false);
       if (!id) { setError(createErr ?? "Couldn't create the item."); return; }

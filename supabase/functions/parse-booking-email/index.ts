@@ -111,7 +111,7 @@ async function notify(supabase: Json, userId: string, title: string, body: strin
   const { data: tokens } = await supabase.from("push_tokens").select("expo_push_token").eq("user_id", userId);
   if (!tokens?.length) return;
   const messages = tokens.map((t: Json) => ({
-    to: t.expo_push_token, title, body, sound: "default", data: { emailProposalId: proposalId },
+    to: t.expo_push_token, title, body, sound: "default", data: { route: "/reviewQueue", emailProposalId: proposalId },
   }));
   try {
     await fetch("https://exp.host/--/api/v2/push/send", {

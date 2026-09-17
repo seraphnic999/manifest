@@ -51,6 +51,7 @@ export async function createQuickAddItem(params: {
   time: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  origin: "google_link" | "natural_language";
 }): Promise<{ id: string | null; error: string | null }> {
   let targetDayId = params.fallbackDayId;
   let startDate: string | null = null;
@@ -80,6 +81,7 @@ export async function createQuickAddItem(params: {
     latitude: params.latitude ?? null,
     longitude: params.longitude ?? null,
     sort_order: sortOrder,
+    custom_fields: { origin: params.origin },
   }).select().single();
   if (error || !item) return { id: null, error: error?.message ?? "Couldn't create the item." };
   return { id: item.id, error: null };

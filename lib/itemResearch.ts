@@ -161,6 +161,10 @@ export async function acceptResearchJob(
   const { data: current } = await supabase.from("items").select("custom_fields").eq("id", job.item_id).single();
   const customFields = { ...((current?.custom_fields as Record<string, unknown>) ?? {}) };
 
+  // Never overwrites a more specific origin (e.g. a Quick-Add Maps link that
+  // also went through research keeps "google_link" — see lib/itemOrigin.ts).
+  if (!customFields.origin) customFields.origin = "research";
+
   if (draft.opening_hours.trim()) customFields.opening_hours = draft.opening_hours.trim();
   if (draft.reservation_lead_time.trim()) customFields.reservation_lead_time = draft.reservation_lead_time.trim();
   if (draft.price_range.trim()) customFields.price_range = draft.price_range.trim();
