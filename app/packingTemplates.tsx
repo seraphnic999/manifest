@@ -1,9 +1,10 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { View, Text, FlatList, StyleSheet, Pressable } from "react-native";
 import { Stack, useRouter, useFocusEffect } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { Alert } from "@/lib/alert";
-import { colors, radius, fonts } from "@/lib/theme";
+import { radius, fonts, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import SubpageHeader from "@/components/SubpageHeader";
 import Icon from "@/components/icons/Icon";
 import TemplateNameModal from "@/components/TemplateNameModal";
@@ -11,6 +12,8 @@ import { fetchPackingTemplates, createPackingTemplate } from "@/lib/packing";
 
 export default function PackingTemplates() {
   const router = useRouter();
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [creating, setCreating] = useState(false);
   const [nameModalOpen, setNameModalOpen] = useState(false);
   const { data, refetch } = useQuery({ queryKey: ["packingTemplates"], queryFn: fetchPackingTemplates });
@@ -55,7 +58,7 @@ export default function PackingTemplates() {
         }
       />
       <Pressable style={styles.fab} onPress={() => setNameModalOpen(true)}>
-        <Icon name="add" size={24} color="#fff" />
+        <Icon name="add" size={24} color={colors.paper} />
       </Pressable>
 
       <TemplateNameModal
@@ -69,7 +72,7 @@ export default function PackingTemplates() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   card: {
     flexDirection: "row", alignItems: "center", gap: 12,

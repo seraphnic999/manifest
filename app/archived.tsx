@@ -1,9 +1,11 @@
+import { useMemo } from "react";
 import { View, Text, FlatList, StyleSheet, Pressable, RefreshControl, ImageBackground } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Alert } from "@/lib/alert";
 import { supabase } from "@/lib/supabase";
-import { colors, radius, fonts } from "@/lib/theme";
+import { radius, fonts, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import { Trip } from "@/lib/types";
 import { formatDateDDMMYYYY } from "@/lib/dateFormat";
 import SubpageHeader from "@/components/SubpageHeader";
@@ -27,6 +29,8 @@ export default function ArchivedTrips() {
     queryFn: fetchArchivedTrips,
   });
   const trips = data ?? [];
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   async function unarchive(trip: Trip) {
     const { error } = await supabase.from("trips").update({ deleted_at: null }).eq("id", trip.id);
@@ -98,7 +102,7 @@ export default function ArchivedTrips() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   card: {
     backgroundColor: colors.paperRaised,

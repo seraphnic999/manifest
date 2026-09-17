@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { View, Text, Pressable, Modal, StyleSheet, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform } from "react-native";
-import { colors, radius, fonts } from "@/lib/theme";
+import { radius, fonts, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import { Item, ItemType } from "@/lib/types";
 import { parseMapsLink, parseNaturalLanguage, createQuickAddItem } from "@/lib/quickAdd";
 import IdentifyCandidatesModal from "@/components/IdentifyCandidatesModal";
@@ -31,6 +32,8 @@ export default function QuickAddModal({ visible, onClose, tripId, fallbackDayId,
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingIdentify, setPendingIdentify] = useState<{ id: string; title: string; trip_id: string } | null>(null);
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   function reset() {
     setText("");
@@ -117,7 +120,7 @@ export default function QuickAddModal({ visible, onClose, tripId, fallbackDayId,
             {error && <Text style={styles.error}>{error}</Text>}
 
             <Pressable style={[styles.submitBtn, (loading || !text.trim()) && { opacity: 0.6 }]} onPress={submit} disabled={loading || !text.trim()}>
-              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>Continue</Text>}
+              {loading ? <ActivityIndicator color={colors.paper} /> : <Text style={styles.submitBtnText}>Continue</Text>}
             </Pressable>
           </View>
         </KeyboardAvoidingView>
@@ -136,7 +139,7 @@ export default function QuickAddModal({ visible, onClose, tripId, fallbackDayId,
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: "rgba(11,30,61,0.4)", justifyContent: "flex-end" },
   sheet: { backgroundColor: colors.paper, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: 16, paddingBottom: 32 },
   title: { fontFamily: fonts.display, fontSize: 17, color: colors.ink, marginBottom: 12 },

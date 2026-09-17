@@ -1,5 +1,7 @@
+import { useMemo } from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
-import { colors, radius } from "@/lib/theme";
+import { radius, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import { formatDateDDMMYYYY } from "@/lib/dateFormat";
 import { Day } from "@/lib/types";
 
@@ -9,6 +11,8 @@ import { Day } from "@/lib/types";
  * Proposals one) is what the rest of the schema actually keys items on. */
 export default function DayField({ label, day, onPress }: { label: string; day: Day | null; onPress: () => void }) {
   const text = !day ? "Pick a day…" : day.date === null ? "Proposals" : formatDateDDMMYYYY(day.date);
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={{ flex: 1 }}>
       <Text style={styles.label}>{label}</Text>
@@ -19,7 +23,7 @@ export default function DayField({ label, day, onPress }: { label: string; day: 
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   label: {
     color: colors.inkSoft, fontSize: 12, fontWeight: "600",
     marginTop: 16, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5,

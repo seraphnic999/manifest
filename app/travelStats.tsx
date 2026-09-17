@@ -1,13 +1,17 @@
+import { useMemo } from "react";
 import { FlatList, View, Text, StyleSheet, Pressable } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { Stack, useRouter } from "expo-router";
 import SubpageHeader from "@/components/SubpageHeader";
 import WorldMapPins from "@/components/WorldMapPins";
-import { colors, radius, fonts } from "@/lib/theme";
+import { radius, fonts, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import { fetchTravelStats, fetchWorldMapPins, tripTimeStatus, YearStats, TripStatsRow } from "@/lib/travelStats";
 import { formatDateDDMMYYYY } from "@/lib/dateFormat";
 
 function StatTile({ label, value }: { label: string; value: string }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={styles.statTile}>
       <Text style={styles.statValue}>{value}</Text>
@@ -18,6 +22,8 @@ function StatTile({ label, value }: { label: string; value: string }) {
 
 function TripRow({ trip }: { trip: TripStatsRow }) {
   const router = useRouter();
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const status = tripTimeStatus(trip);
   return (
     <Pressable style={styles.tripRow} onPress={() => router.push(`/trip/${trip.id}`)}>
@@ -48,6 +54,8 @@ function TripRow({ trip }: { trip: TripStatsRow }) {
 }
 
 function YearSection({ year }: { year: YearStats }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={styles.yearSection}>
       <Text style={styles.yearTitle}>{year.year}</Text>
@@ -63,6 +71,8 @@ function YearSection({ year }: { year: YearStats }) {
 }
 
 export default function TravelStats() {
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { data } = useQuery({ queryKey: ["travelStats"], queryFn: fetchTravelStats });
   const { data: pins } = useQuery({ queryKey: ["travelStatsMapPins"], queryFn: fetchWorldMapPins });
   const years = data ?? [];
@@ -83,7 +93,7 @@ export default function TravelStats() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   empty: { color: colors.inkSoft, fontStyle: "italic", fontSize: 13, textAlign: "center", marginTop: 40 },
   yearSection: { marginBottom: 28 },

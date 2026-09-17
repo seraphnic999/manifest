@@ -3,7 +3,7 @@
 // SVG components — 64x64 viewBox, single filled compound path per icon
 // (fill-rule evenodd), #061D8E source default color. "other" has no source
 // icon and is hand-drawn as a placeholder (three filled dots).
-import Svg, { Path, Circle } from "react-native-svg";
+import Svg, { Path, Circle, Rect } from "react-native-svg";
 import { ViewStyle } from "react-native";
 
 export type IconName =
@@ -18,7 +18,7 @@ export type IconName =
   | "music" | "burger" | "iceCream" | "croissant" | "supermarketCart" | "flag" | "medical" | "amusementPark"
   | "cinema" | "theater" | "pizza" | "steak" | "dollarSign" | "parking" | "park" | "obelisk"
   | "castle" | "signpost" | "club" | "carRental" | "footprints" | "scenicOverlook"
-  | "research" | "stats" | "other";
+  | "research" | "stats" | "other" | "settings";
 
 /** Every icon that makes sense as a marker glyph on the map — used to build
  * the map-icon picker's grid. The curated core-pack subset (excludes
@@ -206,6 +206,16 @@ function renderPaths(name: IconName, color: string) {
         <Circle cx="16" cy="32" r="5" fill={color} />
         <Circle cx="32" cy="32" r="5" fill={color} />
         <Circle cx="48" cy="32" r="5" fill={color} />
+      </>;
+    // Hand-drawn (no source icon, like "other" above) — a gear: a thick
+    // ring plus 8 evenly-rotated teeth, built from primitives rather than
+    // traced path data since there's no generated source glyph to match.
+    case "settings":
+      return <>
+        {[0, 45, 90, 135, 180, 225, 270, 315].map((angle) => (
+          <Rect key={angle} x="49.5" y="29" width="10" height="6" rx="1.5" fill={color} transform={`rotate(${angle} 32 32)`} />
+        ))}
+        <Circle cx="32" cy="32" r="14" fill="none" stroke={color} strokeWidth="7" />
       </>;
   }
 }

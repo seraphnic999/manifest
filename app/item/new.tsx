@@ -1,11 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   View, Text, TextInput, Pressable, StyleSheet, ScrollView, Switch,
 } from "react-native";
 import { Alert } from "@/lib/alert";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { supabase } from "@/lib/supabase";
-import { colors, radius } from "@/lib/theme";
+import { radius, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import { categoryByKey } from "@/lib/itemTypeMeta";
 import { computeInsertSortOrder } from "@/lib/reorder";
 import { DateField, TimeField } from "@/components/DateTimeFields";
@@ -49,6 +50,8 @@ export default function NewItem() {
   const [reminderMinutes, setReminderMinutes] = useState("");
   const [saving, setSaving] = useState(false);
   const [pendingIdentify, setPendingIdentify] = useState<{ id: string; title: string; trip_id: string } | null>(null);
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   // Lodging-specific
   const [checkInDate, setCheckInDate] = useState(date ?? "");
@@ -437,7 +440,7 @@ export default function NewItem() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   label: { color: colors.inkSoft, fontSize: 12, fontWeight: "600", marginTop: 16, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 },
   input: {

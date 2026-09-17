@@ -1,7 +1,9 @@
+import { useMemo } from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { colors, fonts } from "@/lib/theme";
+import { fonts, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import Icon from "@/components/icons/Icon";
 
 /** Back-chevron + title header for account-level screens reached by
@@ -14,6 +16,8 @@ import Icon from "@/components/icons/Icon";
 export default function SubpageHeader({ title, right }: { title: string; right?: React.ReactNode }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={[styles.row, { paddingTop: insets.top + 10 }]}>
       <Pressable
@@ -29,7 +33,7 @@ export default function SubpageHeader({ title, right }: { title: string; right?:
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   row: {
     flexDirection: "row", alignItems: "center", gap: 12,
     paddingHorizontal: 16, paddingBottom: 10,

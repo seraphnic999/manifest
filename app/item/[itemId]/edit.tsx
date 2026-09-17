@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   View, Text, TextInput, Pressable, StyleSheet, ScrollView, Switch, Modal,
 } from "react-native";
 import { Alert } from "@/lib/alert";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { supabase } from "@/lib/supabase";
-import { colors, radius } from "@/lib/theme";
+import { radius, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import { categoryForDbType, categoryByKey, CONVERTIBLE_CATEGORIES, isConvertibleType, itemTypeTag, FieldKey } from "@/lib/itemTypeMeta";
 import { DateField, TimeField } from "@/components/DateTimeFields";
 import DayField from "@/components/DayField";
@@ -74,6 +75,8 @@ export default function EditItem() {
   const [longitude, setLongitude] = useState("");
   const [mapIcon, setMapIcon] = useState<IconName | null>(null);
   const [mapIconPickerOpen, setMapIconPickerOpen] = useState(false);
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   // Research-derived fields (see lib/itemResearch.ts's acceptResearchJob) —
   // live in custom_fields alongside flight_number, not their own columns.
@@ -731,7 +734,7 @@ export default function EditItem() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   label: { color: colors.inkSoft, fontSize: 12, fontWeight: "600", marginTop: 16, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 },
   sectionLabel: { color: colors.ink, fontSize: 15, fontWeight: "800", marginTop: 28 },

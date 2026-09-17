@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { View, Text, Pressable, StyleSheet, Modal, FlatList, TextInput } from "react-native";
-import { colors, radius, fonts } from "@/lib/theme";
+import { radius, fonts, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import Icon from "@/components/icons/Icon";
 import { City } from "@/lib/types";
 import { fetchAllCities, searchCities, TripCityRow, primaryTripCity } from "@/lib/cities";
@@ -27,6 +28,8 @@ export default function DayCityPickerModal({ visible, onClose, tripCities, curre
   const [query, setQuery] = useState("");
   const [customInput, setCustomInput] = useState("");
   const [browsing, setBrowsing] = useState(false);
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   useEffect(() => {
     if (visible && cities.length === 0) {
@@ -157,7 +160,7 @@ export default function DayCityPickerModal({ visible, onClose, tripCities, curre
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   modalRoot: { flex: 1, backgroundColor: colors.paper },
   modalHeader: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",

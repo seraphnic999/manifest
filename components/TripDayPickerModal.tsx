@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { View, Text, Pressable, StyleSheet, Modal, ScrollView, ActivityIndicator } from "react-native";
-import { colors, radius, fonts } from "@/lib/theme";
+import { radius, fonts, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import { supabase } from "@/lib/supabase";
 import { Day } from "@/lib/types";
 import { fetchTripCities, dayCityLabel } from "@/lib/cities";
@@ -35,6 +36,8 @@ export default function TripDayPickerModal({
   const [days, setDays] = useState<Day[]>([]);
   const [cityLabels, setCityLabels] = useState<Record<string, string | null>>({});
   const [loading, setLoading] = useState(true);
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   useEffect(() => {
     if (!visible) return;
@@ -90,7 +93,7 @@ export default function TripDayPickerModal({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: "rgba(11,30,63,0.4)", justifyContent: "center", padding: 24 },
   card: { backgroundColor: colors.paperRaised, borderRadius: radius.lg, padding: 20, width: "100%", maxWidth: 420, alignSelf: "center" },
   title: { fontFamily: fonts.display, fontSize: 18, color: colors.ink, marginBottom: 14, textAlign: "center" },

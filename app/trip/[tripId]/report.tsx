@@ -1,9 +1,10 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView, Modal } from "react-native";
 import { useLocalSearchParams, Stack, useFocusEffect, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { colors, radius } from "@/lib/theme";
+import { radius, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import { TripCurrency, TripParty, Expense, Allocation, ExpenseType } from "@/lib/types";
 import { EXPENSE_TYPES, EXPENSE_TYPE_LABELS } from "@/lib/expenseType";
 import { classifyExpenseTiming, ExpenseTiming } from "@/lib/expenseTiming";
@@ -25,6 +26,8 @@ interface OwedItem {
 
 function Bar({ label, value, maxValue, color }: { label: string; value: number; maxValue: number; color: string }) {
   const pct = maxValue > 0 ? Math.max(2, (value / maxValue) * 100) : 0;
+  const colors = useThemeColors();
+  const barStyles = useMemo(() => makeBarStyles(colors), [colors]);
   return (
     <View style={barStyles.row}>
       <View style={barStyles.labelRow}>
@@ -38,7 +41,7 @@ function Bar({ label, value, maxValue, color }: { label: string; value: number; 
   );
 }
 
-const barStyles = StyleSheet.create({
+const makeBarStyles = (colors: ColorTokens) => StyleSheet.create({
   row: { marginBottom: 12 },
   labelRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 4 },
   label: { color: colors.ink, fontWeight: "600", fontSize: 13 },
@@ -147,6 +150,9 @@ export default function ExpenseReport() {
     return parties.find((p) => p.id === id)?.name ?? "Unknown";
   }
 
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -234,7 +240,7 @@ export default function ExpenseReport() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   summaryCard: { backgroundColor: colors.ink, borderRadius: radius.lg, padding: 18, marginBottom: 14 },
   totalLabel: { fontFamily: "JetBrainsMono_600SemiBold", fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: colors.amberSoft },

@@ -1,11 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   View, Text, TextInput, Pressable, StyleSheet, ScrollView, Modal,
 } from "react-native";
 import { Alert } from "@/lib/alert";
 import { useRouter, Stack } from "expo-router";
 import { supabase } from "@/lib/supabase";
-import { colors, radius } from "@/lib/theme";
+import { radius, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import { Companion, TripType } from "@/lib/types";
 import { setTripCompanions, companionFullName } from "@/lib/companions";
 import CompanionPickerModal from "@/components/CompanionPickerModal";
@@ -222,6 +223,9 @@ export default function NewTrip() {
     setSaving(false);
     router.replace(`/trip/${trip.id}`);
   }
+
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   return (
     <View style={styles.container}>
@@ -457,7 +461,7 @@ export default function NewTrip() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   label: { color: colors.inkSoft, fontSize: 12, fontWeight: "600", marginTop: 16, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 },
   input: {

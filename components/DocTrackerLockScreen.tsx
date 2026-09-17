@@ -1,20 +1,24 @@
+import { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Svg, { Path, Rect } from "react-native-svg";
-import { colors, fonts, radius } from "@/lib/theme";
+import { fonts, radius, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 
 /** A simple hand-drawn padlock — this app's curated icon set (components/icons/Icon.tsx)
  * has no lock glyph, and this is the only place one is needed. */
-function LockGlyph({ size = 56, color = colors.blue }: { size?: number; color?: string }) {
+function LockGlyph({ size = 56, color }: { size?: number; color?: string }) {
+  const colors = useThemeColors();
+  const strokeColor = color ?? colors.blue;
   return (
     <Svg width={size} height={size} viewBox="0 0 64 64">
       <Path
         d="M20 28V20C20 12.268 25.373 6 32 6C38.627 6 44 12.268 44 20V28"
-        stroke={color}
+        stroke={strokeColor}
         strokeWidth={5}
         fill="none"
         strokeLinecap="round"
       />
-      <Rect x="12" y="28" width="40" height="30" rx="6" fill={color} />
+      <Rect x="12" y="28" width="40" height="30" rx="6" fill={strokeColor} />
       <Rect x="29" y="38" width="6" height="12" rx="3" fill={colors.paperRaised} />
     </Svg>
   );
@@ -29,6 +33,8 @@ export default function DocTrackerLockScreen({
   failed: boolean;
   onUnlock: () => void;
 }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={styles.container}>
       <View style={styles.iconWrap}>
@@ -51,7 +57,7 @@ export default function DocTrackerLockScreen({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.paper,

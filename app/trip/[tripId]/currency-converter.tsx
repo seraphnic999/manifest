@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { View, Text, TextInput, Pressable, StyleSheet, ScrollView, Modal } from "react-native";
 import { useLocalSearchParams, Stack, useFocusEffect } from "expo-router";
 import { useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Alert } from "@/lib/alert";
 import { supabase } from "@/lib/supabase";
-import { colors, radius } from "@/lib/theme";
+import { radius, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import { TripCurrency } from "@/lib/types";
 import { COMMON_CURRENCIES } from "@/lib/timezone";
 import { fetchLiveRateToNis } from "@/lib/currencyRates";
@@ -23,6 +24,8 @@ async function fetchCurrencies(tripId: string): Promise<TripCurrency[]> {
 
 export default function CurrencyConverter() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [amounts, setAmounts] = useState<Record<string, string>>({});
   const [addOpen, setAddOpen] = useState(false);
   const [newCode, setNewCode] = useState("");
@@ -115,7 +118,7 @@ export default function CurrencyConverter() {
       </ScrollView>
 
       <Pressable style={styles.fab} onPress={() => setAddOpen(true)}>
-        <Icon name="add" size={24} color="#fff" />
+        <Icon name="add" size={24} color={colors.paper} />
       </Pressable>
 
       <Modal visible={addOpen} transparent animationType="fade" onRequestClose={() => setAddOpen(false)}>
@@ -158,7 +161,7 @@ export default function CurrencyConverter() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   hint: { color: colors.inkSoft, fontSize: 13, marginBottom: 16, lineHeight: 18 },
   row: {

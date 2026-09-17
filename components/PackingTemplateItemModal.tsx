@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Text, TextInput, View, Pressable, Modal, StyleSheet } from "react-native";
-import { colors, radius } from "@/lib/theme";
+import { radius, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import { PACKING_CATEGORIES } from "@/lib/packing";
 
 /** Add/edit popup for a single packing-template item — the same
@@ -19,6 +20,8 @@ export default function PackingTemplateItemModal({
   const [name, setName] = useState(initialName ?? "");
   const [category, setCategory] = useState<string | null>(initialCategory ?? null);
   const isEdit = !!onDelete;
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   useEffect(() => {
     if (visible) {
@@ -71,7 +74,7 @@ export default function PackingTemplateItemModal({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: "rgba(11,30,63,0.4)", justifyContent: "center", padding: 24 },
   card: { backgroundColor: colors.paperRaised, borderRadius: radius.lg, padding: 20, width: "100%", maxWidth: 420, alignSelf: "center" },
   title: { color: colors.ink, fontWeight: "700", fontSize: 17, marginBottom: 14 },

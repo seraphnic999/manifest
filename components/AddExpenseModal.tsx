@@ -1,11 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   View, Text, TextInput, Pressable, StyleSheet, ScrollView, Modal, Switch,
 } from "react-native";
 import { Alert } from "@/lib/alert";
 import { useRouter } from "expo-router";
 import { supabase } from "@/lib/supabase";
-import { colors, radius } from "@/lib/theme";
+import { radius, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import { localIsoDate } from "@/lib/dateFormat";
 import { TripCurrency, TripParty, ShoppingListItem, ExpenseType } from "@/lib/types";
 import { EXPENSE_TYPES, EXPENSE_TYPE_LABELS, deriveExpenseTypeFromItemType } from "@/lib/expenseType";
@@ -302,6 +303,9 @@ export default function AddExpenseModal({
     ]);
   }
 
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.modalBackdrop} onPress={onClose}>
@@ -519,7 +523,7 @@ export default function AddExpenseModal({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   modalBackdrop: { flex: 1, backgroundColor: "rgba(33,47,61,0.5)", justifyContent: "flex-end" },
   sheet: {
     backgroundColor: colors.paper, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: "88%",

@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { View, Text, Image, Pressable, StyleSheet, Modal, FlatList, TextInput } from "react-native";
-import { colors, radius, fonts } from "@/lib/theme";
+import { radius, fonts, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import Icon from "@/components/icons/Icon";
 import {
   DESTINATION_PHOTOS, FALLBACK_COVER_PHOTO, coverPhotoSource, searchDestinationPhotos,
@@ -11,6 +12,8 @@ export default function CoverPhotoPicker({
 }: { value: string | null; onChange: (id: string | null) => void }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const results = searchDestinationPhotos(query);
   const selected = value ? DESTINATION_PHOTOS.find((p) => p.id === value) : undefined;
 
@@ -88,7 +91,7 @@ export default function CoverPhotoPicker({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   button: {
     flexDirection: "row", alignItems: "center", gap: 12,
     backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,

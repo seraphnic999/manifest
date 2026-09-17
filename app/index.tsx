@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { View, Text, FlatList, StyleSheet, Pressable, RefreshControl, TextInput, Image, ImageBackground } from "react-native";
 import { useRouter, useFocusEffect, Stack } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { supabase } from "@/lib/supabase";
-import { colors, radius, fonts } from "@/lib/theme";
+import { radius, fonts, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import { Trip, Item, tripStatus } from "@/lib/types";
 import { formatDateDDMMYYYY, localIsoDate } from "@/lib/dateFormat";
 import { normalizeTimeHHMM } from "@/lib/timeFormat";
@@ -22,6 +23,7 @@ import { fetchTripCities, dayCityLabel, resolveDayCity } from "@/lib/cities";
 import { fetchTripCompanionsWithUrls } from "@/lib/companions";
 import { useResearchJobs } from "@/lib/itemResearch";
 import { useEmailProposals } from "@/lib/emailProposals";
+import { getHasCheckedLaunchRedirect, setHasCheckedLaunchRedirect } from "@/lib/launchRedirect";
 
 // Same semantics as lib/travelStats.ts's and lib/budget.ts's own copies of
 // this (inclusive of both endpoints, so a same-day trip is 1 day) — kept as
@@ -50,13 +52,11 @@ function groupTripsByYear(trips: Trip[]): [string, Trip[]][] {
 interface NavCtx {
   router: ReturnType<typeof useRouter>;
   setSearchOpen: (v: boolean) => void;
-  signOut: () => void;
 }
 
-// The home screen's one-tap navigation row — every option except Sign Out,
-// which moved back into the hamburger menu since the row was getting too
-// crowded. Sign Out is rare enough, and destructive enough, that it doesn't
-// need to be one tap away like the rest of these do.
+// The home screen's one-tap navigation row — every option except Settings
+// (which holds Sign Out and Dark Mode), which lives in the hamburger menu
+// since the row was getting too crowded and neither is a frequent tap.
 const NAV_ITEMS: { label: string; icon: IconName; danger?: boolean; onPress: (ctx: NavCtx) => void }[] = [
   { label: "Search", icon: "search", onPress: ({ setSearchOpen }) => setSearchOpen(true) },
   { label: "Doc Tracker", icon: "document", onPress: ({ router }) => router.push("/doctracker") },
@@ -66,12 +66,6 @@ const NAV_ITEMS: { label: string; icon: IconName; danger?: boolean; onPress: (ct
   { label: "Travel Stats", icon: "stats", onPress: ({ router }) => router.push("/travelStats") },
   { label: "Review Queue", icon: "research", onPress: ({ router }) => router.push("/reviewQueue") },
 ];
-
-// Set once a current-trip redirect has been attempted this app session, so
-// it only ever fires on the first load after launch — the Home button (the
-// only other way back to this screen) must keep working as a real trip list
-// even while a trip is current, not bounce straight back to its Overview.
-let hasCheckedLaunchRedirect = false;
 
 async function fetchTrips(): Promise<Trip[]> {
   const { data, error } = await supabase
@@ -153,6 +147,8 @@ async function fetchHeroExtra(tripId: string, destinations: string[]): Promise<H
 
 function TripPhotoCard({ trip, showCountdown, onArchive }: { trip: Trip; showCountdown: boolean; onArchive?: () => void }) {
   const router = useRouter();
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   // Avatar-only, no names — just enough to see at a glance who a trip is
   // with, right next to the arrow/archive button. Silently empty for a
   // trip with no companions attached, same as the hero and hamburger menu
@@ -213,6 +209,8 @@ function TripPhotoCard({ trip, showCountdown, onArchive }: { trip: Trip; showCou
 
 export default function TripList() {
   const router = useRouter();
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const isOnline = useNetworkStatus();
   const { data, dataUpdatedAt, refetch, isRefetching } = useQuery({
@@ -264,9 +262,9 @@ export default function TripList() {
   // time this screen loads".
   const redirectChecked = useRef(false);
   useEffect(() => {
-    if (!data || redirectChecked.current || hasCheckedLaunchRedirect) return;
+    if (!data || redirectChecked.current || getHasCheckedLaunchRedirect()) return;
     redirectChecked.current = true;
-    hasCheckedLaunchRedirect = true;
+    setHasCheckedLaunchRedirect(true);
     const current = data.find((t) => tripStatus(t) === "current");
     if (current) router.replace(`/trip/${current.id}`);
   }, [data]);
@@ -295,19 +293,6 @@ export default function TripList() {
   function closeSearch() {
     setSearchOpen(false);
     setSearchInput("");
-  }
-
-  function signOut() {
-    Alert.alert("Sign out", "Sign out of Manifest?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Sign out", style: "destructive",
-        onPress: () => {
-          hasCheckedLaunchRedirect = false;
-          supabase.auth.signOut();
-        },
-      },
-    ]);
   }
 
   // Upcoming = not finished yet (already in progress or still to come, minus
@@ -350,10 +335,10 @@ export default function TripList() {
               }}
               accessibilityLabel="New trip"
             >
-              <Icon name="add" size={25} color="#fff" />
+              <Icon name="add" size={25} color={colors.paper} />
             </Pressable>
             <HamburgerMenu
-              items={[{ icon: "signOut", label: "Sign Out", danger: true, onPress: signOut }]}
+              items={[{ icon: "settings", label: "Settings", onPress: () => router.push("/settings") }]}
               solid
               size={42}
               sheetTop={insets.top + 66}
@@ -381,7 +366,7 @@ export default function TripList() {
         ) : (
           <View style={styles.navRow}>
             {NAV_ITEMS.map((n) => (
-              <Pressable key={n.label} style={styles.navBtn} onPress={() => n.onPress({ router, setSearchOpen, signOut })} accessibilityLabel={n.label}>
+              <Pressable key={n.label} style={styles.navBtn} onPress={() => n.onPress({ router, setSearchOpen })} accessibilityLabel={n.label}>
                 <Icon name={n.icon} size={22} color={n.danger ? colors.coral : colors.blue} />
                 {n.label === "Review Queue" && hasPendingReview && <View style={styles.navBtnDot} />}
               </Pressable>
@@ -497,7 +482,7 @@ export default function TripList() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   topbar: { padding: 20, paddingBottom: 8 },
   titleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
@@ -532,6 +517,10 @@ const styles = StyleSheet.create({
   },
   empty: { textAlign: "center", color: colors.inkSoft, marginTop: 40 },
 
+  // hero* / comingUp* / tripCard(Top|Scrim|Info|Name|Type) below are all
+  // rendered over a cover photo (ImageBackground), never the page's own
+  // background — deliberately hardcoded rather than theme-reactive, same
+  // reasoning as TripCountdown's photo-hero badge.
   hero: { height: 168, borderRadius: radius.xl, overflow: "hidden", padding: 14, justifyContent: "flex-end", marginBottom: 6 },
   heroScrim: {
     position: "absolute", top: 0, left: 0, right: 0, bottom: 0, borderRadius: radius.xl,
@@ -545,9 +534,9 @@ const styles = StyleSheet.create({
   weatherTemp: { color: "#fff", fontFamily: fonts.monoBold, fontSize: 12 },
   heroDest: { color: "#fff", fontFamily: fonts.display, fontSize: 17, marginBottom: 4 },
   heroTodayCity: { color: "rgba(255,255,255,0.85)", fontSize: 12, marginBottom: 6 },
-  comingUpLabel: { color: colors.goldSoft, fontFamily: fonts.bodyBold, fontSize: 9, textTransform: "uppercase", letterSpacing: 1 },
+  comingUpLabel: { color: "#F7ECD6", fontFamily: fonts.bodyBold, fontSize: 9, textTransform: "uppercase", letterSpacing: 1 },
   comingUpTitle: { color: "#fff", fontFamily: fonts.bodyBold, fontSize: 13, marginTop: 1 },
-  comingUpMeta: { color: colors.goldSoft, fontFamily: fonts.mono, fontSize: 10, marginTop: 1 },
+  comingUpMeta: { color: "#F7ECD6", fontFamily: fonts.mono, fontSize: 10, marginTop: 1 },
 
   tripCard: { borderRadius: radius.lg, overflow: "hidden", borderWidth: 1, borderColor: colors.line, marginBottom: 10, backgroundColor: colors.paperRaised },
   tripCardTop: { height: 96, justifyContent: "flex-end" },

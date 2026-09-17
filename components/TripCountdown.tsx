@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { useQuery } from "@tanstack/react-query";
-import { colors, radius, fonts } from "@/lib/theme";
+import { radius, fonts, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import { fetchTripCountdownTarget } from "@/lib/countdown";
 
 function pad(n: number): string {
@@ -77,8 +78,12 @@ export default function TripCountdown({
 }
 
 /** A single-line compact version for a trip list row — every upcoming
- * trip gets one of these, not just the soonest. */
+ * trip gets one of these, not just the soonest. Sits on a plain card
+ * background (unlike the big card version above, which is always over a
+ * cover photo), so this one alone is theme-reactive. */
 export function TripCountdownInline({ tripId, fallbackDateIso }: { tripId: string; fallbackDateIso: string }) {
+  const colors = useThemeColors();
+  const inlineStyles = useMemo(() => makeInlineStyles(colors), [colors]);
   const breakdown = useTripCountdown(tripId, fallbackDateIso);
   if (!breakdown) return null;
 
@@ -89,6 +94,12 @@ export function TripCountdownInline({ tripId, fallbackDateIso }: { tripId: strin
   );
 }
 
+// Always rendered over a trip's cover photo (Home's featured-trip hero, or
+// the trip Overview header) — deliberately NOT theme-reactive, unlike
+// almost everything else in the app. A photo backdrop isn't part of the
+// page's own light/dark surface, so this translucent-navy-glass badge and
+// its light text/gold accents stay fixed regardless of the app's theme,
+// the same way the Overview hero's weather badge and trip name do.
 const styles = StyleSheet.create({
   card: {
     backgroundColor: "rgba(11,30,63,0.35)", borderRadius: radius.md,
@@ -96,17 +107,17 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: "rgba(255,255,255,0.3)",
   },
   tripName: {
-    color: colors.goldSoft, fontFamily: fonts.bodyBold, fontSize: 10,
+    color: "#F7ECD6", fontFamily: fonts.bodyBold, fontSize: 10,
     textTransform: "uppercase", letterSpacing: 1, marginBottom: 3,
   },
   row: { flexDirection: "row", alignItems: "center" },
   unit: { alignItems: "center", minWidth: 34 },
-  num: { color: colors.paper, fontFamily: fonts.monoBold, fontSize: 16 },
-  unitLabel: { color: colors.goldSoft, fontSize: 7, fontFamily: fonts.bodyBold, textTransform: "uppercase", letterSpacing: 0.5, marginTop: 1 },
-  colon: { color: colors.goldSoft, fontWeight: "800", fontSize: 14, marginHorizontal: 2 },
+  num: { color: "#F7F9FC", fontFamily: fonts.monoBold, fontSize: 16 },
+  unitLabel: { color: "#F7ECD6", fontSize: 7, fontFamily: fonts.bodyBold, textTransform: "uppercase", letterSpacing: 0.5, marginTop: 1 },
+  colon: { color: "#F7ECD6", fontWeight: "800", fontSize: 14, marginHorizontal: 2 },
 });
 
-const inlineStyles = StyleSheet.create({
+const makeInlineStyles = (colors: ColorTokens) => StyleSheet.create({
   text: {
     fontFamily: fonts.mono, color: colors.blue,
     fontSize: 11, marginTop: 4,

@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { View, Text, Pressable, StyleSheet, Modal, TextInput, ScrollView, Linking } from "react-native";
-import { colors, radius, fonts } from "@/lib/theme";
+import { radius, fonts, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import Icon from "@/components/icons/Icon";
 import { Alert } from "@/lib/alert";
 import { FieldConfidence, ItemResearchJob, ProposedField } from "@/lib/types";
@@ -9,12 +10,12 @@ import { ResearchDraft, acceptResearchJob, draftFromProposal, rejectResearchJob,
 // Confidence shown as a word, not a fake percentage — "Guessed" tells you
 // what to do about a field, "82%" would just imply a precision the agent
 // doesn't have.
-const CONFIDENCE: Record<FieldConfidence, { label: string; color: string; background: string }> = {
+const CONFIDENCE = (colors: ColorTokens): Record<FieldConfidence, { label: string; color: string; background: string }> => ({
   high: { label: "Found", color: colors.blue, background: colors.blueSoft },
   medium: { label: "Likely", color: colors.lightBlue, background: colors.lightBlueSoft },
   low: { label: "Guessed", color: colors.gold, background: colors.goldSoft },
   none: { label: "Blank", color: colors.inkSoft, background: colors.line },
-};
+});
 
 function Field({
   label, meta, value, onChange, placeholder, multiline,
@@ -26,7 +27,9 @@ function Field({
   placeholder?: string;
   multiline?: boolean;
 }) {
-  const c = meta ? CONFIDENCE[meta.confidence] : null;
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const c = meta ? CONFIDENCE(colors)[meta.confidence] : null;
   return (
     <View style={styles.field}>
       <View style={styles.fieldHead}>
@@ -71,6 +74,9 @@ export default function ItemResearchReviewModal({ visible, onClose, job, onChang
   useEffect(() => {
     if (visible) setDraft(draftFromProposal(job.proposal));
   }, [visible, job]);
+
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   if (!draft) return null;
   const p = job.proposal;
@@ -199,7 +205,7 @@ export default function ItemResearchReviewModal({ visible, onClose, job, onChang
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.paper },
   header: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10,

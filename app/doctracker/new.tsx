@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { View, Text, Pressable, StyleSheet, TextInput, ScrollView, Modal, Image } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import SubpageHeader from "@/components/SubpageHeader";
 import Icon from "@/components/icons/Icon";
-import { colors, radius } from "@/lib/theme";
+import { radius, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import { Alert } from "@/lib/alert";
 import { Relationship } from "@/lib/types";
 import { RELATIONSHIP_OPTIONS, createCompanion, setCompanionProfilePhoto } from "@/lib/companions";
@@ -28,6 +29,8 @@ export default function NewCompanion() {
   // this is the simpler "upload only once we know it's really happening" shape.
   const [pickedPhoto, setPickedPhoto] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [photoSourceOpen, setPhotoSourceOpen] = useState(false);
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   async function pickPhoto(source: "camera" | "library") {
     setPhotoSourceOpen(false);
@@ -157,7 +160,7 @@ export default function NewCompanion() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   label: {
     color: colors.inkSoft, fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5,

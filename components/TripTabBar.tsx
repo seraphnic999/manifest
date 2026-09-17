@@ -1,6 +1,8 @@
+import { useMemo } from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
-import { colors, fonts } from "@/lib/theme";
+import { fonts, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import Icon, { IconName } from "@/components/icons/Icon";
 
 export type TripTab = "overview" | "map" | "expenses" | "packing" | "currency";
@@ -21,6 +23,8 @@ const TABS: { key: TripTab; label: string; icon: IconName; path: (id: string) =>
  * with silently no-op'ing. */
 export default function TripTabBar({ tripId, active }: { tripId: string; active?: TripTab }) {
   const router = useRouter();
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={styles.bar}>
       {TABS.map((t) => {
@@ -40,7 +44,7 @@ export default function TripTabBar({ tripId, active }: { tripId: string; active?
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   bar: {
     flexDirection: "row", justifyContent: "center", gap: 4,
     paddingTop: 8, paddingBottom: 10, paddingHorizontal: 4,

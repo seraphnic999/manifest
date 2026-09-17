@@ -1,5 +1,7 @@
+import { useMemo } from "react";
 import { View, Text, Pressable, Modal, StyleSheet, ScrollView } from "react-native";
-import { colors, radius } from "@/lib/theme";
+import { radius, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import Icon, { IconName, MAP_PICKER_ICONS } from "@/components/icons/Icon";
 
 export const MAP_ICON_LABELS: Partial<Record<IconName, string>> = {
@@ -29,6 +31,8 @@ export default function MapIconPickerModal({
   defaultIcon: IconName;
   selected: IconName | null;
 }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
@@ -58,7 +62,7 @@ export default function MapIconPickerModal({
 
 const TILE_SIZE = "31%";
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: "rgba(33,47,61,0.5)", justifyContent: "flex-end" },
   sheet: {
     backgroundColor: colors.ink, borderTopLeftRadius: 24, borderTopRightRadius: 24,

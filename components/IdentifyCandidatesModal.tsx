@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { View, Text, Pressable, StyleSheet, Modal, ActivityIndicator } from "react-native";
-import { colors, radius, fonts } from "@/lib/theme";
+import { radius, fonts, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import Icon from "@/components/icons/Icon";
 import { Alert } from "@/lib/alert";
 import { Item, IdentifyCandidate } from "@/lib/types";
@@ -24,6 +25,8 @@ export default function IdentifyCandidatesModal({ visible, onClose, item, onQueu
   const [loading, setLoading] = useState(true);
   const [candidates, setCandidates] = useState<IdentifyCandidate[] | null>(null);
   const [queuing, setQueuing] = useState(false);
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   useEffect(() => {
     if (!visible) return;
@@ -116,7 +119,7 @@ export default function IdentifyCandidatesModal({ visible, onClose, item, onQueu
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: "rgba(11,30,63,0.4)", justifyContent: "center", padding: 24 },
   card: { backgroundColor: colors.paperRaised, borderRadius: radius.xl, padding: 20, alignItems: "stretch" },
   loadingText: { color: colors.inkSoft, fontSize: 14, textAlign: "center" },

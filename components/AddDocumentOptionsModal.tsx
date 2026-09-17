@@ -1,5 +1,7 @@
+import { useMemo } from "react";
 import { View, Text, Pressable, Modal, StyleSheet } from "react-native";
-import { colors, radius, fonts } from "@/lib/theme";
+import { radius, fonts, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import Icon from "@/components/icons/Icon";
 
 export type AddDocumentMode = "manual" | "gallery" | "camera";
@@ -20,6 +22,8 @@ export default function AddDocumentOptionsModal({
   onClose: () => void;
   onSelect: (mode: AddDocumentMode) => void;
 }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
@@ -42,7 +46,7 @@ export default function AddDocumentOptionsModal({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: "rgba(11,30,61,0.4)", justifyContent: "flex-end" },
   sheet: { backgroundColor: colors.paper, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: 16, paddingBottom: 32 },
   title: { fontFamily: fonts.display, fontSize: 17, color: colors.ink, marginBottom: 12, paddingHorizontal: 4 },

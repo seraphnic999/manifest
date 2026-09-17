@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { View, Text, Pressable, StyleSheet, Modal, TextInput, ScrollView, Linking } from "react-native";
 import { useRouter } from "expo-router";
-import { colors, radius, fonts } from "@/lib/theme";
+import { radius, fonts, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import Icon from "@/components/icons/Icon";
 import { Alert } from "@/lib/alert";
 import { Keeper, Trip, Day, ItemType } from "@/lib/types";
@@ -20,6 +21,8 @@ interface Props {
 }
 
 function Field({ label, value }: { label: string; value: string | null }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   if (!value) return null;
   return (
     <View style={styles.fieldRow}>
@@ -75,6 +78,9 @@ export default function KeeperDetailModal({ visible, onClose, keeper, onChanged 
       loadTrips();
     }
   }, [visible, keeper, loadTrips]);
+
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   async function save() {
     if (editing && !editTitle.trim()) { Alert.alert("Missing info", "Title is required."); return; }
@@ -225,7 +231,7 @@ export default function KeeperDetailModal({ visible, onClose, keeper, onChanged 
           )}
 
           <Pressable style={styles.addToTripBtn} onPress={() => setTripPickerOpen(true)}>
-            <Icon name="add" size={18} color="#fff" />
+            <Icon name="add" size={18} color={colors.paper} />
             <Text style={styles.addToTripBtnText}>Add to trip</Text>
           </Pressable>
 
@@ -294,7 +300,7 @@ export default function KeeperDetailModal({ visible, onClose, keeper, onChanged 
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.paper },
   header: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10,

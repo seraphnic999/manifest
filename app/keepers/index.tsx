@@ -1,16 +1,18 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { View, Text, FlatList, StyleSheet, Pressable } from "react-native";
 import { Stack, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import SubpageHeader from "@/components/SubpageHeader";
 import Icon from "@/components/icons/Icon";
-import { colors, radius, fonts } from "@/lib/theme";
+import { radius, fonts, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import { Keeper } from "@/lib/types";
 import { fetchKeepers, groupKeepersByCity, KeeperCityGroup } from "@/lib/keepers";
 import { categoryForDbType } from "@/lib/itemTypeMeta";
 import KeeperDetailModal from "@/components/KeeperDetailModal";
 
 function StarRow({ rating }: { rating: number | null }) {
+  const colors = useThemeColors();
   if (!rating) return null;
   return (
     <View style={{ flexDirection: "row", gap: 1 }}>
@@ -26,6 +28,8 @@ export default function Keepers() {
   const { data, refetch } = useQuery({ queryKey: ["keepers"], queryFn: fetchKeepers });
   const groups: KeeperCityGroup[] = groupKeepersByCity(data ?? []);
   const [selected, setSelected] = useState<Keeper | null>(null);
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   // The list's 5-minute staleTime (lib/queryClient.ts) is fine for a screen
   // you just browse, but a keeper added moments ago on another screen
@@ -83,7 +87,7 @@ export default function Keepers() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   cityLabel: {
     color: colors.ink, fontFamily: fonts.display, fontSize: 18,

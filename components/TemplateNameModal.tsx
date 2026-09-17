@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Text, TextInput, Pressable, Modal, StyleSheet } from "react-native";
-import { colors, radius } from "@/lib/theme";
+import { radius, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 
 /** Single-purpose "enter a name and save" popup, shared by both creating a
  * new packing template (empty initialName) and renaming an existing one. */
@@ -15,6 +16,8 @@ export default function TemplateNameModal({
   saving?: boolean;
 }) {
   const [name, setName] = useState(initialName ?? "");
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   useEffect(() => {
     if (visible) setName(initialName ?? "");
@@ -48,7 +51,7 @@ export default function TemplateNameModal({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: "rgba(11,30,63,0.4)", justifyContent: "center", padding: 24 },
   card: { backgroundColor: colors.paperRaised, borderRadius: radius.lg, padding: 20, width: "100%", maxWidth: 420, alignSelf: "center" },
   title: { color: colors.ink, fontWeight: "700", fontSize: 17, marginBottom: 14 },

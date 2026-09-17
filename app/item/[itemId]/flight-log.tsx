@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { View, Text, FlatList, StyleSheet } from "react-native";
 import { useLocalSearchParams, Stack } from "expo-router";
 import SubpageHeader from "@/components/SubpageHeader";
-import { colors, radius, fonts } from "@/lib/theme";
+import { radius, fonts, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import { supabase } from "@/lib/supabase";
 import { useFlightStatusLog, FlightStatusLogEntry } from "@/lib/flightStatus";
 
@@ -15,6 +16,8 @@ async function fetchFlightHeader(itemId: string): Promise<FlightHeader | null> {
 }
 
 function LogEntryRow({ entry }: { entry: FlightStatusLogEntry }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const status = entry.data;
   const when = new Date(entry.created_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
   return (
@@ -52,6 +55,8 @@ function LogEntryRow({ entry }: { entry: FlightStatusLogEntry }) {
 
 export default function FlightLog() {
   const { itemId } = useLocalSearchParams<{ itemId: string }>();
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { entries, loading } = useFlightStatusLog(itemId);
   const [header, setHeader] = useState<FlightHeader | null>(null);
 
@@ -83,7 +88,7 @@ export default function FlightLog() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   subheader: {
     paddingHorizontal: 16, paddingVertical: 12,

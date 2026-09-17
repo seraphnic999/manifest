@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { View, Text, Pressable, StyleSheet, Modal, TextInput, ScrollView, Image, ActivityIndicator } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import { colors, radius, fonts } from "@/lib/theme";
+import { radius, fonts, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import Icon from "@/components/icons/Icon";
 import Checkbox from "@/components/Checkbox";
 import { Alert } from "@/lib/alert";
@@ -19,9 +20,12 @@ type ScanResult = DocumentScanResult;
 
 type ScanFieldKey = "document_type" | "document_number" | "issuing_country" | "issue_date" | "expiry_date";
 
-const CONFIDENCE_COLOR: Record<Confidence, string> = {
-  high: "#3E8E5A", medium: colors.gold, low: colors.coral, none: colors.inkSoft,
-};
+function confidenceColor(colors: ColorTokens, confidence: Confidence): string {
+  const map: Record<Confidence, string> = {
+    high: "#3E8E5A", medium: colors.gold, low: colors.coral, none: colors.inkSoft,
+  };
+  return map[confidence];
+}
 
 function scanFieldDisplay(key: ScanFieldKey, value: unknown): string {
   if (value === null || value === undefined || value === "") return "(not found)";
@@ -73,6 +77,8 @@ export default function TravelDocumentEditModal({ visible, onClose, companionId,
   const [scanSelected, setScanSelected] = useState<Record<ScanFieldKey, boolean>>({
     document_type: false, document_number: false, issuing_country: false, issue_date: false, expiry_date: false,
   });
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   function fieldsSnapshot() {
     return JSON.stringify({ type, documentNumber, issuingCountry, issueDate, expiryDate, notes });
@@ -340,7 +346,7 @@ export default function TravelDocumentEditModal({ visible, onClose, companionId,
                       </Text>
                       <Text style={styles.scanFieldValue}>{scanFieldDisplay(key, value)}</Text>
                     </View>
-                    <Text style={[styles.scanConfidence, { color: CONFIDENCE_COLOR[confidence] }]}>{confidence}</Text>
+                    <Text style={[styles.scanConfidence, { color: confidenceColor(colors, confidence) }]}>{confidence}</Text>
                   </Pressable>
                 );
               })}
@@ -380,7 +386,7 @@ export default function TravelDocumentEditModal({ visible, onClose, companionId,
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.paper },
   header: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",

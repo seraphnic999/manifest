@@ -4,7 +4,8 @@ import { Alert } from "@/lib/alert";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { colors, radius } from "@/lib/theme";
+import { radius, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import { Trip, Day, Item } from "@/lib/types";
 import { categoryForDbType } from "@/lib/itemTypeMeta";
 import { formatDateDDMMYYYY } from "@/lib/dateFormat";
@@ -85,6 +86,8 @@ interface SpanMapped {
 export default function DuplicateTrip() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
   const router = useRouter();
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [newStartDate, setNewStartDate] = useState("");
   const [newEndDate, setNewEndDate] = useState("");
   const [checked, setChecked] = useState<Set<string>>(new Set());
@@ -468,7 +471,7 @@ export default function DuplicateTrip() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   hint: { color: colors.inkSoft, fontSize: 13, marginBottom: 16, lineHeight: 18 },
   row: { flexDirection: "row" },

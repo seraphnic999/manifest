@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { View, Text, Pressable, StyleSheet, Modal, ScrollView } from "react-native";
-import { colors, radius, fonts } from "@/lib/theme";
+import { radius, fonts, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import Icon from "@/components/icons/Icon";
 import { Keeper } from "@/lib/types";
 import { fetchKeepersForCity } from "@/lib/keepers";
@@ -19,6 +20,8 @@ interface Props {
 export default function KeeperPickerModal({ visible, onClose, city, onSelect }: Props) {
   const [keepers, setKeepers] = useState<Keeper[]>([]);
   const [loading, setLoading] = useState(true);
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   useEffect(() => {
     if (!visible) return;
@@ -61,7 +64,7 @@ export default function KeeperPickerModal({ visible, onClose, city, onSelect }: 
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: "rgba(11,30,63,0.4)", justifyContent: "flex-end" },
   sheet: {
     backgroundColor: colors.paperRaised, borderTopLeftRadius: 24, borderTopRightRadius: 24,

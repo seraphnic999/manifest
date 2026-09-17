@@ -1,9 +1,10 @@
-import { useState, useCallback } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView, Modal } from "react-native";
 import { useLocalSearchParams, useRouter, Stack, useFocusEffect } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { colors, radius, fonts } from "@/lib/theme";
+import { radius, fonts, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import { TripCurrency, TripParty, Expense, Allocation, ExpenseType, Trip } from "@/lib/types";
 import { EXPENSE_TYPES, EXPENSE_TYPE_LABELS } from "@/lib/expenseType";
 import { classifyExpenseTiming } from "@/lib/expenseTiming";
@@ -87,6 +88,8 @@ export default function MoneyShoppingScreen() {
   const { tripId, tab } = useLocalSearchParams<{ tripId: string; tab?: string }>();
   const router = useRouter();
   const isOnline = useNetworkStatus();
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [activeTab, setActiveTab] = useState<Tab>(tab === "shopping" ? "shopping" : "expenses");
   const { menuItems, shareModal } = useTripHamburgerMenu(tripId);
 
@@ -353,7 +356,7 @@ export default function MoneyShoppingScreen() {
           else setAddFormOpen(true);
         }}
       >
-        <Icon name="add" size={24} color="#fff" />
+        <Icon name="add" size={24} color={colors.paper} />
       </Pressable>
 
       <AddExpenseModal
@@ -433,7 +436,7 @@ export default function MoneyShoppingScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   segTabs: { flexDirection: "row", backgroundColor: colors.paper, borderRadius: 999, padding: 3, gap: 2 },
   seg: { paddingVertical: 8, paddingHorizontal: 15, borderRadius: 999 },
@@ -442,11 +445,11 @@ const styles = StyleSheet.create({
   segTextOn: { color: "#fff" },
 
   summaryCard: { backgroundColor: colors.ink, borderRadius: radius.lg, padding: 18, marginBottom: 14 },
-  totalLabel: { fontFamily: fonts.mono, fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: colors.goldSoft },
+  totalLabel: { fontFamily: fonts.mono, fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: colors.gold },
   totalAmt: { fontFamily: fonts.display, fontSize: 32, color: colors.paper, marginVertical: 4 },
   owedRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 6, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.15)" },
   owedLabel: { color: colors.paper, fontSize: 12 },
-  owedAmt: { color: colors.goldSoft, fontFamily: fonts.bodyBold, fontSize: 12 },
+  owedAmt: { color: colors.gold, fontFamily: fonts.bodyBold, fontSize: 12 },
   sectionLabel: { color: colors.ink, fontFamily: fonts.display, fontSize: 16, marginBottom: 8 },
   noBudgetCard: {
     backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line, borderStyle: "dashed",

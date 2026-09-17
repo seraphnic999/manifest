@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { View, Text, TextInput, Pressable, StyleSheet, ScrollView, Modal, ActivityIndicator } from "react-native";
 import { Alert } from "@/lib/alert";
-import { colors, radius } from "@/lib/theme";
+import { radius, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import { fetchTripShares, shareTripWithEmail, unshareTrip, TripShare } from "@/lib/tripSharing";
 
 export default function ShareTripModal({
@@ -14,6 +15,8 @@ export default function ShareTripModal({
   const [shares, setShares] = useState<TripShare[]>([]);
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   function load() {
     fetchTripShares(tripId).then(setShares).catch(() => {});
@@ -89,7 +92,7 @@ export default function ShareTripModal({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: "rgba(33,47,61,0.5)", justifyContent: "flex-end" },
   sheet: {
     backgroundColor: colors.paper, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: "80%",

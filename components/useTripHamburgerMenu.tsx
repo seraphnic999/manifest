@@ -6,9 +6,11 @@ import { exportTripItineraryPdf } from "@/lib/exportItinerary";
 import ShareTripModal from "@/components/ShareTripModal";
 import { HamburgerMenuItem } from "@/components/HamburgerMenu";
 
-/** The same four trip-level actions (Export/Edit/Share/Sign out) every
- * trip-scoped screen's hamburger menu offers — shared so the export/share
- * wiring only lives in one place instead of being copied into every screen. */
+/** The same trip-level actions (Export/Edit/Share/Doc Tracker/Settings)
+ * every trip-scoped screen's hamburger menu offers — shared so the export/
+ * share wiring only lives in one place instead of being copied into every
+ * screen. Settings (dark mode, sign out) is the same entry point Home's own
+ * hamburger menu uses, not duplicated here. */
 export function useTripHamburgerMenu(tripId: string) {
   const router = useRouter();
   const [exporting, setExporting] = useState(false);
@@ -33,19 +35,12 @@ export function useTripHamburgerMenu(tripId: string) {
     setExporting(false);
   }
 
-  function signOut() {
-    Alert.alert("Sign out", "Sign out of Manifest?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Sign out", style: "destructive", onPress: () => supabase.auth.signOut() },
-    ]);
-  }
-
   const menuItems: HamburgerMenuItem[] = [
     { icon: "export", label: exporting ? "Exporting…" : "Export PDF", onPress: handleExportPdf },
     { icon: "edit", label: "Edit Trip", onPress: () => router.push(`/trip/${tripId}/edit`) },
     ...(isOwner ? [{ icon: "share" as const, label: "Share Trip", onPress: () => setShareOpen(true) }] : []),
     { icon: "document", label: "Doc Tracker", onPress: () => router.push("/doctracker") },
-    { icon: "signOut", label: "Sign Out", onPress: signOut, danger: true },
+    { icon: "settings", label: "Settings", onPress: () => router.push("/settings") },
   ];
 
   const shareModal = <ShareTripModal visible={shareOpen} onClose={() => setShareOpen(false)} tripId={tripId} />;

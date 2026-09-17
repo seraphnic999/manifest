@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, Modal, Platform } from "react-native";
 import { useLocalSearchParams, useRouter, Stack, useFocusEffect } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
@@ -6,7 +6,8 @@ import { RenderItemParams, NestableScrollContainer, NestableDraggableFlatList } 
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { supabase } from "@/lib/supabase";
 import Icon from "@/components/icons/Icon";
-import { colors, radius } from "@/lib/theme";
+import { radius, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import { Item, Day, Keeper } from "@/lib/types";
 import { renumberedOrders } from "@/lib/reorder";
 import { categoryForDbType, mapIconForItem, itemTypeTag } from "@/lib/itemTypeMeta";
@@ -108,6 +109,8 @@ async function fetchDayData(tripId: string, date: string, isProposals: boolean):
 }
 
 export default function DayView() {
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { tripId, date } = useLocalSearchParams<{ tripId: string; date: string }>();
   const isProposals = date === PROPOSALS_SEGMENT;
   const isOnline = useNetworkStatus();
@@ -528,7 +531,7 @@ export default function DayView() {
         onPress={() => prevNav && router.replace(navHref(prevNav))}
         accessibilityLabel="Previous day"
       >
-        <Icon name="back" size={20} color="#fff" />
+        <Icon name="back" size={20} color={colors.paper} />
       </Pressable>
       <Pressable
         style={[styles.floatingNavArrow, styles.floatingNavArrowRight, !nextNav && styles.floatingNavArrowDisabled]}
@@ -536,11 +539,11 @@ export default function DayView() {
         onPress={() => nextNav && router.replace(navHref(nextNav))}
         accessibilityLabel="Next day"
       >
-        <Icon name="forward" size={20} color="#fff" />
+        <Icon name="forward" size={20} color={colors.paper} />
       </Pressable>
 
       <Pressable style={styles.fab} onPress={() => { if (requireOnline()) setPickerOpen(true); }}>
-        <Icon name="add" size={24} color="#fff" />
+        <Icon name="add" size={24} color={colors.paper} />
       </Pressable>
 
       <ItemTypePickerModal
@@ -628,7 +631,7 @@ export default function DayView() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   dayErrorBanner: { backgroundColor: colors.coralSoft, paddingVertical: 8, paddingHorizontal: 12 },
   dayErrorBannerText: { color: colors.coral, fontSize: 12, fontWeight: "700", textAlign: "center" },

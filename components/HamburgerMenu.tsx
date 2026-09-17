@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { View, Text, Pressable, StyleSheet, Modal } from "react-native";
-import { colors, radius, fonts } from "@/lib/theme";
+import { radius, fonts, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import Icon, { IconName } from "@/components/icons/Icon";
 
 export interface HamburgerMenuItem {
@@ -17,6 +18,8 @@ export interface HamburgerMenuItem {
 export default function HamburgerMenu({
   items, solid, sheetTop = 66, size = 40,
 }: { items: HamburgerMenuItem[]; solid?: boolean; sheetTop?: number; size?: number }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -52,7 +55,7 @@ export default function HamburgerMenu({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   btn: {
     width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center",
   },

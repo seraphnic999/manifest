@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { View, Text, TextInput, Pressable, StyleSheet, Image } from "react-native";
 import { Alert } from "@/lib/alert";
 import { supabase } from "@/lib/supabase";
-import { colors, radius, fonts } from "@/lib/theme";
+import { radius, fonts, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 
 type Mode = "signin" | "signup";
 
@@ -15,6 +16,8 @@ export default function Login() {
   // came back yet) — shown instead of the form until the user switches
   // back to sign in.
   const [confirmEmailSentTo, setConfirmEmailSentTo] = useState<string | null>(null);
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   async function signIn() {
     setLoading(true);
@@ -110,7 +113,7 @@ export default function Login() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper, padding: 24, justifyContent: "center" },
   logo: { width: 68, height: 68, marginBottom: 18, borderRadius: radius.lg },
   eyebrow: { color: colors.blue, fontFamily: fonts.bodyBold, letterSpacing: 2, fontSize: 12, marginBottom: 6 },

@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { View, Text, FlatList, StyleSheet, Pressable, ImageBackground, Image, ActivityIndicator } from "react-native";
 import { useLocalSearchParams, useRouter, Stack, useFocusEffect } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
@@ -6,7 +6,8 @@ import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Alert } from "@/lib/alert";
 import { supabase } from "@/lib/supabase";
-import { colors, radius, fonts } from "@/lib/theme";
+import { radius, fonts, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import { Day, Item, Trip, TripCurrency, Expense, ItemType, Keeper, tripStatus } from "@/lib/types";
 import Icon from "@/components/icons/Icon";
 import HamburgerMenu from "@/components/HamburgerMenu";
@@ -115,6 +116,8 @@ async function fetchOverviewData(tripId: string): Promise<OverviewData | null> {
 
 export default function TripOverview() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const isOnline = useNetworkStatus();
   const insets = useSafeAreaInsets();
   const { menuItems, shareModal } = useTripHamburgerMenu(tripId);
@@ -390,7 +393,7 @@ export default function TripOverview() {
                     return (
                       <View key={f.id}>
                         <Pressable style={styles.nextCard} onPress={() => router.push(`/item/${f.id}`)}>
-                          <Icon name="flight" size={28} color="#fff" />
+                          <Icon name="flight" size={28} color={colors.paper} />
                           <View style={{ flex: 1 }}>
                             <Text style={styles.nextLabel}>Flight</Text>
                             <Text style={styles.nextTitle}>{f.title}</Text>
@@ -409,7 +412,7 @@ export default function TripOverview() {
                   {otherTodayItems.length > 0 ? (
                     <>
                       <Pressable style={styles.nextCard} onPress={() => router.push(`/item/${otherTodayItems[0].id}`)}>
-                        <Icon name={categoryForDbType(otherTodayItems[0].type).icon} size={28} color="#fff" />
+                        <Icon name={categoryForDbType(otherTodayItems[0].type).icon} size={28} color={colors.paper} />
                         <View style={{ flex: 1 }}>
                           <Text style={styles.nextLabel}>Next</Text>
                           <Text style={styles.nextTitle}>{otherTodayItems[0].title}</Text>
@@ -422,7 +425,7 @@ export default function TripOverview() {
                             <Text style={styles.itemTimeText}>{normalizeTimeHHMM(it.time_start) || "—"}</Text>
                           </View>
                           <View style={styles.itemIconCol}>
-                            <Icon name={categoryForDbType(it.type).icon} size={28} color="#fff" />
+                            <Icon name={categoryForDbType(it.type).icon} size={28} color={colors.paper} />
                           </View>
                           <View style={styles.itemBody}>
                             <Text style={styles.itemTitle}>{it.title}</Text>
@@ -445,7 +448,7 @@ export default function TripOverview() {
                     const durationText = durationMinutes !== null && durationMinutes >= 0 ? formatDuration(durationMinutes) : null;
                     return (
                       <Pressable key={f.id} style={styles.itemRow} onPress={() => router.push(`/item/${f.id}`)}>
-                        <View style={styles.itemIconCol}><Icon name="flight" size={28} color="#fff" /></View>
+                        <View style={styles.itemIconCol}><Icon name="flight" size={28} color={colors.paper} /></View>
                         <View style={styles.itemBody}>
                           <Text style={styles.itemCat}>{flightNumber ?? "FLIGHT"}</Text>
                           <Text style={styles.itemTitle}>{f.title}</Text>
@@ -464,7 +467,7 @@ export default function TripOverview() {
                   <Text style={styles.sectionLabel}>Lodging</Text>
                   {lodgings.map((l) => (
                     <Pressable key={l.id} style={styles.itemRow} onPress={() => router.push(`/item/${l.id}`)}>
-                      <View style={styles.itemIconCol}><Icon name="lodging" size={28} color="#fff" /></View>
+                      <View style={styles.itemIconCol}><Icon name="lodging" size={28} color={colors.paper} /></View>
                       <View style={styles.itemBody}>
                         <Text style={styles.itemCat}>LODGING</Text>
                         <Text style={styles.itemTitle}>{l.title}</Text>
@@ -509,7 +512,7 @@ export default function TripOverview() {
       />
 
       <Pressable style={styles.fab} onPress={openAddItem}>
-        <Icon name="add" size={24} color="#fff" />
+        <Icon name="add" size={24} color={colors.paper} />
       </Pressable>
 
       <ItemTypePickerModal
@@ -544,7 +547,7 @@ export default function TripOverview() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   fab: {
     position: "absolute", bottom: 74, right: 16, width: 52, height: 52, borderRadius: 26,
@@ -608,9 +611,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.ink, borderRadius: radius.lg, padding: 14,
     flexDirection: "row", alignItems: "center", gap: 12,
   },
-  nextLabel: { color: colors.goldSoft, fontFamily: fonts.bodyBold, fontSize: 9, textTransform: "uppercase", letterSpacing: 1 },
-  nextTitle: { color: "#fff", fontFamily: fonts.display, fontSize: 16, marginTop: 3 },
-  nextMeta: { color: colors.goldSoft, fontFamily: fonts.mono, fontSize: 11, marginTop: 2 },
+  nextLabel: { color: colors.gold, fontFamily: fonts.bodyBold, fontSize: 9, textTransform: "uppercase", letterSpacing: 1 },
+  nextTitle: { color: colors.paper, fontFamily: fonts.display, fontSize: 16, marginTop: 3 },
+  nextMeta: { color: colors.gold, fontFamily: fonts.mono, fontSize: 11, marginTop: 2 },
   doneCard: { backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, padding: 14, alignItems: "center" },
   doneText: { color: colors.inkSoft, fontSize: 13, fontStyle: "italic" },
 
@@ -619,7 +622,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, marginTop: 6, overflow: "hidden",
   },
   itemTimeCol: { width: 56, backgroundColor: colors.ink, alignItems: "center", justifyContent: "center" },
-  itemTimeText: { fontFamily: fonts.mono, color: "#fff", fontSize: 11 },
+  itemTimeText: { fontFamily: fonts.mono, color: colors.paper, fontSize: 11 },
   itemIconCol: { width: 56, backgroundColor: colors.ink, alignItems: "center", justifyContent: "center" },
   itemBody: { flex: 1, padding: 10 },
   itemCat: { color: colors.blue, fontFamily: fonts.bodyBold, fontSize: 9, letterSpacing: 0.5 },

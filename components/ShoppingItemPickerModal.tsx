@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { View, Text, TextInput, Pressable, StyleSheet, ScrollView, Modal, ActivityIndicator } from "react-native";
 import { Alert } from "@/lib/alert";
 import { supabase } from "@/lib/supabase";
-import { colors, radius } from "@/lib/theme";
+import { radius, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 
 interface PickableShoppingItem {
   id: string;
@@ -21,6 +22,8 @@ export default function ShoppingItemPickerModal({
   const [allItems, setAllItems] = useState<PickableShoppingItem[]>([]);
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   useEffect(() => {
     if (!visible || !tripId) return;
@@ -86,7 +89,7 @@ export default function ShoppingItemPickerModal({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: "rgba(33,47,61,0.5)", justifyContent: "flex-end" },
   sheet: {
     backgroundColor: colors.paper, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: "80%",

@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import { View, Text, Pressable, Platform, TextInput } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { colors, radius } from "@/lib/theme";
+import { radius, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import { formatDateDDMMYYYY, localIsoDate } from "@/lib/dateFormat";
 import { normalizeTimeHHMM } from "@/lib/timeFormat";
 
-function webStyle(extra = {}) {
+function webStyle(colors: ColorTokens, extra = {}) {
   return {
     backgroundColor: colors.paperRaised, border: `1px solid ${colors.line}`,
     borderRadius: radius.md, padding: 12, fontSize: 15, color: colors.ink,
@@ -13,18 +14,21 @@ function webStyle(extra = {}) {
   };
 }
 
-const labelStyle = {
+const makeLabelStyle = (colors: ColorTokens) => ({
   color: colors.inkSoft, fontSize: 12, fontWeight: "600" as const,
   marginTop: 16, marginBottom: 6, textTransform: "uppercase" as const, letterSpacing: 0.5,
-};
-const inputStyle = {
+});
+const makeInputStyle = (colors: ColorTokens) => ({
   backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,
   borderRadius: radius.md, padding: 12, fontSize: 15, color: colors.ink,
-};
+});
 
 export function DateField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   const [show, setShow] = useState(false);
   const [focused, setFocused] = useState(false);
+  const colors = useThemeColors();
+  const labelStyle = makeLabelStyle(colors);
+  const inputStyle = makeInputStyle(colors);
   if (Platform.OS === "web") {
     // The native <input type="date"> stays fully functional (including its
     // calendar picker) at all times — the HTML `lang` attribute turned out
@@ -46,7 +50,7 @@ export function DateField({ label, value, onChange }: { label: string; value: st
             onChange={(e: any) => onChange(e.target.value)}
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
-            style={webStyle({ color: focused ? colors.ink : "transparent" })}
+            style={webStyle(colors, { color: focused ? colors.ink : "transparent" })}
           />
           {!focused && (
             <View style={webOverlayStyle}>
@@ -89,6 +93,9 @@ const webOverlayStyle = {
 export function TimeField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   const [show, setShow] = useState(false);
   const displayValue = normalizeTimeHHMM(value);
+  const colors = useThemeColors();
+  const labelStyle = makeLabelStyle(colors);
+  const inputStyle = makeInputStyle(colors);
   if (Platform.OS === "web") {
     // Not a native <input type="time"> — that hid its own text behind a
     // transparent-color + overlay trick to force 24-hour "HH:MM", but
@@ -129,6 +136,10 @@ function WebTimeSegments({ label, value, onChange }: { label: string; value: str
   const [hh, setHh] = useState(() => value.split(":")[0] ?? "");
   const [mm, setMm] = useState(() => value.split(":")[1] ?? "");
   const mmRef = useRef<TextInput>(null);
+  const colors = useThemeColors();
+  const labelStyle = makeLabelStyle(colors);
+  const timeSegmentBoxStyle = makeTimeSegmentBoxStyle(colors);
+  const timeSegmentInputStyle = makeTimeSegmentInputStyle(colors);
 
   // Resync if the value changes from outside (e.g. switching to a different item).
   useEffect(() => {
@@ -198,11 +209,11 @@ function WebTimeSegments({ label, value, onChange }: { label: string; value: str
   );
 }
 
-const timeSegmentBoxStyle = {
+const makeTimeSegmentBoxStyle = (colors: ColorTokens) => ({
   flexDirection: "row" as const, alignItems: "center" as const, gap: 4,
   backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,
   borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 10,
-};
-const timeSegmentInputStyle = {
+});
+const makeTimeSegmentInputStyle = (colors: ColorTokens) => ({
   width: 24, fontSize: 15, color: colors.ink, textAlign: "center" as const, padding: 0,
-};
+});

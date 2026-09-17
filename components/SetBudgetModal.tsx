@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { View, Text, Pressable, Modal, StyleSheet } from "react-native";
-import { colors, radius } from "@/lib/theme";
+import { radius, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import NumberStepper from "@/components/NumberStepper";
 
 /** Small popup to set (or change) a trip's budget on the spot — opened
@@ -15,6 +16,8 @@ export default function SetBudgetModal({
   initialAmount: number | null;
 }) {
   const [amount, setAmount] = useState(initialAmount != null ? String(initialAmount) : "");
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   useEffect(() => {
     if (visible) setAmount(initialAmount != null ? String(initialAmount) : "");
@@ -42,7 +45,7 @@ export default function SetBudgetModal({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: "rgba(11,30,63,0.4)", justifyContent: "center", padding: 24 },
   card: { backgroundColor: colors.paperRaised, borderRadius: radius.lg, padding: 20, width: "100%", maxWidth: 420, alignSelf: "center" },
   title: { color: colors.ink, fontWeight: "700", fontSize: 17, marginBottom: 4 },

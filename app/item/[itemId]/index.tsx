@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { View, Text, ScrollView, StyleSheet, Linking, Pressable, Image, ActivityIndicator, Modal } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Alert } from "@/lib/alert";
@@ -8,7 +8,8 @@ import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import { supabase } from "@/lib/supabase";
 import Icon from "@/components/icons/Icon";
-import { colors, radius, fonts } from "@/lib/theme";
+import { radius, fonts, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import { Item, ItemPhoto, Expense, TripCurrency, TripParty, Keeper } from "@/lib/types";
 import { fetchKeeperById } from "@/lib/keepers";
 import { uploadItemPhoto, uploadItemDocument, fetchItemPhotosWithUrls, deleteItemPhoto, isImageAttachment } from "@/lib/photos";
@@ -103,6 +104,8 @@ export default function ItemDetails() {
   const { job: latestResearchJob, reload: reloadResearchJob } = useLatestItemResearchJob(itemId);
   const researchInProgress = latestResearchJob?.status === "queued" || latestResearchJob?.status === "researching";
   const readyResearchJob = latestResearchJob?.status === "ready" ? latestResearchJob : null;
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const { data, error: itemError, dataUpdatedAt, refetch } = useQuery({
     queryKey: ["itemDetail", itemId],
@@ -646,7 +649,7 @@ export default function ItemDetails() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper, padding: 20 },
   ratingsSection: { marginTop: 4, marginBottom: 12 },
   ratingLine: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 },

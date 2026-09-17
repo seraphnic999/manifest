@@ -1,5 +1,7 @@
+import { useMemo } from "react";
 import { View, Text, Pressable, StyleSheet, ActivityIndicator } from "react-native";
-import { colors, radius } from "@/lib/theme";
+import { radius, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import Icon from "@/components/icons/Icon";
 import { FlightStatusRow } from "@/lib/flightStatus";
 
@@ -21,6 +23,8 @@ interface Props {
  * flight_status row so a refresh from either place shows up on both. */
 export default function FlightStatusCard({ row, loading, onRefresh, onOpenLog, compact }: Props) {
   const status = row?.data;
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   return (
     <View style={[styles.card, compact && styles.cardCompact]}>
@@ -71,7 +75,7 @@ export default function FlightStatusCard({ row, loading, onRefresh, onOpenLog, c
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   card: {
     backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,
     borderRadius: radius.md, padding: 12, marginTop: 12,

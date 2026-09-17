@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import * as Notifications from "expo-notifications";
+import { StatusBar } from "expo-status-bar";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { Session } from "@supabase/supabase-js";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -13,7 +14,8 @@ import { JetBrainsMono_600SemiBold, JetBrainsMono_700Bold } from "@expo-google-f
 import { supabase } from "@/lib/supabase";
 import { claimPendingTripShares } from "@/lib/tripSharing";
 import { registerPushToken } from "@/lib/reminders";
-import { colors } from "@/lib/theme";
+import { ThemeProvider, useTheme } from "@/lib/ThemeContext";
+import { ColorTokens } from "@/lib/theme";
 import { queryClient, QUERY_CACHE_SCHEMA_VERSION } from "@/lib/queryClient";
 import ErrorBoundary from "@/components/ErrorBoundary";
 
@@ -52,6 +54,15 @@ if (Platform.OS !== "web") {
 }
 
 export default function RootLayout() {
+  return (
+    <ThemeProvider>
+      <AppShell />
+    </ThemeProvider>
+  );
+}
+
+function AppShell() {
+  const { mode, colors } = useTheme();
   const [session, setSession] = useState<Session | null | undefined>(undefined);
   const router = useRouter();
   const segments = useSegments();
@@ -102,6 +113,8 @@ export default function RootLayout() {
     }
   }, [session, segments]);
 
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   // Deliberately NOT gating the return on fontsLoaded here: the Stack below
   // is expo-router's root navigator, and the auth redirect effect above can
   // call router.replace() before this component's first render finishes —
@@ -120,6 +133,10 @@ export default function RootLayout() {
         buster: QUERY_CACHE_SCHEMA_VERSION,
       }}
     >
+      {/* Default status bar style for every screen; trip Overview's photo
+          hero overrides this locally to "light" regardless of theme, since
+          it needs light icons against a photo, not the page background. */}
+      <StatusBar style={mode === "dark" ? "light" : "dark"} />
       <GestureHandlerRootView style={styles.outer}>
         <View style={styles.inner}>
           <ErrorBoundary>
@@ -152,7 +169,7 @@ export default function RootLayout() {
 // this app's design is mobile-first, so on web we constrain it to a
 // phone-like column with neutral space on either side. Native (Android)
 // ignores this entirely (maxWidth: undefined there).
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   outer: {
     flex: 1,
     ...(Platform.OS === "web" ? { alignItems: "center" as const, backgroundColor: "#DDD6C6" } : {}),

@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { View, Text, Pressable, StyleSheet, ScrollView } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { Alert } from "@/lib/alert";
 import { supabase } from "@/lib/supabase";
-import { colors, radius, fonts } from "@/lib/theme";
+import { radius, fonts, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import { PackingTemplateItem } from "@/lib/types";
 import {
   PACKING_CATEGORIES,
@@ -37,6 +38,8 @@ export default function PackingTemplateEditor() {
   const [renameOpen, setRenameOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [itemModalItem, setItemModalItem] = useState<PackingTemplateItem | "new" | null>(null);
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const { data, refetch } = useQuery({ queryKey: ["packingTemplate", templateId], queryFn: () => fetchTemplate(templateId) });
   const name = data?.name ?? "";
@@ -130,7 +133,7 @@ export default function PackingTemplateEditor() {
       </ScrollView>
 
       <Pressable style={styles.fab} onPress={() => setItemModalItem("new")}>
-        <Icon name="add" size={24} color="#fff" />
+        <Icon name="add" size={24} color={colors.paper} />
       </Pressable>
 
       <TemplateNameModal
@@ -154,7 +157,7 @@ export default function PackingTemplateEditor() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   header: {
     flexDirection: "row", alignItems: "center", gap: 12,

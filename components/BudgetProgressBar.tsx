@@ -1,9 +1,13 @@
+import { useMemo } from "react";
 import { View, Text, StyleSheet } from "react-native";
-import { colors, radius } from "@/lib/theme";
+import { radius, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import { BudgetProgress } from "@/lib/budget";
 
 export default function BudgetProgressBar({ progress }: { progress: BudgetProgress }) {
   const barPct = Math.min(progress.percent, 100);
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={styles.wrap}>
       <View style={styles.headerRow}>
@@ -26,7 +30,7 @@ export default function BudgetProgressBar({ progress }: { progress: BudgetProgre
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   wrap: {
     backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,
     borderRadius: radius.md, padding: 14, marginBottom: 14,

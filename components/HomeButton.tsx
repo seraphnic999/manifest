@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { colors } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import Icon from "@/components/icons/Icon";
 import HeaderIconButton from "./HeaderIconButton";
 
@@ -9,6 +9,7 @@ import HeaderIconButton from "./HeaderIconButton";
 // so this can never silently no-op.
 export default function HomeButton() {
   const router = useRouter();
+  const colors = useThemeColors();
   function goHome() {
     if (router.canDismiss()) {
       router.dismissAll();

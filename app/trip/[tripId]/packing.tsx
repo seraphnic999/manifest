@@ -1,9 +1,10 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { View, Text, TextInput, Pressable, StyleSheet, ScrollView, Modal } from "react-native";
 import { useLocalSearchParams, Stack, useFocusEffect, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { colors, radius, fonts } from "@/lib/theme";
+import { radius, fonts, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import { PackingItem } from "@/lib/types";
 import { PACKING_CATEGORIES, mergePackingItems, fetchTemplateItems, fetchTripPackingAsSource } from "@/lib/packing";
 import TripScreenHeader from "@/components/TripScreenHeader";
@@ -109,6 +110,9 @@ export default function PackingScreen() {
   }
   const packedCount = items.filter((i) => i.packed).length;
 
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -146,7 +150,7 @@ export default function PackingScreen() {
       </ScrollView>
 
       <Pressable style={styles.fab} onPress={() => { if (requireOnline()) setAddItemOpen(true); }}>
-        <Icon name="add" size={24} color="#fff" />
+        <Icon name="add" size={24} color={colors.paper} />
       </Pressable>
 
       <Modal visible={addItemOpen} transparent animationType="fade" onRequestClose={() => setAddItemOpen(false)}>
@@ -228,7 +232,7 @@ export default function PackingScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   summaryRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 14 },
   summaryText: { color: colors.ink, fontWeight: "700", fontSize: 14 },

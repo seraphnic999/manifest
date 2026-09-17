@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { View, Text, FlatList, StyleSheet, Pressable } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import SubpageHeader from "@/components/SubpageHeader";
 import Icon from "@/components/icons/Icon";
-import { colors, radius, fonts } from "@/lib/theme";
+import { radius, fonts, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import { ItemResearchJob, ItemResearchStatus, EmailProposalStatus } from "@/lib/types";
 import { deleteResearchJob, retryResearchJob } from "@/lib/itemResearch";
 import { deleteEmailProposal } from "@/lib/emailProposals";
@@ -18,20 +19,24 @@ const RESEARCH_STATUS_LABEL: Record<ItemResearchStatus, string> = {
 const EMAIL_STATUS_LABEL: Record<EmailProposalStatus, string> = {
   pending: "Ready to review", failed: "Failed", applied: "Applied", rejected: "Discarded",
 };
-const STATUS_COLOR: Record<string, string> = {
+const STATUS_COLOR = (colors: ColorTokens): Record<string, string> => ({
   "Ready to review": colors.gold, "Researching…": colors.lightBlue, "Queued": colors.inkSoft,
   "Failed": colors.coral, "Applied": colors.blue, "Discarded": colors.inkSoft,
-};
+});
 
 // A tag on every row rather than two separately-titled sections — the whole
 // point of merging these two queues is that they're prioritized together
 // (see lib/reviewQueue.ts's groupOf), so splitting them back into sections
 // here would just recreate the two-screens problem inside one screen.
 const KIND_LABEL: Record<ReviewQueueRow["kind"], string> = { research: "Research", email: "Email" };
-const KIND_COLOR: Record<ReviewQueueRow["kind"], string> = { research: colors.blue, email: colors.lightBlue };
+const KIND_COLOR = (colors: ColorTokens): Record<ReviewQueueRow["kind"], string> => ({ research: colors.blue, email: colors.lightBlue });
 
 export default function ReviewQueue() {
   const router = useRouter();
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const statusColor = useMemo(() => STATUS_COLOR(colors), [colors]);
+  const kindColor = useMemo(() => KIND_COLOR(colors), [colors]);
   const { rows, reload } = useReviewQueue();
   const [openJob, setOpenJob] = useState<Extract<ReviewQueueRow, { kind: "research" }>["job"] | null>(null);
   const [openProposal, setOpenProposal] = useState<Extract<ReviewQueueRow, { kind: "email" }>["proposal"] | null>(null);
@@ -70,14 +75,14 @@ export default function ReviewQueue() {
             <Pressable style={styles.row} onPress={() => openRow(row)}>
               <View style={{ flex: 1 }}>
                 <View style={styles.titleRow}>
-                  <View style={[styles.kindTag, { backgroundColor: KIND_COLOR[row.kind] + "22" }]}>
-                    <Text style={[styles.kindTagText, { color: KIND_COLOR[row.kind] }]}>{KIND_LABEL[row.kind]}</Text>
+                  <View style={[styles.kindTag, { backgroundColor: kindColor[row.kind] + "22" }]}>
+                    <Text style={[styles.kindTagText, { color: kindColor[row.kind] }]}>{KIND_LABEL[row.kind]}</Text>
                   </View>
                   <Text style={styles.rowTitle} numberOfLines={1}>{title}</Text>
                 </View>
                 {!!sub && <Text style={styles.rowSub} numberOfLines={1}>{sub}</Text>}
               </View>
-              <Text style={[styles.statusText, { color: STATUS_COLOR[statusLabel] }]}>{statusLabel}</Text>
+              <Text style={[styles.statusText, { color: statusColor[statusLabel] }]}>{statusLabel}</Text>
               {showRetry && (
                 <Pressable onPress={() => retryResearchJob((row as any).job.id).then(reload)} hitSlop={8} style={{ marginLeft: 10 }}>
                   <Icon name="refresh" size={18} color={colors.blue} />
@@ -124,7 +129,7 @@ export default function ReviewQueue() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   row: {
     flexDirection: "row", alignItems: "center",

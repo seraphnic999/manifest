@@ -1,9 +1,10 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { View, Text, TextInput, Pressable, StyleSheet } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { Alert } from "@/lib/alert";
 import Icon from "@/components/icons/Icon";
-import { colors, radius } from "@/lib/theme";
+import { radius, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import { fetchQuickNotes, addQuickNote, updateQuickNoteText, deleteQuickNote, QuickNote } from "@/lib/itemQuickNotes";
 
 /**
@@ -15,6 +16,8 @@ import { fetchQuickNotes, addQuickNote, updateQuickNoteText, deleteQuickNote, Qu
 export default function QuickNotesList({ itemId }: { itemId: string }) {
   const [notes, setNotes] = useState<QuickNote[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   // Re-fetch on every focus, not just on mount — otherwise a note added on
   // the edit screen doesn't show up back on the details screen until that
@@ -87,7 +90,7 @@ export default function QuickNotesList({ itemId }: { itemId: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   sectionLabel: {
     color: colors.inkSoft, fontWeight: "700", fontSize: 12,
     textTransform: "uppercase", letterSpacing: 1, marginTop: 20, marginBottom: 4,

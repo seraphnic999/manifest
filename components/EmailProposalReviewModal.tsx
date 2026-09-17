@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { View, Text, Pressable, StyleSheet, Modal, TextInput, ScrollView } from "react-native";
-import { colors, radius, fonts } from "@/lib/theme";
+import { radius, fonts, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import Icon from "@/components/icons/Icon";
 import { Alert } from "@/lib/alert";
 import { FieldConfidence, ProposedField, Trip, Item } from "@/lib/types";
@@ -14,19 +15,21 @@ import ItemTypePickerModal from "@/components/ItemTypePickerModal";
 import { formatDateDDMMYYYY } from "@/lib/dateFormat";
 import { supabase } from "@/lib/supabase";
 
-const CONFIDENCE: Record<FieldConfidence, { label: string; color: string; background: string }> = {
+const CONFIDENCE = (colors: ColorTokens): Record<FieldConfidence, { label: string; color: string; background: string }> => ({
   high: { label: "Found", color: colors.blue, background: colors.blueSoft },
   medium: { label: "Likely", color: colors.lightBlue, background: colors.lightBlueSoft },
   low: { label: "Guessed", color: colors.gold, background: colors.goldSoft },
   none: { label: "Blank", color: colors.inkSoft, background: colors.line },
-};
+});
 
 function Field({
   label, meta, value, onChange, placeholder, multiline,
 }: {
   label: string; meta?: ProposedField<any>; value: string; onChange: (v: string) => void; placeholder?: string; multiline?: boolean;
 }) {
-  const c = meta ? CONFIDENCE[meta.confidence] : null;
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const c = meta ? CONFIDENCE(colors)[meta.confidence] : null;
   return (
     <View style={styles.field}>
       <View style={styles.fieldHead}>
@@ -66,6 +69,8 @@ export default function EmailProposalReviewModal({ visible, onClose, proposal, o
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
   const [suggestedItem, setSuggestedItem] = useState<Pick<Item, "id" | "title"> | null>(null);
   const [applyMode, setApplyMode] = useState<"create" | "update">("create");
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   useEffect(() => {
     if (!visible) return;
@@ -250,7 +255,7 @@ export default function EmailProposalReviewModal({ visible, onClose, proposal, o
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.paper },
   header: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10,

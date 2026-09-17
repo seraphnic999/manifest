@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { View, Text, Pressable, StyleSheet, Modal, TextInput, ScrollView, Image, ActivityIndicator } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import { colors, radius, fonts } from "@/lib/theme";
+import { radius, fonts, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import Icon from "@/components/icons/Icon";
 import { Alert } from "@/lib/alert";
 import { Companion, DocumentType, Relationship } from "@/lib/types";
@@ -16,9 +17,12 @@ import {
 import { DateField } from "@/components/DateTimeFields";
 
 type Confidence = "high" | "medium" | "low" | "none";
-const CONFIDENCE_COLOR: Record<Confidence, string> = {
-  high: "#3E8E5A", medium: colors.gold, low: colors.coral, none: colors.inkSoft,
-};
+function confidenceColor(colors: ColorTokens, conf: Confidence): string {
+  const CONFIDENCE_COLOR: Record<Confidence, string> = {
+    high: "#3E8E5A", medium: colors.gold, low: colors.coral, none: colors.inkSoft,
+  };
+  return CONFIDENCE_COLOR[conf];
+}
 
 interface Props {
   visible: boolean;
@@ -62,6 +66,8 @@ export default function ScanDocumentModal({ visible, source, onClose, onDone }: 
   const [newRelationship, setNewRelationship] = useState<Relationship>("other");
 
   const ranRef = useRef(false);
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   useEffect(() => {
     if (!visible) { ranRef.current = false; return; }
@@ -236,7 +242,7 @@ export default function ScanDocumentModal({ visible, source, onClose, onDone }: 
                     {scanFields.map((f) => {
                       const conf = scanResult[f.confKey] as Confidence;
                       return (
-                        <Text key={f.key} style={[styles.confidenceTag, { color: CONFIDENCE_COLOR[conf] }]}>
+                        <Text key={f.key} style={[styles.confidenceTag, { color: confidenceColor(colors, conf) }]}>
                           {f.label}: {conf}
                         </Text>
                       );
@@ -311,7 +317,7 @@ export default function ScanDocumentModal({ visible, source, onClose, onDone }: 
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.paper },
   header: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",

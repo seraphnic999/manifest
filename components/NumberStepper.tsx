@@ -1,5 +1,7 @@
+import { useMemo } from "react";
 import { View, Text, TextInput, Pressable, StyleSheet } from "react-native";
-import { colors, radius } from "@/lib/theme";
+import { radius, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 
 /** A numeric text field with +/- buttons that bump the value by `step`
  * (default 100) — used anywhere a budget amount is entered, since typing
@@ -16,6 +18,9 @@ export default function NumberStepper({
   min?: number;
   placeholder?: string;
 }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   function bump(delta: number) {
     const current = parseFloat(value) || 0;
     const next = Math.max(min, Math.round((current + delta) * 100) / 100);
@@ -42,7 +47,7 @@ export default function NumberStepper({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", gap: 8 },
   btn: {
     width: 40, height: 40, borderRadius: radius.md, backgroundColor: colors.blueSoft,

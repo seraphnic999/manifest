@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { View, Text, Pressable, StyleSheet, ScrollView, Image } from "react-native";
 import { Stack, useLocalSearchParams, useFocusEffect, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
@@ -6,7 +6,8 @@ import * as Clipboard from "expo-clipboard";
 import SubpageHeader from "@/components/SubpageHeader";
 import Icon from "@/components/icons/Icon";
 import Checkbox from "@/components/Checkbox";
-import { colors, radius, fonts } from "@/lib/theme";
+import { radius, fonts, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import { Alert } from "@/lib/alert";
 import { formatDateDDMMYYYY } from "@/lib/dateFormat";
 import { TravelDocument } from "@/lib/types";
@@ -35,6 +36,8 @@ async function fetchDetail(companionId: string) {
 }
 
 function CopyRow({ label, value }: { label: string; value: string | null }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   if (!value) return null;
   async function copy() {
     await Clipboard.setStringAsync(value!);
@@ -66,6 +69,8 @@ export default function CompanionDetail() {
   const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set());
   const [infoSelected, setInfoSelected] = useState(false);
   const [lightbox, setLightbox] = useState<{ urls: string[]; index: number } | null>(null);
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
 
@@ -249,7 +254,7 @@ export default function CompanionDetail() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   headerAction: { color: colors.blue, fontFamily: fonts.bodySemi, fontSize: 14 },
   headerActionMuted: { color: colors.inkSoft, fontFamily: fonts.bodySemi, fontSize: 14 },

@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { View, Text, Pressable, StyleSheet, Modal, ScrollView, Image } from "react-native";
-import { colors, radius, fonts } from "@/lib/theme";
+import { radius, fonts, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import Icon from "@/components/icons/Icon";
 import Checkbox from "@/components/Checkbox";
 import { Companion } from "@/lib/types";
@@ -18,6 +19,8 @@ interface Props {
 export default function CompanionPickerModal({ visible, onClose, selectedIds, onChange }: Props) {
   const [companions, setCompanions] = useState<(Companion & { url: string | null })[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set(selectedIds));
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   useEffect(() => {
     if (!visible) return;
@@ -85,7 +88,7 @@ export default function CompanionPickerModal({ visible, onClose, selectedIds, on
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.paper },
   header: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",

@@ -4,7 +4,8 @@ import { useLocalSearchParams, useRouter, Stack, useFocusEffect } from "expo-rou
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import Icon from "@/components/icons/Icon";
-import { colors, radius } from "@/lib/theme";
+import { radius, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import { Day, Item, ItemType, MapRoute, TripType } from "@/lib/types";
 import { ITEM_CATEGORIES, categoryByKey } from "@/lib/itemTypeMeta";
 import {
@@ -58,6 +59,8 @@ export default function TripMapScreen() {
   const { tripId, focusItemId } = useLocalSearchParams<{ tripId: string; focusItemId?: string }>();
   const router = useRouter();
   const isOnline = useNetworkStatus();
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const [visibleDayIds, setVisibleDayIds] = useState<Set<string>>(new Set());
   const [visibleTypes, setVisibleTypes] = useState<Set<ItemType>>(DEFAULT_VISIBLE_TYPES);
@@ -237,7 +240,7 @@ export default function TripMapScreen() {
           setPickerOpen(true);
         }}
       >
-        <Icon name="add" size={24} color="#fff" />
+        <Icon name="add" size={24} color={colors.paper} />
       </Pressable>
 
       <ItemTypePickerModal visible={pickerOpen} onClose={() => setPickerOpen(false)} onSelect={handleSelectCategory} />
@@ -246,7 +249,7 @@ export default function TripMapScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   filterRowOuter: {
     maxHeight: 48, backgroundColor: colors.paperRaised, borderBottomWidth: 1, borderBottomColor: colors.line,

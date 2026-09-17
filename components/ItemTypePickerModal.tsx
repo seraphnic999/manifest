@@ -1,5 +1,7 @@
+import { useMemo } from "react";
 import { View, Text, Pressable, Modal, StyleSheet, ScrollView } from "react-native";
-import { colors, radius } from "@/lib/theme";
+import { radius, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import { ITEM_CATEGORIES, ItemCategory } from "@/lib/itemTypeMeta";
 import Icon from "@/components/icons/Icon";
 
@@ -26,6 +28,8 @@ export default function ItemTypePickerModal({
   categories?: ItemCategory[];
   title?: string;
 }) {
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
@@ -69,7 +73,7 @@ export default function ItemTypePickerModal({
 
 const TILE_SIZE = "31%";
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: "rgba(33,47,61,0.5)", justifyContent: "flex-end" },
   sheet: {
     backgroundColor: colors.ink, borderTopLeftRadius: 24, borderTopRightRadius: 24,

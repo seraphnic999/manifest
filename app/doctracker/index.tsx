@@ -1,10 +1,11 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { View, Text, FlatList, StyleSheet, Pressable, Image } from "react-native";
 import { Stack, useRouter, useFocusEffect } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import SubpageHeader from "@/components/SubpageHeader";
 import Icon from "@/components/icons/Icon";
-import { colors, radius, fonts } from "@/lib/theme";
+import { radius, fonts, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import { Companion } from "@/lib/types";
 import {
   fetchCompanions, ensureSelfCompanion, relationshipGroup, relationshipLabel, companionFullName, CompanionGroup,
@@ -50,6 +51,8 @@ async function fetchSections(): Promise<Section[]> {
 function CompanionRow({ companion }: { companion: Companion }) {
   const router = useRouter();
   const [url, setUrl] = useState<string | null>(null);
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   useEffect(() => { fetchCompanionProfileUrl(companion.profile_photo_path).then(setUrl); }, [companion.profile_photo_path]);
   return (
     <Pressable style={styles.row} onPress={() => router.push(`/doctracker/${companion.id}`)}>
@@ -73,6 +76,8 @@ export default function DocTracker() {
   const sections = data ?? [];
   const [addOptionsOpen, setAddOptionsOpen] = useState(false);
   const [scanModal, setScanModal] = useState<{ source: "camera" | "gallery" } | null>(null);
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
 
@@ -106,7 +111,7 @@ export default function DocTracker() {
         )}
       />
       <Pressable style={styles.fab} onPress={() => setAddOptionsOpen(true)}>
-        <Icon name="add" size={24} color="#fff" />
+        <Icon name="add" size={24} color={colors.paper} />
       </Pressable>
 
       <DocTrackerAddOptionsModal
@@ -126,7 +131,7 @@ export default function DocTracker() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
   sectionLabel: {
     color: colors.inkSoft, fontFamily: fonts.bodyBold, fontSize: 11.5, textTransform: "uppercase",

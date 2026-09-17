@@ -1,8 +1,9 @@
-import { ReactNode } from "react";
+import { ReactNode, useMemo } from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { colors, fonts } from "@/lib/theme";
+import { fonts, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import Icon from "@/components/icons/Icon";
 import HamburgerMenu, { HamburgerMenuItem } from "@/components/HamburgerMenu";
 
@@ -22,6 +23,8 @@ export default function TripScreenHeader({
 }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={[styles.row, { paddingTop: insets.top + 10 }]}>
       {left ?? (
@@ -48,7 +51,7 @@ export default function TripScreenHeader({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   row: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",
     paddingHorizontal: 16, paddingBottom: 10,

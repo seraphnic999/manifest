@@ -16,7 +16,14 @@ interface State {
  * error, which each screen already handles on its own) unmounts the whole
  * RN tree and the app just disappears — no way for a user to tell us what
  * broke. This shows the actual error + component stack instead, so a
- * "silent crash" report can turn into an actionable one. */
+ * "silent crash" report can turn into an actionable one.
+ *
+ * Deliberately NOT wired to dark mode: a React error boundary must be a
+ * class component (no hooks), and this is the one screen that needs to
+ * render correctly even if the crash it's catching somehow originated
+ * inside ThemeProvider's own subtree — a fixed light appearance here is a
+ * reasonable trade for that robustness on a screen nobody sees in normal
+ * operation. */
 export default class ErrorBoundary extends Component<Props, State> {
   state: State = { error: null };
 

@@ -1,6 +1,8 @@
+import { useMemo } from "react";
 import { ScrollView, View, Text, StyleSheet, useWindowDimensions } from "react-native";
 import { useQuery } from "@tanstack/react-query";
-import { colors, radius, fonts } from "@/lib/theme";
+import { radius, fonts, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import Icon from "@/components/icons/Icon";
 import { fetchTripForecasts, weatherIconName } from "@/lib/weather";
 import { formatDateDDMM } from "@/lib/dateFormat";
@@ -16,6 +18,8 @@ const SCREEN_PADDING = 16;
 export default function WeatherCarousel({ tripId, destinations }: { tripId: string; destinations: string[] }) {
   const { width } = useWindowDimensions();
   const cardWidth = Math.min(width - SCREEN_PADDING * 2, 420);
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const { data } = useQuery({
     queryKey: ["weather", tripId, destinations.join("|")],
@@ -56,7 +60,7 @@ export default function WeatherCarousel({ tripId, destinations }: { tripId: stri
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   sectionLabel: {
     color: colors.inkSoft, fontFamily: fonts.bodyBold, fontSize: 11.5,
     textTransform: "uppercase", letterSpacing: 1, marginBottom: 6,

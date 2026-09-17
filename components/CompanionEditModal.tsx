@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { View, Text, Pressable, StyleSheet, Modal, TextInput, ScrollView, Image } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import { colors, radius, fonts } from "@/lib/theme";
+import { radius, fonts, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import Icon from "@/components/icons/Icon";
 import { Alert } from "@/lib/alert";
 import { Companion, CompanionPhoto, Relationship } from "@/lib/types";
@@ -32,6 +33,8 @@ export default function CompanionEditModal({ visible, onClose, companion, onSave
   const [photos, setPhotos] = useState<(CompanionPhoto & { url: string })[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [photoSourceFor, setPhotoSourceFor] = useState<"profile" | "additional" | null>(null);
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   useEffect(() => {
     if (!visible) return;
@@ -256,7 +259,7 @@ export default function CompanionEditModal({ visible, onClose, companion, onSave
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.paper },
   header: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",

@@ -6,7 +6,8 @@
 import { useMemo } from "react";
 import { View, Text, StyleSheet, useWindowDimensions } from "react-native";
 import Svg, { Path, Circle } from "react-native-svg";
-import { colors, radius } from "@/lib/theme";
+import { radius, ColorTokens } from "@/lib/theme";
+import { useThemeColors } from "@/lib/ThemeContext";
 import { CityPin } from "@/lib/travelStats";
 import { WORLD_MAP_PATH, WORLD_MAP_VIEW_WIDTH, WORLD_MAP_VIEW_HEIGHT, lonLatToXY } from "@/lib/worldMapPath";
 
@@ -14,6 +15,8 @@ export default function WorldMapPins({ pins }: { pins: CityPin[] }) {
   const { width } = useWindowDimensions();
   const mapWidth = width - 40; // mirrors the page's 20px side padding
   const mapHeight = mapWidth * (WORLD_MAP_VIEW_HEIGHT / WORLD_MAP_VIEW_WIDTH);
+  const colors = useThemeColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   // One legend entry per year actually represented among the pins, newest first.
   const years = useMemo(() => {
@@ -45,7 +48,7 @@ export default function WorldMapPins({ pins }: { pins: CityPin[] }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   card: {
     backgroundColor: colors.paperRaised, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line,
     padding: 12, marginBottom: 16, alignItems: "center",
