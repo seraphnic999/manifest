@@ -4,9 +4,11 @@
 -- flight_status (migration_040) holds only the latest known status per
 -- flight item — each poll overwrites it. This table is the append-only
 -- history alongside it: poll-flight-status inserts one row here every time
--- it detects a real status change within a flight's tracking window (the
--- same moment it fires a push notification — one log row per notification,
--- never one per poll). Rows are never updated or deleted by the app, so a
+-- it detects a real status change within a flight's tracking window, plus
+-- one "now tracking" row for the very first status it ever successfully
+-- observes for that flight (previous_status null) — the same moment it
+-- fires a push notification either way, one log row per notification,
+-- never one per poll. Rows are never updated or deleted by the app, so a
 -- flight's log is a permanent record of "what actually happened" even
 -- after flight_status itself is long past its terminal status.
 --
@@ -22,7 +24,7 @@ create table flight_status_log (
   trip_id uuid not null references trips(id) on delete cascade,
   flight_number text not null,
   status text,                          -- the new status as of this event
-  previous_status text,                 -- what it changed from
+  previous_status text,                 -- what it changed from; null on the first-ever "now tracking" event
   data jsonb not null default '{}',     -- full FlightStatus snapshot at this event (same shape as flight_status.data)
   created_at timestamptz not null default now()
 );

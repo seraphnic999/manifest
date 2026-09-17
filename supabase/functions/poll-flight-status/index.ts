@@ -121,13 +121,13 @@ function hasLikelyDeparted(existingStatus: string | null, departureUtc: DateTime
   return now >= departureUtc;
 }
 
-async function notifyStatusChange(supabase: Json, userId: string, itemId: string, itemTitle: string, flightNumber: string, status: string | null) {
+async function notifyStatusChange(supabase: Json, userId: string, itemId: string, itemTitle: string, flightNumber: string, status: string | null, isFirstEvent: boolean) {
   const { data: tokens } = await supabase.from("push_tokens").select("expo_push_token").eq("user_id", userId);
   if (!tokens?.length) return;
   const messages = tokens.map((t: Json) => ({
     to: t.expo_push_token,
-    title: `Flight ${flightNumber} update`,
-    body: `${status ?? "Status changed"} — ${itemTitle}`,
+    title: isFirstEvent ? `Now tracking flight ${flightNumber}` : `Flight ${flightNumber} update`,
+    body: `${status ?? "Status unknown"} — ${itemTitle}`,
     sound: "default",
     data: { route: `/item/${itemId}/flight-log` },
   }));
@@ -201,7 +201,13 @@ Deno.serve(async (req) => {
       const status = await lookupFlight(flightNumber, item.start_date);
       const isTerminal = status.status ? TERMINAL_STATUSES.has(status.status) : false;
       const prevStatus: string | null = existing?.status ?? null;
-      const changed = prevStatus !== null && status.status !== prevStatus;
+      // No previous status on record means this is the first time tracking
+      // has actually produced a result for this flight (normally the first
+      // check inside the 4h window, but also covers a flight whose earlier
+      // checks all failed) — worth its own "now tracking" notification/log
+      // entry, not just a silently-seeded baseline.
+      const isFirstEvent = prevStatus === null;
+      const changed = isFirstEvent || status.status !== prevStatus;
 
       const upsertRow = {
         item_id: item.id,
@@ -219,19 +225,20 @@ Deno.serve(async (req) => {
       if (isForced) forcedRow = saved ?? upsertRow;
 
       if (changed) {
-        // One log row per real change — deliberately the same condition
-        // that fires the push notification below, not one per poll. This
-        // is the permanent history the dedicated log page reads, separate
-        // from flight_status which only ever holds the latest snapshot.
+        // One log row per real change (plus the first-ever event) —
+        // deliberately the same condition that fires the push notification
+        // below, not one per poll. This is the permanent history the
+        // dedicated log page reads, separate from flight_status which only
+        // ever holds the latest snapshot.
         await supabase.from("flight_status_log").insert({
           item_id: item.id,
           trip_id: item.trip_id,
           flight_number: flightNumber,
           status: status.status,
-          previous_status: prevStatus,
+          previous_status: prevStatus, // null on the first event, by definition
           data: status,
         });
-        await notifyStatusChange(supabase, trip.user_id, item.id, item.title, flightNumber, status.status);
+        await notifyStatusChange(supabase, trip.user_id, item.id, item.title, flightNumber, status.status, isFirstEvent);
         notified++;
       }
     } catch (e) {

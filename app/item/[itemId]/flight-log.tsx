@@ -23,9 +23,9 @@ function LogEntryRow({ entry }: { entry: FlightStatusLogEntry }) {
         <Text style={styles.status}>{entry.status ?? "Unknown"}</Text>
         <Text style={styles.when}>{when}</Text>
       </View>
-      {entry.previous_status && (
-        <Text style={styles.changedFrom}>Changed from {entry.previous_status}</Text>
-      )}
+      <Text style={styles.changedFrom}>
+        {entry.previous_status ? `Changed from ${entry.previous_status}` : "Started tracking"}
+      </Text>
       {status && (
         <>
           <View style={styles.fieldRow}>
