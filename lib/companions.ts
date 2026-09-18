@@ -40,6 +40,41 @@ export function relationshipGroup(c: Pick<Companion, "relationship">): Companion
   return "others";
 }
 
+const GROUP_ORDER: Record<CompanionGroup, number> = { family: 0, friends: 1, others: 2 };
+
+// Family reads as a household roster, where age order (via birth date) is
+// the natural way to scan it; Friends/Others have no such shared context,
+// so alphabetical is the only order that's easy to scan for a specific name.
+function byBirthDate(a: Pick<Companion, "birth_date">, b: Pick<Companion, "birth_date">): number {
+  if (!a.birth_date && !b.birth_date) return 0;
+  if (!a.birth_date) return 1;
+  if (!b.birth_date) return -1;
+  return a.birth_date.localeCompare(b.birth_date);
+}
+function byFirstName(a: Pick<Companion, "first_name">, b: Pick<Companion, "first_name">): number {
+  return a.first_name.localeCompare(b.first_name);
+}
+
+/** The one canonical order companions display in anywhere they're listed
+ * together: the user themself first, then family (oldest first), then
+ * friends (alphabetical), then everyone else (alphabetical) — Doc Tracker's
+ * own sectioned list, the "Who is travelling" picker, and the Document
+ * Analysis screen's per-trip grouping all sort this same way. */
+export function sortCompanionsForDisplay<T extends Pick<Companion, "is_self" | "relationship" | "birth_date" | "first_name">>(
+  companions: T[]
+): T[] {
+  const self = companions.filter((c) => c.is_self);
+  const others = companions.filter((c) => !c.is_self);
+  return [
+    ...self,
+    ...others.slice().sort((a, b) => {
+      const groupDiff = GROUP_ORDER[relationshipGroup(a)] - GROUP_ORDER[relationshipGroup(b)];
+      if (groupDiff !== 0) return groupDiff;
+      return relationshipGroup(a) === "family" ? byBirthDate(a, b) : byFirstName(a, b);
+    }),
+  ];
+}
+
 export function companionFullName(c: Pick<Companion, "first_name" | "last_name">): string {
   return [c.first_name, c.last_name].filter(Boolean).join(" ");
 }

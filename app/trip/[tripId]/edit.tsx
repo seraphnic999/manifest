@@ -615,8 +615,8 @@ export default function EditTrip() {
         </Pressable>
       </Modal>
 
-      {/* --- Traveling with --- */}
-      <Text style={styles.label}>Traveling with</Text>
+      {/* --- Who is travelling --- */}
+      <Text style={styles.label}>Who is travelling</Text>
       <Pressable style={styles.addDestinationButton} onPress={() => setCompanionPickerOpen(true)}>
         <Text style={styles.addDestinationButtonText}>+ Add companions</Text>
       </Pressable>

@@ -27,7 +27,7 @@ export default function EntryRequirementBubble({ warnings }: { warnings: EntryRe
       <View style={{ flex: 1 }}>
         <Text style={styles.title}>Entry requirement warning</Text>
         <Text style={styles.detail} numberOfLines={1}>
-          {first.companion_name} — {first.country}: {first.requirement_description}
+          {first.companion_name} — {first.countries.join(", ")}: {first.requirement_description}
         </Text>
         {rest.length > 0 && <Text style={styles.more}>+{rest.length} additional warning{rest.length === 1 ? "" : "s"}</Text>}
       </View>

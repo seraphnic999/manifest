@@ -5,9 +5,7 @@ import { useThemeColors } from "@/lib/ThemeContext";
 import Icon from "@/components/icons/Icon";
 import Checkbox from "@/components/Checkbox";
 import { Companion } from "@/lib/types";
-import { fetchCompanions, companionFullName, relationshipLabel, relationshipGroup, fetchCompanionProfileUrl } from "@/lib/companions";
-
-const GROUP_ORDER = { family: 0, friends: 1, others: 2 } as const;
+import { fetchCompanions, companionFullName, relationshipLabel, sortCompanionsForDisplay, fetchCompanionProfileUrl } from "@/lib/companions";
 
 interface Props {
   visible: boolean;
@@ -26,13 +24,11 @@ export default function CompanionPickerModal({ visible, onClose, selectedIds, on
     if (!visible) return;
     setSelected(new Set(selectedIds));
     fetchCompanions().then(async (list) => {
-      // "Traveling with" means everyone but the trip owner themself, grouped
-      // the same way Doc Tracker orders its own list: family, then friends,
-      // then everyone else.
-      const others = list
-        .filter((c) => !c.is_self)
-        .sort((a, b) => GROUP_ORDER[relationshipGroup(a)] - GROUP_ORDER[relationshipGroup(b)]);
-      const withUrls = await Promise.all(others.map(async (c) => ({ ...c, url: await fetchCompanionProfileUrl(c.profile_photo_path) })));
+      // Includes the user themself, since a trip they manage but don't
+      // personally travel on is now representable — ordered the same way
+      // Doc Tracker's own list and the Document Analysis screen group by.
+      const ordered = sortCompanionsForDisplay(list);
+      const withUrls = await Promise.all(ordered.map(async (c) => ({ ...c, url: await fetchCompanionProfileUrl(c.profile_photo_path) })));
       setCompanions(withUrls);
     });
   }, [visible]);
@@ -55,7 +51,7 @@ export default function CompanionPickerModal({ visible, onClose, selectedIds, on
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={styles.root}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Traveling with</Text>
+          <Text style={styles.headerTitle}>Who is travelling</Text>
           <Pressable onPress={onClose} hitSlop={10}><Text style={styles.cancel}>Cancel</Text></Pressable>
         </View>
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>

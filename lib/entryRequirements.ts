@@ -6,7 +6,7 @@
 // and lib/documentExpiry.ts's dismiss-tracking shape.
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "./supabase";
-import { DocumentType } from "./types";
+import { DocumentType, Relationship } from "./types";
 import { companionFullName } from "./companions";
 
 export type EntryCheckStatus = "queued" | "researching" | "ready" | "failed";
@@ -38,9 +38,14 @@ export interface EntryRequirementWarning {
   id: string;
   trip_id: string;
   trip_name: string;
+  trip_start_date: string;
   companion_id: string;
   companion_name: string;
-  country: string;
+  companion_is_self: boolean;
+  companion_relationship: Relationship | null;
+  companion_birth_date: string | null;
+  companion_first_name: string;
+  countries: string[];
   requirement_description: string;
   matches_doc_type: DocumentType | null;
   dismissed_at: string | null;
@@ -106,7 +111,10 @@ export function useEntryRequirementCheck(tripId: string | undefined) {
 async function fetchWarnings(tripId?: string, includeDismissed = false): Promise<EntryRequirementWarning[]> {
   let query = supabase
     .from("entry_requirement_warnings")
-    .select("id, trip_id, companion_id, country, requirement_description, matches_doc_type, dismissed_at, created_at, trips(name), companions(first_name, last_name)")
+    .select(
+      "id, trip_id, companion_id, countries, requirement_description, matches_doc_type, dismissed_at, created_at, " +
+      "trips(name, start_date), companions(first_name, last_name, is_self, relationship, birth_date)"
+    )
     // id as a tiebreaker: a batch insert gives every row from one run the
     // same created_at, and dismissing one (an UPDATE, which writes a new
     // row version) can otherwise shuffle its position in an unindexed sort
@@ -123,9 +131,14 @@ async function fetchWarnings(tripId?: string, includeDismissed = false): Promise
     id: w.id,
     trip_id: w.trip_id,
     trip_name: w.trips?.name ?? "Trip",
+    trip_start_date: w.trips?.start_date ?? "",
     companion_id: w.companion_id,
     companion_name: w.companions ? companionFullName(w.companions) : "Someone",
-    country: w.country,
+    companion_is_self: !!w.companions?.is_self,
+    companion_relationship: w.companions?.relationship ?? null,
+    companion_birth_date: w.companions?.birth_date ?? null,
+    companion_first_name: w.companions?.first_name ?? "",
+    countries: w.countries ?? [],
     requirement_description: w.requirement_description,
     matches_doc_type: w.matches_doc_type,
     dismissed_at: w.dismissed_at,

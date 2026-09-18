@@ -8,7 +8,7 @@ import { supabase } from "@/lib/supabase";
 import { radius, ColorTokens } from "@/lib/theme";
 import { useThemeColors } from "@/lib/ThemeContext";
 import { Companion, TripType } from "@/lib/types";
-import { setTripCompanions, companionFullName } from "@/lib/companions";
+import { setTripCompanions, companionFullName, ensureSelfCompanion, fetchCompanions } from "@/lib/companions";
 import { startEntryRequirementCheck } from "@/lib/entryRequirements";
 import CompanionPickerModal from "@/components/CompanionPickerModal";
 import { tzOffsetLabel, sortedByOffsetDesc, COMMON_TIMEZONES, COMMON_CURRENCIES } from "@/lib/timezone";
@@ -62,6 +62,14 @@ export default function NewTrip() {
   useEffect(() => {
     supabase.from("packing_templates").select("id, name").order("name").then(({ data }) => setTemplates(data ?? []));
     supabase.from("trips").select("id, name").is("deleted_at", null).order("start_date", { ascending: false }).then(({ data }) => setExistingTrips(data ?? []));
+    // A new trip assumes the user themself is going, same as before this
+    // was explicit — just now a removable default instead of an unstated
+    // assumption, so a trip they only manage (but don't travel on) is
+    // representable by removing themself here.
+    ensureSelfCompanion().then(fetchCompanions).then((list) => {
+      const self = list.find((c) => c.is_self);
+      if (self) setCompanions([self]);
+    });
   }, []);
 
   function packingSourceLabel(): string {
@@ -398,8 +406,8 @@ export default function NewTrip() {
         </Pressable>
       </Modal>
 
-      {/* --- Traveling with --- */}
-      <Text style={styles.label}>Traveling with</Text>
+      {/* --- Who is travelling --- */}
+      <Text style={styles.label}>Who is travelling</Text>
       <Pressable style={styles.addDestinationButton} onPress={() => setCompanionPickerOpen(true)}>
         <Text style={styles.addDestinationButtonText}>+ Add companions</Text>
       </Pressable>

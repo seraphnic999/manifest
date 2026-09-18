@@ -269,7 +269,13 @@ async function run(checkId: string, resetDismissed: boolean) {
     const { data: tripCompanions } = await supabase.from("trip_companions").select("companion_id").eq("trip_id", check.trip_id);
     const companionIds = (tripCompanions ?? []).map((r: Json) => r.companion_id);
 
-    const wantedKeys = new Map<string, { companion_id: string; country: string; requirement_description: string; matches_doc_type: string | null }>();
+    // Keyed by companion + requirement text only (not country) — the exact
+    // same requirement (ETIAS, most often) routinely applies identically to
+    // every Schengen country on a trip, and the research agent reports it
+    // with identical wording each time, so grouping on that text merges
+    // them into one warning listing every country it applies to instead of
+    // repeating the same finding three times.
+    const wanted = new Map<string, { companion_id: string; countries: Set<string>; requirement_description: string; matches_doc_type: string | null }>();
 
     if (companionIds.length > 0) {
       const { data: allDocs } = await supabase.from("travel_documents").select("companion_id, type, expiry_date").in("companion_id", companionIds);
@@ -287,9 +293,11 @@ async function run(checkId: string, resetDismissed: boolean) {
           for (const req of c.documents_required) {
             const ok = isSatisfied(docs, req.matches_doc_type, req.min_validity_months_beyond_travel, trip.end_date);
             if (!ok) {
-              const key = `${companionId}|${c.country}|${req.description}`;
-              wantedKeys.set(key, {
-                companion_id: companionId, country: c.country,
+              const key = `${companionId}|${req.description}`;
+              const existing = wanted.get(key);
+              if (existing) existing.countries.add(c.country);
+              else wanted.set(key, {
+                companion_id: companionId, countries: new Set([c.country]),
                 requirement_description: req.description, matches_doc_type: req.matches_doc_type,
               });
             }
@@ -298,24 +306,38 @@ async function run(checkId: string, resetDismissed: boolean) {
       }
     }
 
-    const { data: existing } = await supabase
-      .from("entry_requirement_warnings").select("id, companion_id, country, requirement_description").eq("trip_id", check.trip_id);
+    const { data: existingRows } = await supabase
+      .from("entry_requirement_warnings").select("id, companion_id, countries, requirement_description").eq("trip_id", check.trip_id);
 
-    const existingKeys = new Set((existing ?? []).map((w: Json) => `${w.companion_id}|${w.country}|${w.requirement_description}`));
-    const staleIds = (existing ?? [])
-      .filter((w: Json) => !wantedKeys.has(`${w.companion_id}|${w.country}|${w.requirement_description}`))
+    const existingByKey = new Map((existingRows ?? []).map((w: Json) => [`${w.companion_id}|${w.requirement_description}`, w]));
+    const staleIds = (existingRows ?? [])
+      .filter((w: Json) => !wanted.has(`${w.companion_id}|${w.requirement_description}`))
       .map((w: Json) => w.id);
 
     if (staleIds.length > 0) {
       await supabase.from("entry_requirement_warnings").delete().in("id", staleIds);
     }
 
-    const toInsert = [...wantedKeys.entries()]
-      .filter(([key]) => !existingKeys.has(key))
-      .map(([, w]) => ({ trip_id: check.trip_id, ...w }));
+    const toInsert: Json[] = [];
+    const toUpdate: { id: string; countries: string[] }[] = [];
+    for (const [key, w] of wanted) {
+      const sortedCountries = [...w.countries].sort();
+      const existingRow = existingByKey.get(key);
+      if (!existingRow) {
+        toInsert.push({
+          trip_id: check.trip_id, companion_id: w.companion_id, countries: sortedCountries,
+          requirement_description: w.requirement_description, matches_doc_type: w.matches_doc_type,
+        });
+      } else if (JSON.stringify(existingRow.countries) !== JSON.stringify(sortedCountries)) {
+        toUpdate.push({ id: existingRow.id, countries: sortedCountries });
+      }
+    }
 
     if (toInsert.length > 0) {
       await supabase.from("entry_requirement_warnings").insert(toInsert);
+    }
+    for (const u of toUpdate) {
+      await supabase.from("entry_requirement_warnings").update({ countries: u.countries }).eq("id", u.id);
     }
 
     if (resetDismissed) {
@@ -323,12 +345,12 @@ async function run(checkId: string, resetDismissed: boolean) {
     }
 
     const { data: activeWarnings } = await supabase
-      .from("entry_requirement_warnings").select("country").eq("trip_id", check.trip_id).is("dismissed_at", null)
-      .order("country");
+      .from("entry_requirement_warnings").select("countries").eq("trip_id", check.trip_id).is("dismissed_at", null)
+      .order("countries");
 
     if (activeWarnings && activeWarnings.length > 0) {
       try {
-        await notify(supabase, trip.user_id, trip.id, trip.name, activeWarnings.length, activeWarnings[0].country);
+        await notify(supabase, trip.user_id, trip.id, trip.name, activeWarnings.length, activeWarnings[0].countries?.[0] ?? "your trip");
       } catch (e) {
         console.error("notify failed", e);
       }
