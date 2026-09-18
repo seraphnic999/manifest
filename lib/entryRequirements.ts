@@ -14,7 +14,6 @@ export type EntryCheckStatus = "queued" | "researching" | "ready" | "failed";
 export interface EntryRequirementDoc {
   description: string;
   matches_doc_type: DocumentType | null;
-  min_validity_months_beyond_travel: number | null;
   source_url: string | null;
 }
 

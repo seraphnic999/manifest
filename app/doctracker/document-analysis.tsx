@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
-import { Stack, useRouter } from "expo-router";
+import { Stack, useRouter, useLocalSearchParams } from "expo-router";
 import { radius, fonts, ColorTokens } from "@/lib/theme";
 import { useThemeColors } from "@/lib/ThemeContext";
 import SubpageHeader from "@/components/SubpageHeader";
@@ -130,7 +130,8 @@ function EntryRow({ warning, onDismiss }: { warning: EntryRequirementWarning; on
 }
 
 export default function DocumentAnalysis() {
-  const [tab, setTab] = useState<Tab>("expiry");
+  const { tab: initialTab } = useLocalSearchParams<{ tab?: string }>();
+  const [tab, setTab] = useState<Tab>(initialTab === "entry" ? "entry" : "expiry");
   const { warnings: expiryWarnings, reload: reloadExpiry } = useAllDocumentExpiryWarnings();
   const { warnings: entryWarnings, reload: reloadEntry } = useAllEntryRequirementWarnings();
   const colors = useThemeColors();

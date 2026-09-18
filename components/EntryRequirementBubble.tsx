@@ -20,7 +20,7 @@ export default function EntryRequirementBubble({ warnings }: { warnings: EntryRe
   const [first, ...rest] = warnings;
 
   return (
-    <Pressable style={styles.card} onPress={() => router.push("/doctracker/document-analysis")}>
+    <Pressable style={styles.card} onPress={() => router.push("/doctracker/document-analysis?tab=entry")}>
       <View style={styles.iconCircle}>
         <Icon name="warning" size={20} color={colors.coral} />
       </View>

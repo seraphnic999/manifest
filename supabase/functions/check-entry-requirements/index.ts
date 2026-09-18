@@ -2,11 +2,14 @@
 //
 // Runs once per trip (automatically right after the trip is created, or on
 // demand via the trip's "Entry Validation" menu item): researches, for each
-// distinct country the trip visits, what an Israeli citizen needs to enter
-// — a minimum passport validity, a visa/ETA/permit, anything else checkable
-// — then validates every companion attached to the trip actually holds a
-// matching, unexpired document. A shortfall becomes a row in
-// entry_requirement_warnings; a since-resolved one is deleted.
+// distinct country the trip visits, what documents (beyond a passport) an
+// Israeli citizen needs to enter — a visa, an ETA/permit, anything else
+// checkable — then validates every companion attached to the trip actually
+// holds a matching document valid at least MIN_VALIDITY_MONTHS beyond the
+// trip's last day. Passport validity itself is checked the same way but
+// unconditionally, not researched per country (see the standalone check in
+// run() below). A shortfall becomes a row in entry_requirement_warnings; a
+// since-resolved one is deleted.
 //
 // Responds 202 immediately and finishes in the background via
 // EdgeRuntime.waitUntil — same reason research-item does: this can run
@@ -30,21 +33,26 @@ const BUDGET_USD = Number(Deno.env.get("ENTRY_REQ_BUDGET_USD") ?? 0.5);
 
 const DOC_TYPES = ["passport", "national_id", "visa", "drivers_license", "other"] as const;
 
+// The app enforces its own fixed 6-month passport/document validity floor
+// (see MIN_VALIDITY_MONTHS below) regardless of a given country's actual
+// legal minimum — the common airline-industry rule of thumb, and simpler
+// and more consistent than trusting a researched number per country. So
+// the agent is only asked to find *what* is required, never *how long it
+// must remain valid* — that half is no longer part of its job.
 const SYSTEM = `You research entry requirements for Israeli passport holders traveling to specific countries, for a trip-planning app. A human never reads your prose — you report structured findings the app uses to check whether the traveler already holds the right documents.
 
 ASSUMPTIONS
 - Every traveler is an Israeli citizen traveling on an Israeli passport, taking a normal short tourist or business trip (not immigrating, not working, not studying).
-- You are given the trip's date range — use it to check date-specific validity rules (e.g. "passport must be valid 6 months beyond your stay").
 
 FOR EACH COUNTRY, DETERMINE
-1. Whether Israeli passport holders can enter with nothing beyond a standard passport (no special requirement beyond normal validity) — if so, set no_special_requirements true and leave documents_required empty. Most short-stay destinations for Israelis are visa-free; do not invent a requirement that doesn't exist.
-2. Any minimum passport validity requirement beyond the trip's own end date (e.g. "6 months beyond date of departure/stay") — if there is one, add a documents_required entry with matches_doc_type "passport" and the number of months in min_validity_months_beyond_travel.
-3. Any visa, electronic travel authorization (ETA/eTA/ESTA-style), entry permit, or other document that must be arranged before travel — add one documents_required entry per such document. Set matches_doc_type to whichever of these best describes something a traveler could physically hold on file: "visa" for a traditional visa (including an e-visa), or null if it's something else entirely that doesn't correspond to a document type (e.g. a standalone electronic authorization/pre-registration that isn't a stamped visa — those get matches_doc_type null, since there's no way to represent "I already have my ETA" as a held document type here). Never guess "passport" or "national_id" for this kind of entry — those are only for genuine passport/ID validity rules.
+1. Whether Israeli passport holders can enter with nothing beyond a standard passport — if so, set no_special_requirements true and leave documents_required empty. Most short-stay destinations for Israelis are visa-free; do not invent a requirement that doesn't exist. The app itself separately checks passport validity, so do not report a passport-validity rule here even if you find one.
+2. Any visa, electronic travel authorization (ETA/eTA/ESTA-style), entry permit, or other document that must be arranged before travel — add one documents_required entry per such document. Set matches_doc_type to whichever of these best describes something a traveler could physically hold on file: "visa" for a traditional visa (including an e-visa), or null if it's something else entirely that doesn't correspond to a document type (e.g. a standalone electronic authorization/pre-registration that isn't a stamped visa — those get matches_doc_type null, since there's no way to represent "I already have my ETA" as a held document type here). Never use "passport" here — passport rules are handled separately, not through this field.
+3. EXCEPTION — do not report ETIAS (the EU's upcoming Schengen-area pre-travel authorization) as a requirement for any country, even if you find sources describing it. It has not yet come into force; treat Schengen-area countries as needing nothing beyond what rule 1 and 2 above would otherwise find.
 
 RULES
 - Never invent a requirement. If you're not sure a country has anything beyond standard visa-free entry, say so with no_special_requirements true rather than guessing at a plausible-sounding rule.
 - requirement_summary is one plain sentence a traveler would understand (e.g. "Visa-free for stays up to 90 days; an ETA must be obtained online before travel.").
-- description on each documents_required entry names the specific thing needed (e.g. "UK Electronic Travel Authorization (ETA)", "Passport valid 6 months beyond travel dates").
+- description on each documents_required entry names the specific thing needed (e.g. "UK Electronic Travel Authorization (ETA)").
 - Always include a source_url when you have one from your search.
 
 Finish by calling propose_entry_requirements exactly once with one entry per country you were given, in the same order. Do not write prose.`;
@@ -70,10 +78,9 @@ const PROPOSE_TOOL = {
                 properties: {
                   description: { type: "string" },
                   matches_doc_type: { type: ["string", "null"], enum: [...DOC_TYPES, null] },
-                  min_validity_months_beyond_travel: { type: ["integer", "null"] },
                   source_url: { type: ["string", "null"] },
                 },
-                required: ["description", "matches_doc_type", "min_validity_months_beyond_travel", "source_url"],
+                required: ["description", "matches_doc_type", "source_url"],
               },
             },
           },
@@ -156,23 +163,27 @@ async function notify(supabase: Json, userId: string, tripId: string, tripName: 
   }
 }
 
+// The app's own fixed floor, applied to every document this feature checks
+// (passport and any other required document alike) regardless of what any
+// one country actually mandates — the common airline-check-in rule of
+// thumb, and a single consistent number is simpler to reason about (and to
+// show the user) than a different researched figure per country.
+const MIN_VALIDITY_MONTHS = 6;
+
 // A required document is satisfied only by a same-type document the
-// companion holds whose expiry clears the trip's own end date (plus any
-// extra validity-beyond-travel window the requirement calls for). A held
-// document with no expiry_date on file is treated as satisfying the
-// requirement — Doc Tracker doesn't force every document to carry one, and
-// treating "unknown" as "invalid" would falsely warn on every such
-// document. A requirement with matches_doc_type null can never be
-// satisfied from Doc Tracker data at all (e.g. a standalone ETA) — it
-// always warns until the finding itself no longer applies on a re-run.
-function isSatisfied(
-  docs: Json[], matchesDocType: string | null, minValidityMonths: number | null, tripEndDate: string
-): boolean {
+// companion holds whose expiry clears the trip's own end date by at least
+// MIN_VALIDITY_MONTHS. A held document with no expiry_date on file is
+// treated as satisfying the requirement — Doc Tracker doesn't force every
+// document to carry one, and treating "unknown" as "invalid" would falsely
+// warn on every such document. A requirement with matches_doc_type null can
+// never be satisfied from Doc Tracker data at all (e.g. a standalone ETA)
+// — it always warns until the finding itself no longer applies on a re-run.
+function isSatisfied(docs: Json[], matchesDocType: string | null, tripEndDate: string): boolean {
   if (!matchesDocType) return false;
   const candidates = docs.filter((d) => d.type === matchesDocType);
   if (candidates.length === 0) return false;
   const deadline = new Date(`${tripEndDate}T00:00:00Z`);
-  if (minValidityMonths) deadline.setUTCMonth(deadline.getUTCMonth() + minValidityMonths);
+  deadline.setUTCMonth(deadline.getUTCMonth() + MIN_VALIDITY_MONTHS);
   return candidates.some((d) => {
     if (!d.expiry_date) return true;
     return new Date(`${d.expiry_date}T00:00:00Z`) >= deadline;
@@ -286,12 +297,33 @@ async function run(checkId: string, resetDismissed: boolean) {
         docsByCompanion.set(d.companion_id, list);
       }
 
+      // Passport validity is checked once per companion, independent of
+      // any single country's findings — every country needs *some* valid
+      // passport, including the many with no_special_requirements at all,
+      // so this can't live inside the per-country loop below the way the
+      // other document checks do.
+      for (const companionId of companionIds) {
+        const docs = docsByCompanion.get(companionId) ?? [];
+        if (!isSatisfied(docs, "passport", trip.end_date)) {
+          wanted.set(`${companionId}|__passport__`, {
+            companion_id: companionId, countries: new Set(countries),
+            requirement_description: `Passport valid at least ${MIN_VALIDITY_MONTHS} months beyond the trip's last day`,
+            matches_doc_type: "passport",
+          });
+        }
+      }
+
       for (const c of countryResults) {
         if (c.no_special_requirements || !c.documents_required?.length) continue;
         for (const companionId of companionIds) {
           const docs = docsByCompanion.get(companionId) ?? [];
           for (const req of c.documents_required) {
-            const ok = isSatisfied(docs, req.matches_doc_type, req.min_validity_months_beyond_travel, trip.end_date);
+            // ETIAS isn't yet enforced — filtered here too as a backstop in
+            // case the model reports it despite the system prompt telling
+            // it not to. Passport-type entries are skipped since that's
+            // now the standalone check above, not a per-country one.
+            if (/etias/i.test(req.description) || req.matches_doc_type === "passport") continue;
+            const ok = isSatisfied(docs, req.matches_doc_type, trip.end_date);
             if (!ok) {
               const key = `${companionId}|${req.description}`;
               const existing = wanted.get(key);
