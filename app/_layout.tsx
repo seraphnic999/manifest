@@ -161,6 +161,11 @@ function AppShell() {
                   every screen inside it, which already has its own real
                   header via SubpageHeader. */}
               <Stack.Screen name="doctracker" options={{ headerShown: false }} />
+              {/* The public share page is its own full-bleed screen (hero
+                  photo, no back button, no account) — the root Stack's
+                  default header would otherwise show the literal route
+                  pattern "share/[token]" as a title bar above it. */}
+              <Stack.Screen name="share/[token]" options={{ headerShown: false }} />
             </Stack>
           </ErrorBoundary>
         </View>

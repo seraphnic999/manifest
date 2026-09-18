@@ -22,6 +22,7 @@ import TripMap from "@/components/TripMap";
 import { Day, Trip, ItemType, ItemStatus, MapRoute } from "@/lib/types";
 import { DestinationForecast } from "@/lib/weather";
 import { FlightStatusRow } from "@/lib/flightStatus";
+import { computeDurationMinutes, formatDuration } from "@/lib/duration";
 
 const SHARE_ENDPOINT = "https://yvqptrjxbptloucyuubm.supabase.co/functions/v1/share-trip-data";
 
@@ -188,6 +189,13 @@ export default function SharedTrip() {
   const { trip, days, items, trip_cities: tripCities, routes, weather, flight_statuses: flightStatuses } = payload;
   const flightStatusByItem = new Map(flightStatuses.map((r) => [r.item_id, r]));
   const stays = items.filter((i) => i.is_stay_span);
+  // Rolled up into one dedicated section, same as the app's Trip Overview —
+  // excluded from the day-by-day itinerary below (rather than shown in
+  // both places on what is, here, a single continuous page) to avoid
+  // showing the same flight card twice.
+  const flights = items
+    .filter((i) => i.type === "flight")
+    .sort((a, b) => `${a.start_date ?? ""}${a.time_start ?? ""}`.localeCompare(`${b.start_date ?? ""}${b.time_start ?? ""}`));
   const dayColors = buildDayColorMap(days);
   const dateToDayId = buildDateToDayId(days);
   const neutral = NEUTRAL_DAY_COLOR;
@@ -205,6 +213,31 @@ export default function SharedTrip() {
 
       <View style={styles.body}>
         <WeatherCarousel tripId={trip.id} destinations={destinations} forecasts={forecasts} />
+
+        {flights.length > 0 && (
+          <>
+            <Text style={styles.sectionLabel}>Flights</Text>
+            {flights.map((f) => {
+              const flightNumber = (f.custom_fields as any)?.flight_number as string | undefined;
+              const durationMinutes = computeDurationMinutes(f.start_date, f.time_start, f.end_date, f.time_end);
+              const durationText = durationMinutes !== null && durationMinutes >= 0 ? formatDuration(durationMinutes) : null;
+              const status = flightStatusByItem.get(f.id);
+              return (
+                <View key={f.id} style={styles.stayCard}>
+                  <Icon name="flight" size={18} color={colors.blue} />
+                  <View style={{ flex: 1, marginLeft: 10 }}>
+                    <Text style={styles.itemTag}>{flightNumber ?? "FLIGHT"}</Text>
+                    <Text style={styles.itemTitle}>{f.title}</Text>
+                    <Text style={styles.itemMeta}>
+                      {[normalizeTimeHHMM(f.time_start), formatDateDDMMYYYY(f.start_date), durationText].filter(Boolean).join(" · ")}
+                    </Text>
+                    {status && <FlightStatusCard row={status} loading={false} onRefresh={() => {}} compact />}
+                  </View>
+                </View>
+              );
+            })}
+          </>
+        )}
 
         {stays.length > 0 && (
           <>
@@ -226,7 +259,7 @@ export default function SharedTrip() {
 
         <Text style={styles.sectionLabel}>Itinerary</Text>
         {days.map((day) => {
-          const dayItems = items.filter((i) => i.day_id === day.id && !i.is_stay_span).sort((a, b) => a.sort_order - b.sort_order);
+          const dayItems = items.filter((i) => i.day_id === day.id && !i.is_stay_span && i.type !== "flight").sort((a, b) => a.sort_order - b.sort_order);
           if (dayItems.length === 0) return null;
           const label = day.date ? dayCityLabel(day, tripCities) : "Proposals";
           return (
