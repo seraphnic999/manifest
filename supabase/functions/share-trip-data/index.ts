@@ -31,8 +31,21 @@ const STRIPPED_ITEM_FIELDS = ["confirmation_code", "booking_source", "reminder_m
 const WEATHER_CACHE_TTL_MS = 3 * 60 * 60 * 1000; // 3 hours — Open-Meteo forecasts don't move fast enough to need fresher than this for a shared read-only view.
 const WEATHER_DAYS = 6;
 
+// Called from the browser (manifest-teal-ten.vercel.app) — a different
+// origin than this function's own supabase.co URL, so every response needs
+// CORS headers or the browser silently blocks the page's JS from reading
+// it (the fetch itself "succeeds" at the network level, then errors when
+// the page tries to use the response — indistinguishable from a real
+// failure without checking the network tab, which is exactly what
+// happened testing this against the live page).
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "content-type",
+};
+
 function jsonResponse(body: Json, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+  return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", ...CORS_HEADERS } });
 }
 
 async function sha256Hex(s: string): Promise<string> {
@@ -70,6 +83,8 @@ async function fetchWeather(supabase: Json, lat: number, lon: number): Promise<J
 }
 
 Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS_HEADERS });
+
   const url = new URL(req.url);
   let token: string | null = url.searchParams.get("token");
   let pin: string | null = url.searchParams.get("pin");
