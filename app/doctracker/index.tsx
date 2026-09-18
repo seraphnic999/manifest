@@ -96,7 +96,14 @@ export default function DocTracker() {
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
-      <SubpageHeader title="Doc Tracker" />
+      <SubpageHeader
+        title="Doc Tracker"
+        right={
+          <Pressable onPress={() => router.push("/doctracker/document-analysis")}>
+            <Text style={styles.analysisLink}>Analysis</Text>
+          </Pressable>
+        }
+      />
       <FlatList
         contentContainerStyle={{ padding: 16, paddingBottom: 90 }}
         data={sections}
@@ -133,6 +140,7 @@ export default function DocTracker() {
 
 const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.paper },
+  analysisLink: { color: colors.blue, fontFamily: fonts.bodySemi, fontSize: 14 },
   sectionLabel: {
     color: colors.inkSoft, fontFamily: fonts.bodyBold, fontSize: 11.5, textTransform: "uppercase",
     letterSpacing: 1, marginBottom: 8, marginTop: 8,

@@ -4,16 +4,14 @@ import { useRouter } from "expo-router";
 import { radius, fonts, ColorTokens } from "@/lib/theme";
 import { useThemeColors } from "@/lib/ThemeContext";
 import Icon from "@/components/icons/Icon";
-import { formatDateDDMMYYYY } from "@/lib/dateFormat";
-import { documentTypeLabel } from "@/lib/travelDocuments";
-import { DocumentExpiryWarning } from "@/lib/documentExpiry";
+import { EntryRequirementWarning } from "@/lib/entryRequirements";
 
-/** Home screen banner for expiring documents — sits below the nav icon row
- * and above the current-trip hero. Only the single most urgent (soonest
- * expiry) warning is named directly; any others are summarized as a count,
- * matching the review-one-at-a-time shape the dedicated expiry-warnings
- * screen (behind Doc Tracker's lock) actually lists them in. */
-export default function DocumentExpiryBubble({ warnings }: { warnings: DocumentExpiryWarning[] }) {
+/** Trip Overview banner for entry-requirement problems found on this trip —
+ * sits below the companions bar and above Weather. Only shown when this
+ * trip actually has an active (non-dismissed) warning; a trip with no
+ * special requirements, or where everyone's documents already clear them,
+ * shows nothing at all. */
+export default function EntryRequirementBubble({ warnings }: { warnings: EntryRequirementWarning[] }) {
   const router = useRouter();
   const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -24,12 +22,12 @@ export default function DocumentExpiryBubble({ warnings }: { warnings: DocumentE
   return (
     <Pressable style={styles.card} onPress={() => router.push("/doctracker/document-analysis")}>
       <View style={styles.iconCircle}>
-        <Icon name="warning" size={20} color={colors.gold} />
+        <Icon name="warning" size={20} color={colors.coral} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={styles.title}>Document expiring soon</Text>
+        <Text style={styles.title}>Entry requirement warning</Text>
         <Text style={styles.detail} numberOfLines={1}>
-          {first.companion_name}'s {documentTypeLabel(first.document_type)} — {formatDateDDMMYYYY(first.expiry_date)}
+          {first.companion_name} — {first.country}: {first.requirement_description}
         </Text>
         {rest.length > 0 && <Text style={styles.more}>+{rest.length} additional warning{rest.length === 1 ? "" : "s"}</Text>}
       </View>
@@ -41,8 +39,8 @@ export default function DocumentExpiryBubble({ warnings }: { warnings: DocumentE
 const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   card: {
     flexDirection: "row", alignItems: "center", gap: 12,
-    backgroundColor: colors.goldSoft, borderWidth: 1, borderColor: colors.gold,
-    borderRadius: radius.lg, padding: 12, marginHorizontal: 16, marginTop: 12,
+    backgroundColor: colors.coralSoft, borderWidth: 1, borderColor: colors.coral,
+    borderRadius: radius.lg, padding: 12, marginTop: 10,
   },
   iconCircle: {
     width: 38, height: 38, borderRadius: 19, backgroundColor: colors.paperRaised,

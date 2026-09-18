@@ -17,7 +17,7 @@ import {
 } from "@/lib/companions";
 import { fetchDocumentsForCompanion, fetchDocumentPhotoUrl, documentTypeLabel, documentTypeIcon } from "@/lib/travelDocuments";
 import { buildCompanionExportText, shareCompanionText } from "@/lib/companionExport";
-import { useDocumentExpiryWarnings, dismissExpiryWarning } from "@/lib/documentExpiry";
+import { useAllDocumentExpiryWarnings } from "@/lib/documentExpiry";
 import CompanionEditModal from "@/components/CompanionEditModal";
 import TravelDocumentEditModal from "@/components/TravelDocumentEditModal";
 import AddDocumentOptionsModal, { AddDocumentMode } from "@/components/AddDocumentOptionsModal";
@@ -72,15 +72,9 @@ export default function CompanionDetail() {
   const [lightbox, setLightbox] = useState<{ urls: string[]; index: number } | null>(null);
   const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { warnings: expiryWarnings, reload: reloadExpiryWarnings } = useDocumentExpiryWarnings();
+  const { warnings: expiryWarnings } = useAllDocumentExpiryWarnings();
 
   useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
-
-  async function handleDismissExpiry(documentId: string) {
-    const error = await dismissExpiryWarning(documentId);
-    if (error) { Alert.alert("Couldn't dismiss", error); return; }
-    reloadExpiryWarnings();
-  }
 
   if (!data) return null;
   const { companion, documents, profileUrl, photos, docPhotoMap } = data;
@@ -221,12 +215,6 @@ export default function CompanionDetail() {
                   <Text style={styles.expiryWarningText}>
                     Expires {formatDateDDMMYYYY(expiryWarning.expiry_date)}
                   </Text>
-                  <Pressable
-                    hitSlop={8}
-                    onPress={(e) => { e.stopPropagation(); handleDismissExpiry(doc.id); }}
-                  >
-                    <Text style={styles.expiryWarningDismiss}>Dismiss</Text>
-                  </Pressable>
                 </View>
               )}
               <CopyRow label="Number" value={doc.document_number} />
@@ -313,7 +301,6 @@ const makeStyles = (colors: ColorTokens) => StyleSheet.create({
     backgroundColor: colors.goldSoft, borderRadius: radius.sm, padding: 8, marginBottom: 8,
   },
   expiryWarningText: { flex: 1, color: colors.ink, fontSize: 12.5, fontWeight: "600" },
-  expiryWarningDismiss: { color: colors.coral, fontFamily: fonts.bodySemi, fontSize: 12.5 },
   docThumb: { width: "100%", height: 140, borderRadius: radius.md, marginTop: 8, backgroundColor: colors.paper },
   deleteBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, padding: 14, marginTop: 18 },
   deleteBtnText: { color: colors.coral, fontWeight: "600", fontSize: 14.5 },

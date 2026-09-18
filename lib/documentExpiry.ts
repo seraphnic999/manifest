@@ -14,18 +14,20 @@ export interface DocumentExpiryWarning {
   document_type: DocumentType;
   expiry_date: string;
   first_detected_at: string;
+  dismissed_at: string | null;
 }
 
 // Deliberately two flat queries rather than one two-level-deep nested
 // embed (alerts -> travel_documents -> companions) — this codebase has no
 // existing precedent for embedding that deep, and joining client-side here
 // is simple enough not to be worth the risk.
-async function fetchActiveWarnings(): Promise<DocumentExpiryWarning[]> {
-  const { data: alerts, error: alertsError } = await supabase
+async function fetchActiveWarnings(includeDismissed: boolean): Promise<DocumentExpiryWarning[]> {
+  let query = supabase
     .from("document_expiry_alerts")
-    .select("document_id, expiry_date, first_detected_at")
-    .is("dismissed_at", null)
+    .select("document_id, expiry_date, first_detected_at, dismissed_at")
     .order("expiry_date", { ascending: true });
+  if (!includeDismissed) query = query.is("dismissed_at", null);
+  const { data: alerts, error: alertsError } = await query;
   if (alertsError) throw alertsError;
   if (!alerts || alerts.length === 0) return [];
 
@@ -48,29 +50,25 @@ async function fetchActiveWarnings(): Promise<DocumentExpiryWarning[]> {
         document_type: doc.type as DocumentType,
         expiry_date: a.expiry_date,
         first_detected_at: a.first_detected_at,
+        dismissed_at: a.dismissed_at,
       };
     })
     .filter((w): w is DocumentExpiryWarning => !!w);
 }
 
-/** Active (non-dismissed) expiry warnings, soonest first — the same query
- * backs the Home bubble, the dedicated expiry-warnings screen, and the
- * per-document banner on a companion's page. Realtime-subscribed so a
- * dismissal (from this device or another) and the daily sweep both update
- * every screen reading this without a manual refresh. */
-export function useDocumentExpiryWarnings() {
+function useExpiryWarningsQuery(includeDismissed: boolean) {
   const [warnings, setWarnings] = useState<DocumentExpiryWarning[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     try {
-      setWarnings(await fetchActiveWarnings());
+      setWarnings(await fetchActiveWarnings(includeDismissed));
     } catch (e) {
       console.error("useDocumentExpiryWarnings load failed", e);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [includeDismissed]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -86,6 +84,26 @@ export function useDocumentExpiryWarnings() {
   }, [load]);
 
   return { warnings, loading, reload: load };
+}
+
+/** Active (non-dismissed) expiry warnings, soonest first — backs the Home
+ * bubble and the dedicated expiry-warnings screen, both of which offer a
+ * Dismiss action. Realtime-subscribed so a dismissal (from this device or
+ * another) and the daily sweep both update every screen reading this
+ * without a manual refresh. */
+export function useDocumentExpiryWarnings() {
+  return useExpiryWarningsQuery(false);
+}
+
+/** Every currently-qualifying expiry warning, dismissed or not — backs both
+ * the per-document banner on a companion's page (a standing fact about that
+ * document, never dismissible from there) and the Expiring Documents
+ * section of the Document Analysis screen (where a dismissed one still
+ * shows, greyed out). A row disappears from this list only once the edge
+ * function itself removes it (expiry moved outside the one-year window, or
+ * the document was deleted), never from a dismissal. */
+export function useAllDocumentExpiryWarnings() {
+  return useExpiryWarningsQuery(true);
 }
 
 export async function dismissExpiryWarning(documentId: string): Promise<string | null> {

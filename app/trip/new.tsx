@@ -9,6 +9,7 @@ import { radius, ColorTokens } from "@/lib/theme";
 import { useThemeColors } from "@/lib/ThemeContext";
 import { Companion, TripType } from "@/lib/types";
 import { setTripCompanions, companionFullName } from "@/lib/companions";
+import { startEntryRequirementCheck } from "@/lib/entryRequirements";
 import CompanionPickerModal from "@/components/CompanionPickerModal";
 import { tzOffsetLabel, sortedByOffsetDesc, COMMON_TIMEZONES, COMMON_CURRENCIES } from "@/lib/timezone";
 import { fetchLiveRateToNis } from "@/lib/currencyRates";
@@ -205,6 +206,11 @@ export default function NewTrip() {
     if (companions.length > 0) {
       await setTripCompanions(trip.id, companions.map((c) => c.id));
     }
+
+    // Fire-and-forget, same as item research: the queued row is what
+    // matters, not waiting on this particular invoke call to land before
+    // the user moves on to the new trip.
+    startEntryRequirementCheck(trip.id).catch(() => {});
 
     // "Work" party is auto-added only for business/mixed trips.
     if (type === "business" || type === "mixed") {

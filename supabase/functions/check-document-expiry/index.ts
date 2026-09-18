@@ -53,7 +53,7 @@ async function notify(supabase: Json, userId: string, count: number, firstLabel:
     title,
     body,
     sound: "default",
-    data: { route: "/doctracker/expiry-warnings" },
+    data: { route: "/doctracker/document-analysis" },
   }));
 
   const res = await fetch("https://exp.host/--/api/v2/push/send", {

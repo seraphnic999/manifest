@@ -28,6 +28,8 @@ import { fetchDestinationForecast } from "@/lib/weather";
 import { weatherIconName } from "@/lib/weather";
 import { fetchTripCities, fetchAllCities, dayCityLabel, resolveDayCity, resolveDayCityPick, TripCityRow } from "@/lib/cities";
 import { fetchTripCompanionsWithUrls, companionFullName } from "@/lib/companions";
+import { useTripEntryWarnings } from "@/lib/entryRequirements";
+import EntryRequirementBubble from "@/components/EntryRequirementBubble";
 import ItemTypePickerModal from "@/components/ItemTypePickerModal";
 import KeeperPickerModal from "@/components/KeeperPickerModal";
 import QuickAddModal from "@/components/QuickAddModal";
@@ -121,6 +123,7 @@ export default function TripOverview() {
   const isOnline = useNetworkStatus();
   const insets = useSafeAreaInsets();
   const { menuItems, shareModal } = useTripHamburgerMenu(tripId);
+  const { warnings: entryWarnings } = useTripEntryWarnings(tripId);
   const router = useRouter();
 
   const { data, error: tripError, dataUpdatedAt, refetch } = useQuery({
@@ -348,6 +351,8 @@ export default function TripOverview() {
                   ))}
                 </View>
               )}
+
+              <EntryRequirementBubble warnings={entryWarnings} />
 
               <WeatherCarousel tripId={tripId} destinations={weatherDestinations} />
 

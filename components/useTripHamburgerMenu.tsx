@@ -3,6 +3,7 @@ import { useRouter } from "expo-router";
 import { Alert } from "@/lib/alert";
 import { supabase } from "@/lib/supabase";
 import { exportTripItineraryPdf } from "@/lib/exportItinerary";
+import { rerunEntryRequirementCheck } from "@/lib/entryRequirements";
 import ShareTripModal from "@/components/ShareTripModal";
 import { HamburgerMenuItem } from "@/components/HamburgerMenu";
 
@@ -35,11 +36,18 @@ export function useTripHamburgerMenu(tripId: string) {
     setExporting(false);
   }
 
+  async function handleEntryValidation() {
+    const error = await rerunEntryRequirementCheck(tripId);
+    if (error) { Alert.alert("Couldn't start entry validation", error); return; }
+    Alert.alert("Entry validation started", "Re-checking entry requirements and everyone's documents — results will appear on this page shortly.");
+  }
+
   const menuItems: HamburgerMenuItem[] = [
     { icon: "export", label: exporting ? "Exporting…" : "Export PDF", onPress: handleExportPdf },
     { icon: "edit", label: "Edit Trip", onPress: () => router.push(`/trip/${tripId}/edit`) },
     ...(isOwner ? [{ icon: "share" as const, label: "Share Trip", onPress: () => setShareOpen(true) }] : []),
     { icon: "document", label: "Doc Tracker", onPress: () => router.push("/doctracker") },
+    { icon: "flag", label: "Entry Validation", onPress: handleEntryValidation },
     { icon: "settings", label: "Settings", onPress: () => router.push("/settings") },
   ];
 
