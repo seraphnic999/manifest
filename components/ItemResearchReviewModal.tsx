@@ -11,6 +11,7 @@ import { categoryForDbType, categoryByKey, CONVERTIBLE_CATEGORIES, isConvertible
 import { formatDateDDMMYYYY } from "@/lib/dateFormat";
 import ItemTypePickerModal from "@/components/ItemTypePickerModal";
 import TripDayPickerModal from "@/components/TripDayPickerModal";
+import { TimeField } from "@/components/DateTimeFields";
 
 // Confidence shown as a word, not a fake percentage — "Guessed" tells you
 // what to do about a field, "82%" would just imply a precision the agent
@@ -72,7 +73,7 @@ interface Props {
   onChanged: () => void;
 }
 
-interface ItemMeta { type: ItemType; day_id: string | null; start_date: string | null; trip_id: string }
+interface ItemMeta { type: ItemType; day_id: string | null; start_date: string | null; time_start: string | null; trip_id: string }
 
 export default function ItemResearchReviewModal({ visible, onClose, job, onChanged }: Props) {
   const [draft, setDraft] = useState<ResearchDraft | null>(null);
@@ -92,7 +93,7 @@ export default function ItemResearchReviewModal({ visible, onClose, job, onChang
   useEffect(() => {
     if (!visible) return;
     setDraft(draftFromProposal(job.proposal));
-    supabase.from("items").select("type, day_id, start_date, trip_id").eq("id", job.item_id).single()
+    supabase.from("items").select("type, day_id, start_date, time_start, trip_id").eq("id", job.item_id).single()
       .then(({ data }) => setItemMeta((data as ItemMeta) ?? null));
   }, [visible, job]);
 
@@ -113,6 +114,13 @@ export default function ItemResearchReviewModal({ visible, onClose, job, onChang
     const { error } = await supabase.from("items").update({ day_id: day.id, start_date: day.date }).eq("id", job.item_id);
     if (error) { Alert.alert("Couldn't change day", error.message); return; }
     setItemMeta((m) => (m ? { ...m, day_id: day.id, start_date: day.date } : m));
+    onChanged();
+  }
+
+  async function handleSetTime(time: string) {
+    const { error } = await supabase.from("items").update({ time_start: time || null }).eq("id", job.item_id);
+    if (error) { Alert.alert("Couldn't set time", error.message); return; }
+    setItemMeta((m) => (m ? { ...m, time_start: time || null } : m));
     onChanged();
   }
 
@@ -188,9 +196,6 @@ export default function ItemResearchReviewModal({ visible, onClose, job, onChang
           {itemMeta && (
             <View style={styles.destinationCard}>
               <Text style={styles.destinationLabel}>Where this item will land</Text>
-              <Text style={styles.destinationHint}>
-                Applying below only fills in place details (address, hours, ratings…) — it never changes these.
-              </Text>
               <Pressable
                 style={styles.destinationRow}
                 onPress={() => isConvertibleType(itemMeta.type) && setTypePickerOpen(true)}
@@ -211,6 +216,9 @@ export default function ItemResearchReviewModal({ visible, onClose, job, onChang
                 </View>
                 <Text style={styles.destinationChange}>Change</Text>
               </Pressable>
+              <View style={styles.destinationTimeField}>
+                <TimeField label="Time (optional)" value={itemMeta.time_start ?? ""} onChange={handleSetTime} />
+              </View>
             </View>
           )}
 
@@ -306,8 +314,8 @@ const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   },
   destinationLabel: {
     color: colors.ink, fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5,
+    marginBottom: 8,
   },
-  destinationHint: { color: colors.inkSoft, fontSize: 12, lineHeight: 16, marginTop: 3, marginBottom: 10 },
   destinationRow: {
     flexDirection: "row", alignItems: "center", gap: 10,
     backgroundColor: colors.paperRaised, borderRadius: radius.sm, padding: 10, marginTop: 6,
@@ -315,6 +323,7 @@ const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   destinationRowLabel: { color: colors.inkSoft, fontSize: 10.5, textTransform: "uppercase", letterSpacing: 0.5 },
   destinationRowValue: { color: colors.ink, fontFamily: fonts.bodySemi, fontSize: 14, marginTop: 2 },
   destinationChange: { color: colors.blue, fontFamily: fonts.bodySemi, fontSize: 13 },
+  destinationTimeField: { marginTop: 2 },
   subheading: {
     fontFamily: fonts.bodySemi, fontSize: 13, color: colors.inkSoft,
     textTransform: "uppercase", letterSpacing: 0.5,
