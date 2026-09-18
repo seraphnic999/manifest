@@ -26,6 +26,7 @@ import { useEmailProposals } from "@/lib/emailProposals";
 import { useDocumentExpiryWarnings } from "@/lib/documentExpiry";
 import DocumentExpiryBubble from "@/components/DocumentExpiryBubble";
 import { getHasCheckedLaunchRedirect, setHasCheckedLaunchRedirect } from "@/lib/launchRedirect";
+import { fetchShareLink, setShareLinkEnabled } from "@/lib/tripPublicSharing";
 
 // Same semantics as lib/travelStats.ts's and lib/budget.ts's own copies of
 // this (inclusive of both endpoints, so a same-day trip is 1 day) — kept as
@@ -159,6 +160,18 @@ function TripPhotoCard({ trip, showCountdown, onArchive }: { trip: Trip; showCou
     queryKey: ["tripCompanionsHome", trip.id],
     queryFn: () => fetchTripCompanionsWithUrls(trip.id),
   });
+  const { data: shareLink, refetch: refetchShareLink } = useQuery({
+    queryKey: ["tripShareLink", trip.id],
+    queryFn: () => fetchShareLink(trip.id),
+  });
+
+  function confirmStopSharing(e: any) {
+    e.stopPropagation();
+    Alert.alert("This trip is shared live", "Stop sharing? The link will no longer work.", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Yes", style: "destructive", onPress: async () => { await setShareLinkEnabled(trip.id, false); refetchShareLink(); } },
+    ]);
+  }
 
   return (
     <Pressable
@@ -181,6 +194,11 @@ function TripPhotoCard({ trip, showCountdown, onArchive }: { trip: Trip; showCou
           {showCountdown && <TripCountdownInline tripId={trip.id} fallbackDateIso={trip.start_date} />}
         </View>
         <View style={styles.tripCardBottomRight}>
+          {shareLink?.enabled && (
+            <Pressable onPress={confirmStopSharing} hitSlop={8} style={styles.sharedBadge}>
+              <Icon name="share" size={13} color={colors.blue} />
+            </Pressable>
+          )}
           {!!companions?.length && (
             <View style={styles.tripCardAvatarRow}>
               {companions.map((c, i) => (
@@ -227,6 +245,19 @@ export default function TripList() {
     queryFn: () => fetchHeroExtra(currentTrip!.id, currentTrip!.destinations),
     enabled: !!currentTrip,
   });
+  const { data: heroShareLink, refetch: refetchHeroShareLink } = useQuery({
+    queryKey: ["tripShareLink", currentTrip?.id],
+    queryFn: () => fetchShareLink(currentTrip!.id),
+    enabled: !!currentTrip,
+  });
+  function confirmStopSharingHero(e: any) {
+    e.stopPropagation();
+    if (!currentTrip) return;
+    Alert.alert("This trip is shared live", "Stop sharing? The link will no longer work.", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Yes", style: "destructive", onPress: async () => { await setShareLinkEnabled(currentTrip.id, false); refetchHeroShareLink(); } },
+    ]);
+  }
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchInput, setSearchInput] = useState("");
@@ -430,6 +461,11 @@ export default function TripList() {
                     imageStyle={{ borderRadius: radius.xl }}
                   >
                     <View style={styles.heroScrim} />
+                    {heroShareLink?.enabled && (
+                      <Pressable onPress={confirmStopSharingHero} hitSlop={8} style={styles.heroSharedBadge} accessibilityLabel="This trip is shared live">
+                        <Icon name="share" size={18} color="#fff" />
+                      </Pressable>
+                    )}
                     {heroExtra?.weatherTemp != null && heroExtra.weatherCode != null && (
                       <View style={styles.weatherBadge}>
                         <Icon name={weatherIconName(heroExtra.weatherCode)} size={26} color="#fff" />
@@ -535,6 +571,11 @@ const makeStyles = (colors: ColorTokens) => StyleSheet.create({
     borderWidth: 1.5, borderColor: "rgba(255,255,255,0.85)", backgroundColor: "rgba(11,30,63,0.35)",
     alignItems: "center", justifyContent: "center",
   },
+  heroSharedBadge: {
+    position: "absolute", top: 10, left: 12, width: 34, height: 34, borderRadius: 17,
+    borderWidth: 1.5, borderColor: "rgba(255,255,255,0.85)", backgroundColor: "rgba(11,30,63,0.35)",
+    alignItems: "center", justifyContent: "center",
+  },
   weatherTemp: { color: "#fff", fontFamily: fonts.monoBold, fontSize: 12 },
   heroDest: { color: "#fff", fontFamily: fonts.display, fontSize: 17, marginBottom: 4 },
   heroTodayCity: { color: "rgba(255,255,255,0.85)", fontSize: 12, marginBottom: 6 },
@@ -556,6 +597,10 @@ const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   tripCardAvatarWrap: { borderRadius: 13, borderWidth: 1.5, borderColor: colors.paperRaised },
   tripCardAvatar: { width: 24, height: 24, borderRadius: 12 },
   tripCardAvatarPlaceholder: { backgroundColor: colors.line, alignItems: "center", justifyContent: "center" },
+  sharedBadge: {
+    width: 24, height: 24, borderRadius: 12, backgroundColor: colors.blueSoft,
+    alignItems: "center", justifyContent: "center",
+  },
 
   searchCard: {
     backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,

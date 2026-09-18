@@ -30,6 +30,7 @@ import { fetchTripCities, fetchAllCities, dayCityLabel, resolveDayCity, resolveD
 import { fetchTripCompanionsWithUrls, companionFullName } from "@/lib/companions";
 import { useTripEntryWarnings } from "@/lib/entryRequirements";
 import EntryRequirementBubble from "@/components/EntryRequirementBubble";
+import { fetchShareLink, setShareLinkEnabled } from "@/lib/tripPublicSharing";
 import ItemTypePickerModal from "@/components/ItemTypePickerModal";
 import KeeperPickerModal from "@/components/KeeperPickerModal";
 import QuickAddModal from "@/components/QuickAddModal";
@@ -125,6 +126,17 @@ export default function TripOverview() {
   const { menuItems, shareModal } = useTripHamburgerMenu(tripId);
   const { warnings: entryWarnings } = useTripEntryWarnings(tripId);
   const router = useRouter();
+
+  const { data: shareLink, refetch: refetchShareLink } = useQuery({
+    queryKey: ["tripShareLink", tripId],
+    queryFn: () => fetchShareLink(tripId),
+  });
+  function confirmStopSharing() {
+    Alert.alert("This trip is shared live", "Stop sharing? The link will no longer work.", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Yes", style: "destructive", onPress: async () => { await setShareLinkEnabled(tripId, false); refetchShareLink(); } },
+    ]);
+  }
 
   const { data, error: tripError, dataUpdatedAt, refetch } = useQuery({
     queryKey: ["tripOverview", tripId],
@@ -309,6 +321,11 @@ export default function TripOverview() {
             >
               <View style={styles.heroScrim} />
               <View style={[styles.headerRow, { top: insets.top + 10 }]}>
+                {shareLink?.enabled && (
+                  <Pressable style={styles.hbtn} onPress={confirmStopSharing} accessibilityLabel="This trip is shared live">
+                    <Icon name="share" size={21} color="#fff" />
+                  </Pressable>
+                )}
                 <Pressable style={styles.hbtn} onPress={() => router.canDismiss() ? router.dismissAll() : router.replace("/")} accessibilityLabel="Home">
                   <Icon name="home" size={25} color="#fff" />
                 </Pressable>

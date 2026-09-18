@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { radius, fonts, ColorTokens } from "@/lib/theme";
 import { useThemeColors } from "@/lib/ThemeContext";
 import Icon from "@/components/icons/Icon";
-import { fetchTripForecasts, weatherIconName } from "@/lib/weather";
+import { fetchTripForecasts, weatherIconName, DestinationForecast } from "@/lib/weather";
 import { formatDateDDMM } from "@/lib/dateFormat";
 
 // Forecasts don't meaningfully change more often than this, so a query
@@ -15,18 +15,30 @@ const STALE_MS = 3 * 60 * 60 * 1000;
 
 const SCREEN_PADDING = 16;
 
-export default function WeatherCarousel({ tripId, destinations }: { tripId: string; destinations: string[] }) {
+export default function WeatherCarousel({
+  tripId, destinations, forecasts,
+}: {
+  tripId: string;
+  destinations: string[];
+  /** Pre-fetched forecasts to render as-is instead of fetching — used by
+   * the public share page, which gets its (server-cached) weather from the
+   * share-trip-data Edge Function payload rather than calling Open-Meteo
+   * itself. Every in-app caller omits this and keeps the fetch-on-mount
+   * behavior below unchanged. */
+  forecasts?: DestinationForecast[];
+}) {
   const { width } = useWindowDimensions();
   const cardWidth = Math.min(width - SCREEN_PADDING * 2, 420);
   const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
-  const { data } = useQuery({
+  const { data: fetched } = useQuery({
     queryKey: ["weather", tripId, destinations.join("|")],
     queryFn: () => fetchTripForecasts(destinations),
     staleTime: STALE_MS,
-    enabled: destinations.length > 0,
+    enabled: destinations.length > 0 && !forecasts,
   });
+  const data = forecasts ?? fetched;
 
   if (destinations.length === 0 || !data || data.length === 0) return null;
 

@@ -49,6 +49,7 @@ export default function EditItem() {
 
   const [title, setTitle] = useState("");
   const [status, setStatus] = useState<ItemStatus>("booked");
+  const [isPrivate, setIsPrivate] = useState(false);
   const [selectedDay, setSelectedDay] = useState<Day | null>(null);
   const [origDayId, setOrigDayId] = useState("");
   const [dayPickerOpen, setDayPickerOpen] = useState(false);
@@ -158,6 +159,7 @@ export default function EditItem() {
 
       setTitle(item.title);
       setStatus(item.status);
+      setIsPrivate(item.is_private);
       setTime(item.time_start ?? "");
       setOrigTime(item.time_start ?? "");
       if (!item.is_stay_span && item.day_id) {
@@ -338,6 +340,7 @@ export default function EditItem() {
 
     const { error } = await supabase.from("items").update({
       title, status,
+      is_private: isPrivate,
       type: itemType,
       time_start: newTimeStart,
       time_end: isStaySpan ? (checkOutTime || null) : (has("flightTimes") ? (arrivalTime || null) : undefined),
@@ -549,6 +552,14 @@ export default function EditItem() {
         ))}
       </View>
 
+      <View style={styles.privateRow}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.privateLabel}>Private</Text>
+          <Text style={styles.privateHint}>Hidden from this trip's shared link, if any.</Text>
+        </View>
+        <Switch value={isPrivate} onValueChange={setIsPrivate} />
+      </View>
+
       {has("vendor") && (
         <><Text style={styles.label}>Vendor</Text>
         <TextInput style={styles.input} value={vendor} onChangeText={setVendor} /></>
@@ -747,6 +758,9 @@ const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   hintError: { color: colors.coral, fontStyle: "normal", fontWeight: "600" },
   row: { flexDirection: "row" },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  privateRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 16 },
+  privateLabel: { color: colors.ink, fontSize: 15, fontWeight: "600" },
+  privateHint: { color: colors.inkSoft, fontSize: 12, marginTop: 2 },
   chip: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.paperRaised },
   chipActive: { backgroundColor: colors.blue, borderColor: colors.blue },
   chipText: { color: colors.inkSoft, fontWeight: "600", fontSize: 13 },

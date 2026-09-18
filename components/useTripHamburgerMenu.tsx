@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { exportTripItineraryPdf } from "@/lib/exportItinerary";
 import { rerunEntryRequirementCheck } from "@/lib/entryRequirements";
 import ShareTripModal from "@/components/ShareTripModal";
+import SharePublicLinkModal from "@/components/SharePublicLinkModal";
 import { HamburgerMenuItem } from "@/components/HamburgerMenu";
 
 /** The same trip-level actions (Export/Edit/Share/Doc Tracker/Settings)
@@ -17,9 +18,12 @@ export function useTripHamburgerMenu(tripId: string) {
   const [exporting, setExporting] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [shareLinkOpen, setShareLinkOpen] = useState(false);
+  const [tripName, setTripName] = useState("");
 
   useEffect(() => {
-    supabase.from("trips").select("user_id").eq("id", tripId).single().then(({ data }) => {
+    supabase.from("trips").select("user_id, name").eq("id", tripId).single().then(({ data }) => {
+      if (data) setTripName(data.name);
       supabase.auth.getUser().then(({ data: userData }) => {
         if (userData.user && data) setIsOwner(userData.user.id === data.user_id);
       });
@@ -46,12 +50,18 @@ export function useTripHamburgerMenu(tripId: string) {
     { icon: "export", label: exporting ? "Exporting…" : "Export PDF", onPress: handleExportPdf },
     { icon: "edit", label: "Edit Trip", onPress: () => router.push(`/trip/${tripId}/edit`) },
     ...(isOwner ? [{ icon: "share" as const, label: "Share Trip", onPress: () => setShareOpen(true) }] : []),
+    { icon: "share" as const, label: "Share Link", onPress: () => setShareLinkOpen(true) },
     { icon: "document", label: "Doc Tracker", onPress: () => router.push("/doctracker") },
     { icon: "flag", label: "Entry Validation", onPress: handleEntryValidation },
     { icon: "settings", label: "Settings", onPress: () => router.push("/settings") },
   ];
 
-  const shareModal = <ShareTripModal visible={shareOpen} onClose={() => setShareOpen(false)} tripId={tripId} />;
+  const shareModal = (
+    <>
+      <ShareTripModal visible={shareOpen} onClose={() => setShareOpen(false)} tripId={tripId} />
+      <SharePublicLinkModal visible={shareLinkOpen} onClose={() => setShareLinkOpen(false)} tripId={tripId} tripName={tripName} />
+    </>
+  );
 
   return { menuItems, shareModal };
 }

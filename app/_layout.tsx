@@ -106,7 +106,11 @@ function AppShell() {
   useEffect(() => {
     if (session === undefined) return; // still loading
     const inAuthGroup = segments[0] === "(auth)";
-    if (!session && !inAuthGroup) {
+    // The public, read-only trip-sharing page (/share/<token>) is the one
+    // route anyone should reach without an account — same trust model as
+    // any share-link product, security is the unguessable token itself.
+    const inPublicShareRoute = segments[0] === "share";
+    if (!session && !inAuthGroup && !inPublicShareRoute) {
       router.replace("/(auth)/login");
     } else if (session && inAuthGroup) {
       router.replace("/");

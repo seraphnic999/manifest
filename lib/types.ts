@@ -99,6 +99,7 @@ export interface Item {
   custom_fields: Record<string, unknown>;
   deleted_at: string | null;
   keeper_id: string | null;
+  is_private: boolean;
 }
 
 export interface ItemPhoto {

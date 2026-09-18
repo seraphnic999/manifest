@@ -34,6 +34,7 @@ export default function NewItem() {
   const [title, setTitle] = useState("");
   const [subtype, setSubtype] = useState(cat.dbTypes[0]);
   const [status, setStatus] = useState<ItemStatus>("planned");
+  const [isPrivate, setIsPrivate] = useState(false);
   const [selectedDay, setSelectedDay] = useState<Day | null>(null);
   const [dayPickerOpen, setDayPickerOpen] = useState(false);
   const [time, setTime] = useState("");
@@ -172,6 +173,7 @@ export default function NewItem() {
       type: subtype,
       title,
       status,
+      is_private: isPrivate,
       address: address || null,
       phone: phone || null,
       vendor: vendor || null,
@@ -227,7 +229,7 @@ export default function NewItem() {
         if (checkInDay) {
           await supabase.from("items").insert({
             trip_id: tripId, day_id: checkInDay.id, parent_item_id: span.id,
-            type: "lodging", title: `Check in — ${title}`, status: "booked",
+            type: "lodging", title: `Check in — ${title}`, status: "booked", is_private: isPrivate,
             time_start: checkInTime || null,
             sort_order: await siblingSortOrder(checkInDay.id, checkInTime || null),
           });
@@ -235,7 +237,7 @@ export default function NewItem() {
         if (checkOutDay) {
           await supabase.from("items").insert({
             trip_id: tripId, day_id: checkOutDay.id, parent_item_id: span.id,
-            type: "lodging", title: `Check out — ${title}`, status: "booked",
+            type: "lodging", title: `Check out — ${title}`, status: "booked", is_private: isPrivate,
             time_start: checkOutTime || null,
             sort_order: await siblingSortOrder(checkOutDay.id, checkOutTime || null),
           });
@@ -354,6 +356,14 @@ export default function NewItem() {
         ))}
       </View>
 
+      <View style={styles.privateRow}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.privateLabel}>Private</Text>
+          <Text style={styles.privateHint}>Hidden from this trip's shared link, if any.</Text>
+        </View>
+        <Switch value={isPrivate} onValueChange={setIsPrivate} />
+      </View>
+
       {has("vendor") && (
         <><Text style={styles.label}>{cat.key === "flight" ? "Airline" : "Vendor"}</Text>
         <TextInput style={styles.input} value={vendor} onChangeText={setVendor} /></>
@@ -451,6 +461,9 @@ const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   hintError: { color: colors.coral, fontStyle: "normal", fontWeight: "600" },
   row: { flexDirection: "row" },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  privateRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 16 },
+  privateLabel: { color: colors.ink, fontSize: 15, fontWeight: "600" },
+  privateHint: { color: colors.inkSoft, fontSize: 12, marginTop: 2 },
   chip: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.paperRaised },
   chipActive: { backgroundColor: colors.blue, borderColor: colors.blue },
   chipText: { color: colors.inkSoft, fontWeight: "600", fontSize: 13 },
