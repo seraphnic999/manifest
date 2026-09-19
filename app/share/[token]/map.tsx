@@ -32,11 +32,20 @@ export default function ShareMap() {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { trip, days, items, routes } = useSharePayload();
 
-  const dayColors = buildDayColorMap(days);
-  const dateToDayId = buildDateToDayId(days);
-  const mapItems: MapItem[] = items.filter(
-    (i): i is PublicItem & { latitude: number; longitude: number } => i.latitude != null && i.longitude != null
-  ) as MapItem[];
+  // Memoized so their identity stays stable across re-renders that don't
+  // actually change the trip data (e.g. selecting a pin) — TripMap re-fits
+  // the viewport whenever items/dayColors/dateToDayId change identity, so
+  // recomputing plain new array/Map objects on every render was resetting
+  // the zoom/pan back to the auto-fit view on every tap.
+  const dayColors = useMemo(() => buildDayColorMap(days), [days]);
+  const dateToDayId = useMemo(() => buildDateToDayId(days), [days]);
+  const mapItems: MapItem[] = useMemo(
+    () =>
+      items.filter(
+        (i): i is PublicItem & { latitude: number; longitude: number } => i.latitude != null && i.longitude != null
+      ) as MapItem[],
+    [items]
+  );
 
   const presentTypes = new Set(mapItems.map((i) => i.type));
   const categories = ITEM_CATEGORIES.filter((cat) => cat.dbTypes.some((t) => presentTypes.has(t)));
@@ -103,26 +112,17 @@ export default function ShareMap() {
       )}
 
       <View style={{ flex: 1 }}>
-        {/* MapLibre attaches its own click listeners straight onto marker
-            DOM elements it manages itself, outside this View's normal
-            stacking — a plain zIndex on the preview panel below doesn't
-            reliably out-rank that, so a tap meant for the panel's close
-            button could still land on a marker underneath. Disabling the
-            map's own pointer events while a preview is open sidesteps that
-            entirely rather than fighting it. */}
-        <View style={{ flex: 1 }} pointerEvents={selected ? "none" : "auto"}>
-          <TripMap
-            items={mapItems}
-            routes={routes}
-            dayColors={dayColors}
-            dateToDayId={dateToDayId}
-            neutralColor={NEUTRAL_DAY_COLOR}
-            visibleDayIds={visibleDayIds}
-            visibleTypes={visibleTypes}
-            tripFocus={trip.latitude != null && trip.longitude != null ? { latitude: trip.latitude, longitude: trip.longitude } : null}
-            onItemPress={(item) => setSelected(item)}
-          />
-        </View>
+        <TripMap
+          items={mapItems}
+          routes={routes}
+          dayColors={dayColors}
+          dateToDayId={dateToDayId}
+          neutralColor={NEUTRAL_DAY_COLOR}
+          visibleDayIds={visibleDayIds}
+          visibleTypes={visibleTypes}
+          tripFocus={trip.latitude != null && trip.longitude != null ? { latitude: trip.latitude, longitude: trip.longitude } : null}
+          onItemPress={(item) => setSelected(item)}
+        />
 
         {selected && (
           <View style={styles.previewPanel}>
