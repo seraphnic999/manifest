@@ -60,6 +60,12 @@ TRAPS THAT HAVE CAUGHT PREVIOUS RUNS — check each before answering:
 - Reservation lead time is an opinion, not a fact — say whose: the venue's own stated policy, a well-known rule of thumb for that kind of place ("popular tasting menus book out weeks ahead"), or your own inference. Leave it null for places that don't take reservations (most shops, most casual spots) rather than forcing an answer.
 - Price range only applies to dining and bars. Leave it null with confidence "none" for anything else — do not guess a price range for a museum or a shop.
 
+BOOKING LINK
+
+For a dining, attraction, or ticketed-activity place, look for ONE real, confirmed link where a human could actually book or buy a ticket: the place's own booking/reservation page first, then a major reservation platform showing this exact venue (OpenTable, Resy, TheFork, Google's "Reserve a table"), then an attraction's official ticket page. Never a generic homepage with no booking function, never a directory listing, never a guessed search-results URL — if you cannot confirm a page that actually lets someone book or buy a ticket, leave it null with confidence "none". A wrong or dead booking link is worse than none.
+
+Alongside the existing free-text reservation_lead_time, also give the same lead time as a plain number of days (reservation_lead_days_min/max) so the app can compute an actual date from it — e.g. "2-3 weeks ahead" becomes min 14, max 21; "book same day" becomes min 0, max 0; "book 6-8 weeks ahead" becomes min 42, max 56. Leave both null wherever reservation_lead_time itself is null.
+
 PRICE RANGE
 
 Only for dining/bar-type places. Report as one of "€", "€€", "€€€", "€€€€" (roughly: cheap eats, mid-range, upscale, splurge) based on what you find, never a specific number — a specific number goes stale immediately and a range doesn't.
@@ -108,6 +114,13 @@ const PROPOSE_TOOL = {
       reservation_lead_time: { type: ["string", "null"], description: "E.g. '2-3 weeks ahead', 'Same day usually fine', null if not applicable." },
       reservation_lead_time_confidence: { type: "string", enum: ["high", "medium", "low", "none"] },
       reservation_lead_time_basis: { type: "string" },
+      reservation_lead_days_min: { type: ["integer", "null"], description: "reservation_lead_time as a number of days, lower bound. Null if reservation_lead_time is null." },
+      reservation_lead_days_max: { type: ["integer", "null"], description: "reservation_lead_time as a number of days, upper bound. Null if reservation_lead_time is null." },
+
+      booking_link: { type: ["string", "null"], description: "A confirmed page where this exact place can actually be booked/reserved/ticketed. Null if you cannot confirm one." },
+      booking_link_confidence: { type: "string", enum: ["high", "medium", "low", "none"] },
+      booking_link_basis: { type: "string" },
+      booking_link_source: { type: ["string", "null"] },
 
       price_range: { type: ["string", "null"], enum: ["€", "€€", "€€€", "€€€€", null], description: "Dining/bar only." },
       price_range_confidence: { type: "string", enum: ["high", "medium", "low", "none"] },
@@ -437,6 +450,9 @@ async function research(jobId: string) {
       google_maps_link: field(mapsLink, proposed.address_confidence ?? "medium", "Built from the confirmed name and location.", null),
       opening_hours: field(proposed.opening_hours, proposed.opening_hours_confidence, proposed.opening_hours_basis, proposed.opening_hours_source),
       reservation_lead_time: field(proposed.reservation_lead_time, proposed.reservation_lead_time_confidence, proposed.reservation_lead_time_basis, null),
+      reservation_lead_days_min: field(proposed.reservation_lead_days_min, proposed.reservation_lead_time_confidence, proposed.reservation_lead_time_basis, null),
+      reservation_lead_days_max: field(proposed.reservation_lead_days_max, proposed.reservation_lead_time_confidence, proposed.reservation_lead_time_basis, null),
+      booking_link: field(proposed.booking_link, proposed.booking_link_confidence, proposed.booking_link_basis, proposed.booking_link_source),
       price_range: field(proposed.price_range, proposed.price_range_confidence, proposed.price_range_basis, null),
       latitude: field(lat, lat != null ? "medium" : "none", lat != null ? "Geocoded from the confirmed address." : "Could not geocode the address."),
       longitude: field(lon, lon != null ? "medium" : "none", lon != null ? "Geocoded from the confirmed address." : "Could not geocode the address."),

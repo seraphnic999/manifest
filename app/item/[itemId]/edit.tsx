@@ -91,6 +91,9 @@ export default function EditItem() {
   const [awardBadges, setAwardBadges] = useState(""); // one per line in the UI, array in storage
   const [openingHours, setOpeningHours] = useState("");
   const [reservationLeadTime, setReservationLeadTime] = useState("");
+  const [reservationLeadDaysMin, setReservationLeadDaysMin] = useState("");
+  const [reservationLeadDaysMax, setReservationLeadDaysMax] = useState("");
+  const [bookingLink, setBookingLink] = useState("");
   const [priceRange, setPriceRange] = useState("");
 
   // Lodging span only
@@ -119,7 +122,7 @@ export default function EditItem() {
       checkInDate, checkInTime, checkOutDate, checkOutTime,
       arrivalDate, arrivalTime,
       shortDescription, googleRating, googleRatingCount, reviewHighlights, awardBadges,
-      openingHours, reservationLeadTime, priceRange,
+      openingHours, reservationLeadTime, reservationLeadDaysMin, reservationLeadDaysMax, bookingLink, priceRange,
     });
   }
   useEffect(() => { latestSnapshotRef.current = currentSnapshot(); });
@@ -180,6 +183,9 @@ export default function EditItem() {
       setAwardBadges(Array.isArray(cf.award_badges) ? (cf.award_badges as string[]).join("\n") : "");
       setOpeningHours(typeof cf.opening_hours === "string" ? cf.opening_hours : "");
       setReservationLeadTime(typeof cf.reservation_lead_time === "string" ? cf.reservation_lead_time : "");
+      setReservationLeadDaysMin(typeof cf.reservation_lead_days_min === "number" ? String(cf.reservation_lead_days_min) : "");
+      setReservationLeadDaysMax(typeof cf.reservation_lead_days_max === "number" ? String(cf.reservation_lead_days_max) : "");
+      setBookingLink(typeof cf.booking_link === "string" ? cf.booking_link : "");
       setPriceRange(typeof cf.price_range === "string" ? cf.price_range : "");
       setBookingSource(item.booking_source ?? "");
       setConfirmationCode(item.confirmation_code ?? "");
@@ -223,6 +229,9 @@ export default function EditItem() {
         awardBadges: Array.isArray(cf.award_badges) ? (cf.award_badges as string[]).join("\n") : "",
         openingHours: typeof cf.opening_hours === "string" ? cf.opening_hours : "",
         reservationLeadTime: typeof cf.reservation_lead_time === "string" ? cf.reservation_lead_time : "",
+        reservationLeadDaysMin: typeof cf.reservation_lead_days_min === "number" ? String(cf.reservation_lead_days_min) : "",
+        reservationLeadDaysMax: typeof cf.reservation_lead_days_max === "number" ? String(cf.reservation_lead_days_max) : "",
+        bookingLink: typeof cf.booking_link === "string" ? cf.booking_link : "",
         priceRange: typeof cf.price_range === "string" ? cf.price_range : "",
       });
       setTripId(item.trip_id);
@@ -321,6 +330,11 @@ export default function EditItem() {
     setOrDelete("short_description", shortDescription.trim() || null);
     setOrDelete("opening_hours", openingHours.trim() || null);
     setOrDelete("reservation_lead_time", reservationLeadTime.trim() || null);
+    setOrDelete("booking_link", bookingLink.trim() || null);
+    const leadDaysMinNum = reservationLeadDaysMin.trim() ? Number(reservationLeadDaysMin) : null;
+    const leadDaysMaxNum = reservationLeadDaysMax.trim() ? Number(reservationLeadDaysMax) : null;
+    if (leadDaysMinNum !== null && !Number.isNaN(leadDaysMinNum)) customFields.reservation_lead_days_min = leadDaysMinNum; else delete customFields.reservation_lead_days_min;
+    if (leadDaysMaxNum !== null && !Number.isNaN(leadDaysMaxNum)) customFields.reservation_lead_days_max = leadDaysMaxNum; else delete customFields.reservation_lead_days_max;
     setOrDelete("price_range", priceRange.trim() || null);
     const ratingNum = googleRating.trim() ? Number(googleRating) : null;
     const ratingCountNum = googleRatingCount.trim() ? Number(googleRatingCount) : null;
@@ -653,6 +667,21 @@ export default function EditItem() {
           <TextInput style={styles.input} value={priceRange} onChangeText={setPriceRange} placeholder="€ – €€€€" />
         </View>
       </View>
+
+      <View style={styles.row}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.label}>Lead days (min)</Text>
+          <TextInput style={styles.input} value={reservationLeadDaysMin} onChangeText={setReservationLeadDaysMin} keyboardType="number-pad" placeholder="e.g. 14" />
+        </View>
+        <View style={{ width: 10 }} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.label}>Lead days (max)</Text>
+          <TextInput style={styles.input} value={reservationLeadDaysMax} onChangeText={setReservationLeadDaysMax} keyboardType="number-pad" placeholder="e.g. 21" />
+        </View>
+      </View>
+
+      <Text style={styles.label}>Booking link</Text>
+      <TextInput style={styles.input} value={bookingLink} onChangeText={setBookingLink} placeholder="Not found" autoCapitalize="none" />
 
       <Text style={styles.label}>Remind me (minutes before, optional)</Text>
       <TextInput

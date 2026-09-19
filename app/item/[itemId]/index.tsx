@@ -18,8 +18,9 @@ import { fetchLinkedItems, LinkedItemSummary } from "@/lib/itemLinks";
 import { categoryForDbType, itemTypeTag } from "@/lib/itemTypeMeta";
 import { itemOrigin, ITEM_ORIGIN_LABEL } from "@/lib/itemOrigin";
 import { computeDurationMinutes, formatDuration } from "@/lib/duration";
-import { formatDateDDMMYYYY, formatDateDDMM } from "@/lib/dateFormat";
+import { formatDateDDMMYYYY, formatDateDDMM, addDaysIso, localIsoDate } from "@/lib/dateFormat";
 import { normalizeTimeHHMM } from "@/lib/timeFormat";
+import { DateField } from "@/components/DateTimeFields";
 import AddExpenseModal from "@/components/AddExpenseModal";
 import AddShoppingItemModal from "@/components/AddShoppingItemModal";
 import QuickNotesList from "@/components/QuickNotesList";
@@ -102,6 +103,9 @@ export default function ItemDetails() {
   const [identifyOpen, setIdentifyOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const { job: latestResearchJob, reload: reloadResearchJob } = useLatestItemResearchJob(itemId);
+  const [bookingReminderEditing, setBookingReminderEditing] = useState(false);
+  const [bookingReminderDraft, setBookingReminderDraft] = useState("");
+  const [savingBookingReminder, setSavingBookingReminder] = useState(false);
   const researchInProgress = latestResearchJob?.status === "queued" || latestResearchJob?.status === "researching";
   const readyResearchJob = latestResearchJob?.status === "ready" ? latestResearchJob : null;
   const colors = useThemeColors();
@@ -305,6 +309,54 @@ export default function ItemDetails() {
   const hasRatingsData =
     (googleRating != null && googleRatingCount != null) || !!shortDescription || reviewHighlights.length > 0 || awardBadges.length > 0;
 
+  // Logistics fields — researched but, until now, never actually rendered
+  // anywhere (only editable in the edit form). See lib/itemResearch.ts.
+  const openingHours = typeof cf.opening_hours === "string" ? cf.opening_hours : null;
+  const priceRange = typeof cf.price_range === "string" ? cf.price_range : null;
+  const reservationLeadTime = typeof cf.reservation_lead_time === "string" ? cf.reservation_lead_time : null;
+  const bookingLink = typeof cf.booking_link === "string" ? cf.booking_link : null;
+  const leadDaysMax = typeof cf.reservation_lead_days_max === "number" ? cf.reservation_lead_days_max : null;
+  const hasLogisticsData = !!openingHours || !!priceRange || !!reservationLeadTime;
+
+  // A confirmed booking link and a "reserve by" nudge only make sense for
+  // places you actually book ahead for — not every research-eligible type
+  // (e.g. a bar or cafe someone just walks into).
+  const RESERVABLE_TYPES = ["meal", "attraction", "activity"];
+  const isReservableType = RESERVABLE_TYPES.includes(item.type);
+  const bookByLabel = item.type === "meal" ? "Reserve a table" : "Book tickets";
+  const reserveByDate = isReservableType && leadDaysMax != null && item.start_date
+    ? (() => {
+        const computed = addDaysIso(item.start_date!, -leadDaysMax);
+        const today = localIsoDate();
+        return computed < today ? today : computed;
+      })()
+    : null;
+
+  async function setBookingReminder(dateIso: string) {
+    if (!dateIso) return;
+    setSavingBookingReminder(true);
+    const at = new Date(`${dateIso}T09:00:00`);
+    const { error } = await supabase
+      .from("items")
+      .update({ booking_reminder_at: at.toISOString(), booking_reminder_sent_at: null })
+      .eq("id", itemId);
+    setSavingBookingReminder(false);
+    if (error) { Alert.alert("Couldn't set reminder", error.message); return; }
+    setBookingReminderEditing(false);
+    refetch();
+  }
+
+  async function clearBookingReminder() {
+    setSavingBookingReminder(true);
+    const { error } = await supabase
+      .from("items")
+      .update({ booking_reminder_at: null, booking_reminder_sent_at: null })
+      .eq("id", itemId);
+    setSavingBookingReminder(false);
+    if (error) { Alert.alert("Couldn't clear reminder", error.message); return; }
+    refetch();
+  }
+
   const fields: [string, string | null][] = item.is_stay_span
     ? [
         ["Check-in", [formatDateDDMMYYYY(item.start_date), normalizeTimeHHMM(item.time_start)].filter(Boolean).join(" \u00b7 ") || null],
@@ -417,6 +469,86 @@ export default function ItemDetails() {
           )}
         </View>
       )}
+
+      {hasLogisticsData && (
+        <View style={styles.logisticsSection}>
+          {!!openingHours && (
+            <View style={styles.fieldRow}>
+              <Text style={styles.fieldLabel}>Hours</Text>
+              <Text style={styles.fieldValue}>{openingHours}</Text>
+            </View>
+          )}
+          {!!priceRange && (
+            <View style={styles.fieldRow}>
+              <Text style={styles.fieldLabel}>Price</Text>
+              <Text style={styles.fieldValue}>{priceRange}</Text>
+            </View>
+          )}
+          {!!reservationLeadTime && (
+            <View style={styles.fieldRow}>
+              <Text style={styles.fieldLabel}>Book ahead</Text>
+              <Text style={styles.fieldValue}>{reservationLeadTime}</Text>
+            </View>
+          )}
+        </View>
+      )}
+
+      {isReservableType && bookingLink ? (
+        <Pressable onPress={() => Linking.openURL(bookingLink)} style={styles.mapLinkButton}>
+          <Icon name="check" size={20} color={colors.lightBlue} />
+          <Text style={styles.mapLinkButtonText}>{bookByLabel}</Text>
+        </Pressable>
+      ) : null}
+
+      {isReservableType && reserveByDate ? (
+        <View style={styles.reminderCard}>
+          {item.booking_reminder_at ? (
+            <>
+              <View style={styles.reminderRow}>
+                <Icon name="countdown" size={18} color={colors.blue} />
+                <Text style={styles.reminderText}>
+                  Booking reminder set for {formatDateDDMMYYYY(item.booking_reminder_at.slice(0, 10))}
+                </Text>
+              </View>
+              <View style={styles.reminderActions}>
+                <Pressable
+                  onPress={() => { setBookingReminderDraft(item.booking_reminder_at!.slice(0, 10)); setBookingReminderEditing(true); }}
+                  disabled={savingBookingReminder}
+                >
+                  <Text style={styles.reminderActionText}>Change</Text>
+                </Pressable>
+                <Pressable onPress={clearBookingReminder} disabled={savingBookingReminder}>
+                  <Text style={[styles.reminderActionText, { color: colors.coral }]}>Cancel</Text>
+                </Pressable>
+              </View>
+            </>
+          ) : bookingReminderEditing ? null : (
+            <Pressable
+              style={styles.reminderRow}
+              onPress={() => { setBookingReminderDraft(reserveByDate); setBookingReminderEditing(true); }}
+              disabled={savingBookingReminder}
+            >
+              <Icon name="countdown" size={18} color={colors.blue} />
+              <Text style={styles.reminderText}>Remind me to book — by {formatDateDDMMYYYY(reserveByDate)}</Text>
+            </Pressable>
+          )}
+          {bookingReminderEditing && (
+            <View style={styles.reminderPicker}>
+              <DateField label="Reminder date" value={bookingReminderDraft} onChange={setBookingReminderDraft} />
+              <View style={styles.reminderPickerActions}>
+                <Pressable onPress={() => setBookingReminderEditing(false)} disabled={savingBookingReminder}>
+                  <Text style={styles.reminderActionText}>Cancel</Text>
+                </Pressable>
+                <Pressable onPress={() => setBookingReminder(bookingReminderDraft)} disabled={savingBookingReminder || !bookingReminderDraft}>
+                  <Text style={[styles.reminderActionText, { color: colors.blue, fontWeight: "700" }]}>
+                    {savingBookingReminder ? "Saving…" : "Save"}
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
+        </View>
+      ) : null}
 
       {item.link ? (
         <Pressable onPress={() => Linking.openURL(item.link!)} style={styles.linkButton}>
@@ -684,6 +816,17 @@ const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   fieldValue: { color: colors.ink, fontSize: 15, marginTop: 2 },
   linkButton: { backgroundColor: colors.ink, borderRadius: radius.md, padding: 12, alignItems: "center", marginTop: 16 },
   linkButtonText: { color: colors.paper, fontWeight: "700" },
+  logisticsSection: { marginTop: 4 },
+  reminderCard: {
+    borderWidth: 1, borderColor: colors.line, backgroundColor: colors.paperRaised,
+    borderRadius: radius.md, padding: 12, marginTop: 10,
+  },
+  reminderRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  reminderText: { color: colors.ink, fontSize: 13.5, flex: 1 },
+  reminderActions: { flexDirection: "row", justifyContent: "flex-end", gap: 18, marginTop: 8 },
+  reminderActionText: { color: colors.blue, fontWeight: "600", fontSize: 13 },
+  reminderPicker: { marginTop: 8 },
+  reminderPickerActions: { flexDirection: "row", justifyContent: "flex-end", gap: 18, marginTop: 8 },
   mapLinkButton: {
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
     borderWidth: 1, borderColor: colors.lightBlue, borderRadius: radius.md, padding: 12, marginTop: 10,

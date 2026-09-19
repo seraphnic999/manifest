@@ -120,6 +120,9 @@ export interface ResearchDraft {
   google_maps_link: string;
   opening_hours: string;
   reservation_lead_time: string;
+  reservation_lead_days_min: string;
+  reservation_lead_days_max: string;
+  booking_link: string;
   price_range: string;
   latitude: string;
   longitude: string;
@@ -141,6 +144,9 @@ export function draftFromProposal(p: ItemResearchProposal | null): ResearchDraft
     google_maps_link: str(p?.google_maps_link?.value),
     opening_hours: str(p?.opening_hours?.value),
     reservation_lead_time: str(p?.reservation_lead_time?.value),
+    reservation_lead_days_min: str(p?.reservation_lead_days_min?.value),
+    reservation_lead_days_max: str(p?.reservation_lead_days_max?.value),
+    booking_link: str(p?.booking_link?.value),
     price_range: str(p?.price_range?.value),
     latitude: str(p?.latitude?.value),
     longitude: str(p?.longitude?.value),
@@ -175,6 +181,11 @@ export async function acceptResearchJob(
 
   if (draft.opening_hours.trim()) customFields.opening_hours = draft.opening_hours.trim();
   if (draft.reservation_lead_time.trim()) customFields.reservation_lead_time = draft.reservation_lead_time.trim();
+  const leadDaysMin = num(draft.reservation_lead_days_min);
+  const leadDaysMax = num(draft.reservation_lead_days_max);
+  if (leadDaysMin !== null) customFields.reservation_lead_days_min = leadDaysMin;
+  if (leadDaysMax !== null) customFields.reservation_lead_days_max = leadDaysMax;
+  if (draft.booking_link.trim()) customFields.booking_link = draft.booking_link.trim();
   if (draft.price_range.trim()) customFields.price_range = draft.price_range.trim();
   if (draft.short_description.trim()) customFields.short_description = draft.short_description.trim();
   const googleRating = num(draft.google_rating);

@@ -96,6 +96,12 @@ export interface Item {
   map_icon: string | null; // IconName override for the map marker; falls back to the item type's category icon
   reminder_minutes_before: number | null;
   reminder_sent_at: string | null;
+  // A separate "go make this reservation" nudge, decoupled from the day-of
+  // reminder above — that one fires N minutes before the item's own start
+  // time (wrong shape for "book 6 weeks before the trip"), this one is a
+  // plain absolute instant the user (or the researched lead time) picked.
+  booking_reminder_at: string | null;
+  booking_reminder_sent_at: string | null;
   custom_fields: Record<string, unknown>;
   deleted_at: string | null;
   keeper_id: string | null;
@@ -291,6 +297,9 @@ export interface ItemResearchProposal {
   google_maps_link: ProposedField<string>;
   opening_hours: ProposedField<string>;
   reservation_lead_time: ProposedField<string>;
+  reservation_lead_days_min: ProposedField<number>;
+  reservation_lead_days_max: ProposedField<number>;
+  booking_link: ProposedField<string>;
   price_range: ProposedField<string>;
   latitude: ProposedField<number>;
   longitude: ProposedField<number>;

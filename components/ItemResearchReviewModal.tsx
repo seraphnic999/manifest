@@ -235,6 +235,15 @@ export default function ItemResearchReviewModal({ visible, onClose, job, onChang
           <Field label="Google Maps link" meta={p?.google_maps_link} value={draft.google_maps_link} onChange={set("google_maps_link")} placeholder="Not built" />
           <Field label="Opening hours" meta={p?.opening_hours} value={draft.opening_hours} onChange={set("opening_hours")} placeholder="Not found" multiline />
           <Field label="Reservation lead time" meta={p?.reservation_lead_time} value={draft.reservation_lead_time} onChange={set("reservation_lead_time")} placeholder="Not applicable" />
+          <View style={styles.ratingRow}>
+            <View style={styles.ratingField}>
+              <Field label="Lead days (min)" meta={p?.reservation_lead_days_min} value={draft.reservation_lead_days_min} onChange={set("reservation_lead_days_min")} placeholder="e.g. 14" />
+            </View>
+            <View style={styles.ratingField}>
+              <Field label="Lead days (max)" meta={p?.reservation_lead_days_max} value={draft.reservation_lead_days_max} onChange={set("reservation_lead_days_max")} placeholder="e.g. 21" />
+            </View>
+          </View>
+          <Field label="Booking link" meta={p?.booking_link} value={draft.booking_link} onChange={set("booking_link")} placeholder="Not found" />
           <Field label="Price range" meta={p?.price_range} value={draft.price_range} onChange={set("price_range")} placeholder="Not applicable" />
 
           <Text style={styles.subheading}>Ratings & reviews</Text>

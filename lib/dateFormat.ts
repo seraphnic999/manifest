@@ -31,3 +31,13 @@ export function localIsoDate(d: Date = new Date()): string {
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
+
+// Plain calendar-day arithmetic on a "YYYY-MM-DD" string — parsed via its
+// three numeric parts (not `new Date(iso)`, which reads as UTC midnight and
+// would drift the date by one day when formatted back through local getters
+// on any timezone west of UTC).
+export function addDaysIso(iso: string, deltaDays: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(y, (m ?? 1) - 1, (d ?? 1) + deltaDays);
+  return localIsoDate(dt);
+}
