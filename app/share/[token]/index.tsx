@@ -51,25 +51,25 @@ export default function ShareOverview() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.paper }}>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 24 }}>
-        {/* Plain CSS background-image instead of ImageBackground: this hero
+        {/* Plain absolute-fill Image instead of ImageBackground: this hero
             is a very wide, short banner (full device width, ~220px tall),
             and react-native-web's cover-mode Image scales correctly but
             doesn't reliably center the crop at that aspect ratio — it was
-            anchoring near the top-left, cutting the actual subject (e.g. the
-            Eiffel Tower) out of frame entirely while still "filling" the
-            box, so it looked fine until compared against the real photo.
-            backgroundPosition:"center" is the one thing RN's own style API
-            has no equivalent for, hence dropping to raw CSS here. */}
-        <View
-          style={[
-            styles.hero,
-            {
-              backgroundImage: `url(${Image.resolveAssetSource(coverPhotoSource(trip.cover_photo_id)).uri})`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-            } as any,
-          ]}
-        >
+            anchoring near the top-left, cutting the actual subject (e.g.
+            the Eiffel Tower) out of frame entirely while still "filling"
+            the box, so it looked fine until compared against the real
+            photo. objectPosition is the one thing RN's own style API has
+            no equivalent for; react-native-web forwards unrecognized style
+            keys straight through to CSS, so it's added directly here
+            rather than fighting ImageBackground's opaque web behavior.
+            (Image.resolveAssetSource, tried first, isn't present in this
+            web bundle at all — crashed the page outright.) */}
+        <View style={styles.hero}>
+          <Image
+            source={coverPhotoSource(trip.cover_photo_id)}
+            resizeMode="cover"
+            style={[StyleSheet.absoluteFillObject, { objectFit: "cover", objectPosition: "center" } as any]}
+          />
           <View style={styles.heroScrim} />
           <Text style={styles.heroName}>{trip.name}</Text>
           <Text style={styles.heroDates}>{formatDateDDMMYYYY(trip.start_date)} – {formatDateDDMMYYYY(trip.end_date)}</Text>
