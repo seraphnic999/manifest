@@ -51,7 +51,7 @@ export default function ShareOverview() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.paper }}>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 24 }}>
-        <ImageBackground source={coverPhotoSource(trip.cover_photo_id)} style={styles.hero}>
+        <ImageBackground source={coverPhotoSource(trip.cover_photo_id)} style={styles.hero} resizeMode="cover">
           <View style={styles.heroScrim} />
           <Text style={styles.heroName}>{trip.name}</Text>
           <Text style={styles.heroDates}>{formatDateDDMMYYYY(trip.start_date)} – {formatDateDDMMYYYY(trip.end_date)}</Text>

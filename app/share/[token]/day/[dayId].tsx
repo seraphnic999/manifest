@@ -15,7 +15,7 @@ import ShareItemRow from "@/components/ShareItemRow";
 import { useSharePayload } from "../_layout";
 
 export default function ShareDay() {
-  const { dayId } = useLocalSearchParams<{ dayId: string }>();
+  const { token, dayId } = useLocalSearchParams<{ token: string; dayId: string }>();
   const router = useRouter();
   const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -31,7 +31,10 @@ export default function ShareDay() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.paper }}>
       <View style={styles.header}>
-        <Pressable style={styles.backBtn} onPress={() => router.back()}>
+        <Pressable
+          style={styles.backBtn}
+          onPress={() => (router.canGoBack() ? router.back() : router.replace(`/share/${token}` as any))}
+        >
           <Icon name="back" size={20} color={colors.ink} />
         </Pressable>
         <View style={{ flex: 1 }}>
