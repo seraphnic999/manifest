@@ -4,7 +4,7 @@
 // already having their own section here; this mirrors the app's own split
 // between Trip Overview's rolled-up Flights section and a day's full list).
 import { useMemo } from "react";
-import { View, Text, ScrollView, Pressable, StyleSheet, ImageBackground } from "react-native";
+import { View, Text, ScrollView, Pressable, StyleSheet, Image } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { radius, fonts, ColorTokens } from "@/lib/theme";
 import { useThemeColors } from "@/lib/ThemeContext";
@@ -51,11 +51,29 @@ export default function ShareOverview() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.paper }}>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 24 }}>
-        <ImageBackground source={coverPhotoSource(trip.cover_photo_id)} style={styles.hero} resizeMode="cover">
+        {/* Plain CSS background-image instead of ImageBackground: this hero
+            is a very wide, short banner (full device width, ~220px tall),
+            and react-native-web's cover-mode Image scales correctly but
+            doesn't reliably center the crop at that aspect ratio — it was
+            anchoring near the top-left, cutting the actual subject (e.g. the
+            Eiffel Tower) out of frame entirely while still "filling" the
+            box, so it looked fine until compared against the real photo.
+            backgroundPosition:"center" is the one thing RN's own style API
+            has no equivalent for, hence dropping to raw CSS here. */}
+        <View
+          style={[
+            styles.hero,
+            {
+              backgroundImage: `url(${Image.resolveAssetSource(coverPhotoSource(trip.cover_photo_id)).uri})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+            } as any,
+          ]}
+        >
           <View style={styles.heroScrim} />
           <Text style={styles.heroName}>{trip.name}</Text>
           <Text style={styles.heroDates}>{formatDateDDMMYYYY(trip.start_date)} – {formatDateDDMMYYYY(trip.end_date)}</Text>
-        </ImageBackground>
+        </View>
 
         <View style={styles.body}>
           <WeatherCarousel tripId={trip.id} destinations={destinations} forecasts={forecasts} />
