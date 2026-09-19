@@ -7,6 +7,9 @@ import { radius, fonts, ColorTokens } from "@/lib/theme";
 import { useThemeColors } from "@/lib/ThemeContext";
 import { PackingItem } from "@/lib/types";
 import { PACKING_CATEGORIES, mergePackingItems, fetchTemplateItems, fetchTripPackingAsSource } from "@/lib/packing";
+import { fetchTripForecasts } from "@/lib/weather";
+import { computeWeatherPackingSuggestions } from "@/lib/weatherPacking";
+import WeatherPackingModal from "@/components/WeatherPackingModal";
 import TripScreenHeader from "@/components/TripScreenHeader";
 import TripTabBar from "@/components/TripTabBar";
 import { useTripHamburgerMenu } from "@/components/useTripHamburgerMenu";
@@ -20,22 +23,30 @@ interface PackingData {
   items: PackingItem[];
   templates: { id: string; name: string }[];
   otherTrips: { id: string; name: string }[];
+  trip: { destinations: string[]; start_date: string | null; end_date: string | null } | null;
 }
 
 async function fetchPackingData(tripId: string): Promise<PackingData> {
-  const [{ data: items, error: itemsError }, { data: templates, error: templatesError }, { data: trips, error: tripsError }] =
-    await Promise.all([
+  const [
+    { data: items, error: itemsError },
+    { data: templates, error: templatesError },
+    { data: trips, error: tripsError },
+    { data: trip, error: tripError },
+  ] = await Promise.all([
       supabase.from("packing_items").select("*").eq("trip_id", tripId).order("sort_order"),
       supabase.from("packing_templates").select("id, name").order("name"),
       supabase.from("trips").select("id, name").is("deleted_at", null).neq("id", tripId).order("start_date", { ascending: false }),
+      supabase.from("trips").select("destinations, start_date, end_date").eq("id", tripId).single(),
     ]);
   if (itemsError) throw itemsError;
   if (templatesError) throw templatesError;
   if (tripsError) throw tripsError;
+  if (tripError) throw tripError;
   return {
     items: (items ?? []) as PackingItem[],
     templates: templates ?? [],
     otherTrips: trips ?? [],
+    trip: trip as PackingData["trip"],
   };
 }
 
@@ -48,12 +59,31 @@ export default function PackingScreen() {
   const [populateOpen, setPopulateOpen] = useState(false);
   const [addItemOpen, setAddItemOpen] = useState(false);
   const [sourcePickerOpen, setSourcePickerOpen] = useState<"template" | "trip" | null>(null);
+  const [weatherModalOpen, setWeatherModalOpen] = useState(false);
   const { menuItems, shareModal } = useTripHamburgerMenu(tripId);
 
   const { data, dataUpdatedAt, refetch } = useQuery({ queryKey: ["packing", tripId], queryFn: () => fetchPackingData(tripId) });
   const items = data?.items ?? [];
   const templates = data?.templates ?? [];
   const otherTrips = data?.otherTrips ?? [];
+  const trip = data?.trip ?? null;
+
+  // Same free, keyless Open-Meteo call the trip overview's WeatherCarousel
+  // already makes — fetched once the trip's destinations are known so the
+  // "From this trip's weather" row can show as enabled/disabled with a
+  // reason immediately, rather than only discovering availability after
+  // the user taps into it.
+  const hasDestinations = !!trip && trip.destinations.length > 0;
+  const { data: weatherForecasts, isLoading: weatherLoading } = useQuery({
+    queryKey: ["packingWeather", tripId, trip?.destinations],
+    queryFn: () => fetchTripForecasts(trip!.destinations),
+    enabled: hasDestinations,
+  });
+  // A trip with no destinations set never has anything to fetch — treat it
+  // as "no forecast" immediately rather than showing "Loading forecast…"
+  // forever waiting on a query that will never run.
+  const weatherResult = trip ? computeWeatherPackingSuggestions(trip, hasDestinations ? weatherForecasts ?? [] : []) : null;
+  const weatherStillLoading = hasDestinations && weatherLoading;
 
   useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
 
@@ -196,6 +226,22 @@ export default function PackingScreen() {
             <Pressable style={styles.modalRow} onPress={() => setSourcePickerOpen("trip")}>
               <Text style={styles.modalRowText}>Copy from an existing trip</Text>
             </Pressable>
+            <Pressable
+              style={styles.modalRow}
+              disabled={!weatherResult?.available}
+              onPress={() => { setPopulateOpen(false); setWeatherModalOpen(true); }}
+            >
+              <Text style={[styles.modalRowText, !weatherResult?.available && styles.modalRowTextDisabled]}>
+                From this trip's weather
+              </Text>
+              <Text style={styles.modalRowSubtext}>
+                {weatherStillLoading
+                  ? "Loading forecast…"
+                  : weatherResult?.available
+                  ? weatherResult.summary
+                  : weatherResult?.unavailableReason}
+              </Text>
+            </Pressable>
           </Pressable>
         </Pressable>
       </Modal>
@@ -227,6 +273,17 @@ export default function PackingScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {weatherResult && (
+        <WeatherPackingModal
+          visible={weatherModalOpen}
+          onClose={() => setWeatherModalOpen(false)}
+          tripId={tripId}
+          result={weatherResult}
+          destinationsLabel={(trip?.destinations ?? []).join(", ")}
+          onAdded={refetch}
+        />
+      )}
       <TripTabBar tripId={tripId} active="packing" />
     </View>
   );
@@ -271,6 +328,8 @@ const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   modalTitle: { color: colors.ink, fontWeight: "700", fontSize: 16, marginBottom: 6 },
   modalHint: { color: colors.inkSoft, fontSize: 12, marginBottom: 12 },
   modalRow: { padding: 12, borderBottomWidth: 1, borderBottomColor: colors.line },
+  modalRowTextDisabled: { color: colors.inkSoft },
+  modalRowSubtext: { color: colors.inkSoft, fontSize: 11.5, marginTop: 3 },
   fab: {
     position: "absolute", bottom: 74, right: 16, width: 52, height: 52, borderRadius: 26,
     backgroundColor: colors.ink, alignItems: "center", justifyContent: "center",
