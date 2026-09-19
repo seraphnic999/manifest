@@ -69,7 +69,14 @@ export default function QuickAddModal({ visible, onClose, tripId, fallbackDayId,
     if (!asset.base64) { setError("Couldn't read that photo."); return; }
     setError(null);
     setText("");
-    setPhoto({ uri: asset.uri, base64: asset.base64, mimeType: asset.mimeType ?? "image/jpeg" });
+    // asset.mimeType can't be trusted here — passing `quality` forces
+    // JPEG re-encoding of the actual output regardless of the source
+    // file's format, but on some Android/picker combinations the asset's
+    // own mimeType still reflects the original (e.g. a picked PNG reports
+    // "image/png" while the bytes underneath are already JPEG), which
+    // Claude's vision API rejects outright as a mismatch. Hardcoding
+    // jpeg here matches what `quality` actually guarantees.
+    setPhoto({ uri: asset.uri, base64: asset.base64, mimeType: "image/jpeg" });
   }
 
   async function submit() {
