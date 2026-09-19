@@ -32,13 +32,21 @@ export async function identifyItem(
      * item's day was placed there by the user directly, so that day's own
      * resolved city is already correct. */
     tripWideCityContext?: boolean;
+    /** Quick Add's "paste a link" path — the fetched page's own text,
+     * folded into the identify prompt so a page that names the actual
+     * place a few paragraphs into its own body still resolves correctly. */
+    extraContext?: string;
   }
 ): Promise<{
   candidates: IdentifyCandidate[] | null;
   error: string | null;
 }> {
   const { data, error } = await supabase.functions.invoke("identify-item", {
-    body: { item_id: itemId, trip_wide_city_context: options?.tripWideCityContext ?? false },
+    body: {
+      item_id: itemId,
+      trip_wide_city_context: options?.tripWideCityContext ?? false,
+      extra_context: options?.extraContext,
+    },
   });
   if (error) return { candidates: null, error: error.message ?? "Couldn't identify this item." };
   if (data?.error) return { candidates: null, error: data.error };

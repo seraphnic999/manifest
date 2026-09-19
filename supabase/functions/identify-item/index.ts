@@ -169,10 +169,14 @@ async function callClaude(apiKey: string, messages: Json[]) {
 Deno.serve(async (req) => {
   let itemId: string | undefined;
   let tripWideCityContext = false;
+  let extraContext: string | undefined;
   try {
     const body = await req.json();
     itemId = body?.item_id;
     tripWideCityContext = !!body?.trip_wide_city_context;
+    if (typeof body?.extra_context === "string" && body.extra_context.trim()) {
+      extraContext = body.extra_context.slice(0, 4000);
+    }
   } catch { /* fall through */ }
   if (!itemId) {
     return new Response(JSON.stringify({ error: "item_id is required" }), { status: 400 });
@@ -223,6 +227,14 @@ Deno.serve(async (req) => {
     }
 
     if (trip) contextLines.push(`Trip dates: ${trip.start_date} to ${trip.end_date}`);
+
+    // Set by Quick Add's "paste a link" path — the fetched page's own text,
+    // which often names the actual place more precisely than the page's
+    // <title> alone (a blog post titled "Best pizza in Naples" that names
+    // the actual restaurant three paragraphs in, say).
+    if (extraContext) {
+      contextLines.push(`Additional context from a page the user pasted a link to:\n${extraContext}`);
+    }
 
     const messages: Json[] = [
       {

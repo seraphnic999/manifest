@@ -1,16 +1,30 @@
 // Manifest — quick-add-parse Edge Function
 //
-// Turns a pasted Google Maps link or a natural-language sentence ("dinner at
-// Shabour restaurant on 30/10 20:00") into a first-draft item: a title, a
-// best-guess item type, and a date/time if one was given. Nothing is written
-// to the database here — the client creates the real `items` row from this,
-// then runs the normal identify-item/research-item pipeline against it
-// exactly as if the user had typed the title in by hand.
+// Turns whatever a user pasted or attached into Quick Add — a Google Maps
+// link, a natural-language sentence, any other URL, or a photo — into a
+// first-draft item: a title, a best-guess item type, and a date/time if one
+// was given. Nothing is written to the database here — the client creates
+// the real `items` row from this, then runs the normal identify-item/
+// research-item pipeline against it exactly as if the user had typed the
+// title in by hand.
 //
-// Maps-link mode is pure URL parsing, no LLM involved — Google's own
-// non-shortened place links already embed the place name and coordinates.
-// Natural-language mode needs a tiny Claude call, since "30/10" only
-// resolves to a real date with the trip's own date range as context.
+// Four modes, picked by the client via lightweight auto-detection of what
+// was pasted (Quick Add itself has no mode tabs any more):
+//   maps_link — pure URL parsing, no LLM. Google's own non-shortened place
+//     links already embed the place name and coordinates.
+//   natural_language — a tiny Claude call, since "30/10" only resolves to a
+//     real date with the trip's own date range as context.
+//   url — any other link. Fetches the page, pulls a title from its own
+//     <title>/og:title (no LLM here either), and returns the page's text
+//     too — identify-item folds that in as extra context so a page that
+//     names the actual place a few paragraphs into its own body (a blog
+//     post, say) still resolves correctly, not just whatever the page's own
+//     title happens to say.
+//   image — a photo (a booking confirmation, a ticket, a flyer). One Claude
+//     vision call extracts the same title/type/date/time shape as the
+//     natural-language path. Sent as base64 directly in the request rather
+//     than uploaded to storage first — nothing here needs to persist past
+//     this one call.
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
@@ -69,6 +83,127 @@ async function parseMapsLink(
     return { title: decodeMapsSegment(queryMatch[1]), latitude: lat, longitude: lon };
   }
   return { error: "Couldn't read a place name from that link — try a full (non-shortened) Google Maps link, or paste the place name directly instead." };
+}
+
+const MAX_FETCH_BYTES = 2_000_000; // 2MB is plenty for an HTML page's markup; stops a huge/misbehaving response from tying up the function
+const MAX_PAGE_TEXT_CHARS = 4000;
+
+const PRIVATE_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1"]);
+function isPrivateHost(hostname: string): boolean {
+  if (PRIVATE_HOSTS.has(hostname)) return true;
+  // Raw IP literals in the private/link-local ranges — a hostname-only
+  // check (not a DNS-rebinding-proof one), but this is a low-stakes
+  // authenticated-user tool, not a public endpoint, so this is a
+  // reasonable v1 guard against an obviously-wrong paste rather than a
+  // hardened SSRF defense.
+  const m = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (!m) return false;
+  const [a, b] = [Number(m[1]), Number(m[2])];
+  return a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 169 && b === 254);
+}
+
+function decodeHtmlEntities(s: string): string {
+  return s
+    .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&rsquo;/g, "’").replace(/&mdash;/g, "—");
+}
+
+function stripHtml(html: string): string {
+  const withoutScripts = html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<!--[\s\S]*?-->/g, " ");
+  const text = withoutScripts.replace(/<[^>]+>/g, " ");
+  return decodeHtmlEntities(text).replace(/\s+/g, " ").trim();
+}
+
+function extractTitle(html: string): string | null {
+  const og = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)
+    ?? html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:title["']/i);
+  if (og?.[1]) return decodeHtmlEntities(og[1]).trim();
+  const titleTag = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+  if (titleTag?.[1]) return decodeHtmlEntities(titleTag[1]).trim();
+  return null;
+}
+
+async function parseUrl(rawUrl: string): Promise<{ title: string; page_text: string } | { error: string }> {
+  let url: URL;
+  try {
+    url = new URL(rawUrl.trim());
+  } catch {
+    return { error: "That doesn't look like a valid link." };
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    return { error: "That doesn't look like a valid link." };
+  }
+  if (isPrivateHost(url.hostname)) {
+    return { error: "That link isn't reachable." };
+  }
+
+  let html: string;
+  try {
+    const res = await fetch(url.toString(), {
+      redirect: "follow",
+      headers: { "user-agent": "Mozilla/5.0 (compatible; ManifestQuickAdd/1.0)" },
+    });
+    if (!res.ok) return { error: `Couldn't open that link (${res.status}).` };
+    const buf = await res.arrayBuffer();
+    html = new TextDecoder("utf-8", { fatal: false }).decode(buf.slice(0, MAX_FETCH_BYTES));
+  } catch {
+    return { error: "Couldn't open that link." };
+  }
+
+  const title = extractTitle(html);
+  if (!title) return { error: "Couldn't find a name on that page — try pasting the place name directly instead." };
+
+  const pageText = stripHtml(html).slice(0, MAX_PAGE_TEXT_CHARS);
+  return { title, page_text: pageText };
+}
+
+async function parseImage(
+  base64: string, mediaType: string
+): Promise<{ title: string; item_type: string; date: string | null; time: string | null; cost_usd: number } | { error: string }> {
+  const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+  if (!apiKey) return { error: "ANTHROPIC_API_KEY is not set on this project." };
+
+  const res = await fetch(ANTHROPIC_URL, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: 512,
+      system: `Extract a trip item from a photo the user attached to a "quick add" box — a screenshot of a booking confirmation, a ticket, a menu, a flyer, anything that names a specific place, event, or reservation.
+
+Return a clean title (the place/venue/event name — not the whole confirmation text), a best-guess item type, and a date/time if the photo shows one.
+
+item_type must be exactly one of: ${ITEM_TYPES.join(", ")}. Guess from context; use "other" only if nothing fits.
+
+Dates: return YYYY-MM-DD, or null if none is shown. Times: 24-hour HH:MM, or null.
+
+If the photo doesn't clearly show a specific place, event, or reservation, call the tool with title set to an empty string instead of guessing.
+
+Call extract_quick_add exactly once. No prose.`,
+      messages: [{
+        role: "user",
+        content: [{ type: "image", source: { type: "base64", media_type: mediaType, data: base64 } }],
+      }],
+      tools: [NL_TOOL],
+      tool_choice: { type: "tool", name: "extract_quick_add" },
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    return { error: `Claude API ${res.status}: ${body.slice(0, 300)}` };
+  }
+  const json = await res.json();
+  const call = (json.content ?? []).find((c: any) => c.type === "tool_use" && c.name === "extract_quick_add");
+  if (!call) return { error: "The model didn't return a usable result." };
+  if (!call.input?.title) return { error: "Couldn't make out a place or booking in that photo." };
+  const usage = json.usage ?? {};
+  const cost_usd = Number((
+    (usage.input_tokens ?? 0) * USD_PER_INPUT_TOKEN + (usage.output_tokens ?? 0) * USD_PER_OUTPUT_TOKEN
+  ).toFixed(5));
+  return { ...call.input, cost_usd };
 }
 
 const NL_SYSTEM = `Extract a trip item from one short natural-language sentence a user typed into a "quick add" box.
@@ -161,7 +296,25 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify(result), { headers: { "content-type": "application/json" } });
     }
 
-    return new Response(JSON.stringify({ error: "mode must be 'maps_link' or 'natural_language'" }), { status: 400 });
+    if (body?.mode === "url") {
+      if (!body.url || typeof body.url !== "string") {
+        return new Response(JSON.stringify({ error: "url is required" }), { status: 400 });
+      }
+      const result = await parseUrl(body.url);
+      if ("error" in result) return new Response(JSON.stringify(result), { status: 422 });
+      return new Response(JSON.stringify(result), { headers: { "content-type": "application/json" } });
+    }
+
+    if (body?.mode === "image") {
+      if (!body.base64 || typeof body.base64 !== "string") {
+        return new Response(JSON.stringify({ error: "base64 is required" }), { status: 400 });
+      }
+      const result = await parseImage(body.base64, body.media_type || "image/jpeg");
+      if ("error" in result) return new Response(JSON.stringify(result), { status: 422 });
+      return new Response(JSON.stringify(result), { headers: { "content-type": "application/json" } });
+    }
+
+    return new Response(JSON.stringify({ error: "mode must be 'maps_link', 'natural_language', 'url', or 'image'" }), { status: 400 });
   } catch (e) {
     return new Response(
       JSON.stringify({ error: String(e instanceof Error ? e.message : e).slice(0, 300) }),
