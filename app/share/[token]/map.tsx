@@ -163,7 +163,10 @@ const makeStyles = (colors: ColorTokens) => StyleSheet.create({
     backgroundColor: colors.paperRaised, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line,
     padding: 14, shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4,
   },
-  previewClose: { position: "absolute", top: 10, right: 10, padding: 4, zIndex: 1 },
+  previewClose: {
+    position: "absolute", top: 4, right: 4, padding: 10, zIndex: 1,
+    alignItems: "center", justifyContent: "center",
+  },
   previewRow: { flexDirection: "row", paddingRight: 20 },
   previewTagRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 2 },
   previewTag: { color: colors.blue, fontSize: 10, fontWeight: "700", letterSpacing: 0.5 },
