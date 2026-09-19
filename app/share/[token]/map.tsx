@@ -103,17 +103,26 @@ export default function ShareMap() {
       )}
 
       <View style={{ flex: 1 }}>
-        <TripMap
-          items={mapItems}
-          routes={routes}
-          dayColors={dayColors}
-          dateToDayId={dateToDayId}
-          neutralColor={NEUTRAL_DAY_COLOR}
-          visibleDayIds={visibleDayIds}
-          visibleTypes={visibleTypes}
-          tripFocus={trip.latitude != null && trip.longitude != null ? { latitude: trip.latitude, longitude: trip.longitude } : null}
-          onItemPress={(item) => setSelected(item)}
-        />
+        {/* MapLibre attaches its own click listeners straight onto marker
+            DOM elements it manages itself, outside this View's normal
+            stacking — a plain zIndex on the preview panel below doesn't
+            reliably out-rank that, so a tap meant for the panel's close
+            button could still land on a marker underneath. Disabling the
+            map's own pointer events while a preview is open sidesteps that
+            entirely rather than fighting it. */}
+        <View style={{ flex: 1 }} pointerEvents={selected ? "none" : "auto"}>
+          <TripMap
+            items={mapItems}
+            routes={routes}
+            dayColors={dayColors}
+            dateToDayId={dateToDayId}
+            neutralColor={NEUTRAL_DAY_COLOR}
+            visibleDayIds={visibleDayIds}
+            visibleTypes={visibleTypes}
+            tripFocus={trip.latitude != null && trip.longitude != null ? { latitude: trip.latitude, longitude: trip.longitude } : null}
+            onItemPress={(item) => setSelected(item)}
+          />
+        </View>
 
         {selected && (
           <View style={styles.previewPanel}>
