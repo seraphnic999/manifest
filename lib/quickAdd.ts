@@ -3,9 +3,26 @@
 // item, then hands it straight into the existing identify-item/research-item
 // pipeline (via IdentifyCandidatesModal) exactly as if the user had typed
 // the title into the normal new-item form.
+import { FunctionsHttpError } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 import { computeInsertSortOrder } from "./reorder";
 import { ItemType } from "./types";
+
+// supabase-js's `error` for a non-2xx Edge Function response is always the
+// same generic "Edge Function returned a non-2xx status code" — the actual
+// {error: "..."} body quick-add-parse sends (a real link-couldn't-be-read/
+// photo-couldn't-be-read message) only lives on error.context, a raw
+// Response that has to be read separately. Every mode below hit this the
+// same way, so it's pulled out once here rather than four times over.
+async function functionErrorMessage(error: unknown, fallback: string): Promise<string> {
+  if (error instanceof FunctionsHttpError) {
+    try {
+      const body = await error.context.json();
+      if (typeof body?.error === "string") return body.error;
+    } catch { /* non-JSON body, or already consumed — fall through */ }
+  }
+  return (error as { message?: string })?.message ?? fallback;
+}
 
 const MAPS_HOSTS = new Set(["maps.app.goo.gl", "goo.gl", "maps.google.com"]);
 
@@ -54,7 +71,7 @@ export interface QuickAddUrlResult {
 
 export async function parseMapsLink(url: string): Promise<{ result: QuickAddMapsResult | null; error: string | null }> {
   const { data, error } = await supabase.functions.invoke("quick-add-parse", { body: { mode: "maps_link", url } });
-  if (error) return { result: null, error: error.message ?? "Couldn't read that link." };
+  if (error) return { result: null, error: await functionErrorMessage(error, "Couldn't read that link.") };
   if (data?.error) return { result: null, error: data.error };
   return { result: data as QuickAddMapsResult, error: null };
 }
@@ -65,14 +82,14 @@ export async function parseNaturalLanguage(
   const { data, error } = await supabase.functions.invoke("quick-add-parse", {
     body: { mode: "natural_language", text, trip_start: tripStart, trip_end: tripEnd },
   });
-  if (error) return { result: null, error: error.message ?? "Couldn't parse that." };
+  if (error) return { result: null, error: await functionErrorMessage(error, "Couldn't parse that.") };
   if (data?.error) return { result: null, error: data.error };
   return { result: data as QuickAddNLResult, error: null };
 }
 
 export async function parseUrl(url: string): Promise<{ result: QuickAddUrlResult | null; error: string | null }> {
   const { data, error } = await supabase.functions.invoke("quick-add-parse", { body: { mode: "url", url } });
-  if (error) return { result: null, error: error.message ?? "Couldn't read that link." };
+  if (error) return { result: null, error: await functionErrorMessage(error, "Couldn't read that link.") };
   if (data?.error) return { result: null, error: data.error };
   return { result: { title: data.title, pageText: data.page_text }, error: null };
 }
@@ -83,7 +100,7 @@ export async function parseImage(
   const { data, error } = await supabase.functions.invoke("quick-add-parse", {
     body: { mode: "image", base64, media_type: mediaType },
   });
-  if (error) return { result: null, error: error.message ?? "Couldn't read that photo." };
+  if (error) return { result: null, error: await functionErrorMessage(error, "Couldn't read that photo.") };
   if (data?.error) return { result: null, error: data.error };
   return { result: data as QuickAddNLResult, error: null };
 }

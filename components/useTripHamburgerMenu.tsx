@@ -49,7 +49,12 @@ export function useTripHamburgerMenu(tripId: string) {
   const menuItems: HamburgerMenuItem[] = [
     { icon: "export", label: exporting ? "Exporting…" : "Export PDF", onPress: handleExportPdf },
     { icon: "edit", label: "Edit Trip", onPress: () => router.push(`/trip/${tripId}/edit`) },
-    ...(isOwner ? [{ icon: "share" as const, label: "Share Trip", onPress: () => setShareOpen(true) }] : []),
+    // "Share Trip" (collaborator invite by email) is deliberately hidden
+    // from the menu for now, per the user's request — the feature itself
+    // (ShareTripModal, setShareOpen, claimPendingTripShares) is untouched
+    // below and still fully wired, just unreachable from the UI. Restore
+    // by uncommenting this entry.
+    // ...(isOwner ? [{ icon: "share" as const, label: "Share Trip", onPress: () => setShareOpen(true) }] : []),
     { icon: "share" as const, label: "Share Link", onPress: () => setShareLinkOpen(true) },
     { icon: "document", label: "Doc Tracker", onPress: () => router.push("/doctracker") },
     { icon: "flag", label: "Entry Validation", onPress: handleEntryValidation },
