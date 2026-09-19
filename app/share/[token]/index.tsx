@@ -4,7 +4,7 @@
 // already having their own section here; this mirrors the app's own split
 // between Trip Overview's rolled-up Flights section and a day's full list).
 import { useMemo } from "react";
-import { View, Text, ScrollView, Pressable, StyleSheet, Image } from "react-native";
+import { View, Text, ScrollView, Pressable, StyleSheet, ImageBackground } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { radius, fonts, ColorTokens } from "@/lib/theme";
 import { useThemeColors } from "@/lib/ThemeContext";
@@ -51,29 +51,21 @@ export default function ShareOverview() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.paper }}>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 24 }}>
-        {/* Plain absolute-fill Image instead of ImageBackground: this hero
-            is a very wide, short banner (full device width, ~220px tall),
-            and react-native-web's cover-mode Image scales correctly but
-            doesn't reliably center the crop at that aspect ratio — it was
-            anchoring near the top-left, cutting the actual subject (e.g.
-            the Eiffel Tower) out of frame entirely while still "filling"
-            the box, so it looked fine until compared against the real
-            photo. objectPosition is the one thing RN's own style API has
-            no equivalent for; react-native-web forwards unrecognized style
-            keys straight through to CSS, so it's added directly here
-            rather than fighting ImageBackground's opaque web behavior.
-            (Image.resolveAssetSource, tried first, isn't present in this
-            web bundle at all — crashed the page outright.) */}
-        <View style={styles.hero}>
-          <Image
-            source={coverPhotoSource(trip.cover_photo_id)}
-            resizeMode="cover"
-            style={[StyleSheet.absoluteFillObject, { objectFit: "cover", objectPosition: "center" } as any]}
-          />
+        {/* react-native-web's Image bakes the source asset's own intrinsic
+            width/height into its style before the container's style is
+            merged in (see its resolveAssetDimensions/imageSizeStyle). Our
+            hero style never set an explicit width, so that real value
+            never overrode the intrinsic one — the image rendered at its
+            native ~1200px size, anchored top-left, then got clipped down
+            to whatever fit in the 220px-tall box (ImageBackground's root
+            has overflow:hidden), showing only its top-left corner instead
+            of a scaled, centered crop. width:"100%" on .hero is what makes
+            this ImageBackground + resizeMode="cover" work correctly. */}
+        <ImageBackground source={coverPhotoSource(trip.cover_photo_id)} style={styles.hero} resizeMode="cover">
           <View style={styles.heroScrim} />
           <Text style={styles.heroName}>{trip.name}</Text>
           <Text style={styles.heroDates}>{formatDateDDMMYYYY(trip.start_date)} – {formatDateDDMMYYYY(trip.end_date)}</Text>
-        </View>
+        </ImageBackground>
 
         <View style={styles.body}>
           <WeatherCarousel tripId={trip.id} destinations={destinations} forecasts={forecasts} />
@@ -144,7 +136,7 @@ export default function ShareOverview() {
 }
 
 const makeStyles = (colors: ColorTokens) => StyleSheet.create({
-  hero: { height: 220, justifyContent: "flex-end", padding: 20 },
+  hero: { height: 220, width: "100%", justifyContent: "flex-end", padding: 20 },
   heroScrim: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(11,30,63,0.35)" },
   heroName: { color: "#fff", fontFamily: fonts.display, fontSize: 24, marginBottom: 4 },
   heroDates: { color: "rgba(255,255,255,0.9)", fontSize: 14 },
