@@ -159,7 +159,7 @@ const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   },
   typeChipActive: { backgroundColor: colors.blue, borderColor: colors.blue },
   previewPanel: {
-    position: "absolute", left: 12, right: 12, bottom: 12,
+    position: "absolute", left: 12, right: 12, bottom: 12, zIndex: 20,
     backgroundColor: colors.paperRaised, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line,
     padding: 14, shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4,
   },
