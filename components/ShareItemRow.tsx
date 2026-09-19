@@ -4,8 +4,8 @@
 // day). Kept separate from the app's own item-row components since this one
 // is deliberately read-only with no drag handle, edit affordance, or
 // navigation on tap.
-import { useMemo } from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { useMemo, useState } from "react";
+import { View, Text, Pressable, StyleSheet } from "react-native";
 import { fonts, radius, ColorTokens } from "@/lib/theme";
 import { useThemeColors } from "@/lib/ThemeContext";
 import Icon from "@/components/icons/Icon";
@@ -18,8 +18,16 @@ import { FlightStatusRow } from "@/lib/flightStatus";
 export default function ShareItemRow({ item, flightStatus }: { item: PublicItem; flightStatus?: FlightStatusRow }) {
   const colors = useThemeColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const [expanded, setExpanded] = useState(false);
+  // Live flight status is never hidden behind the tap — only the address/
+  // notes "description" the user asked to collapse.
+  const hasDetails = !!item.address || !!item.notes;
   return (
-    <View style={styles.itemRow}>
+    <Pressable
+      style={styles.itemRow}
+      onPress={() => hasDetails && setExpanded((e) => !e)}
+      disabled={!hasDetails}
+    >
       <View style={styles.itemTimeCol}>
         <Text style={styles.itemTime}>{item.time_start ? normalizeTimeHHMM(item.time_start) : ""}</Text>
         {item.time_end && <Text style={styles.itemTimeEnd}>↓ {normalizeTimeHHMM(item.time_end)}</Text>}
@@ -31,13 +39,21 @@ export default function ShareItemRow({ item, flightStatus }: { item: PublicItem;
         <View style={styles.itemTagRow}>
           <Text style={styles.itemTag}>{itemTypeTag(item.type)}</Text>
           {item.status !== "booked" && <Text style={styles.itemStatusBadge}>{STATUS_LABEL[item.status]}</Text>}
+          {hasDetails && (
+            <Icon
+              name="forward"
+              size={13}
+              color={colors.inkSoft}
+              style={{ marginLeft: "auto", transform: [{ rotate: expanded ? "90deg" : "0deg" }] }}
+            />
+          )}
         </View>
         <Text style={styles.itemTitle}>{item.title}</Text>
-        {!!item.address && <Text style={styles.itemMeta}>{item.address}</Text>}
-        {!!item.notes && <Text style={styles.itemMeta}>{item.notes}</Text>}
+        {expanded && !!item.address && <Text style={styles.itemMeta}>{item.address}</Text>}
+        {expanded && !!item.notes && <Text style={styles.itemMeta}>{item.notes}</Text>}
         {flightStatus && <FlightStatusCard row={flightStatus} loading={false} onRefresh={() => {}} compact />}
       </View>
-    </View>
+    </Pressable>
   );
 }
 
