@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState } from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView, Modal } from "react-native";
+import { useCallback, useMemo } from "react";
+import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
 import { useLocalSearchParams, Stack, useFocusEffect, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
@@ -8,7 +8,7 @@ import { useThemeColors } from "@/lib/ThemeContext";
 import { TripCurrency, TripParty, Expense, Allocation, ExpenseType } from "@/lib/types";
 import { EXPENSE_TYPES, EXPENSE_TYPE_LABELS } from "@/lib/expenseType";
 import { classifyExpenseTiming, ExpenseTiming } from "@/lib/expenseTiming";
-import { formatDateDDMMYYYY } from "@/lib/dateFormat";
+import { fetchTripPayments } from "@/lib/settlement";
 import TripScreenHeader from "@/components/TripScreenHeader";
 import TripTabBar from "@/components/TripTabBar";
 import { useTripHamburgerMenu } from "@/components/useTripHamburgerMenu";
@@ -16,13 +16,6 @@ import { useNetworkStatus } from "@/lib/useNetworkStatus";
 import OfflineBanner from "@/components/OfflineBanner";
 
 type ExpenseWithAllocations = Expense & { allocations: Allocation[] };
-
-interface OwedItem {
-  expenseId: string;
-  note: string | null;
-  date: string | null;
-  nis: number;
-}
 
 function Bar({ label, value, maxValue, color }: { label: string; value: number; maxValue: number; color: string }) {
   const pct = maxValue > 0 ? Math.max(2, (value / maxValue) * 100) : 0;
@@ -60,6 +53,7 @@ interface ReportData {
   currencies: TripCurrency[];
   parties: TripParty[];
   expenses: ExpenseWithAllocations[];
+  paidByParty: Record<string, number>;
 }
 
 async function fetchReportData(tripId: string): Promise<ReportData> {
@@ -71,12 +65,19 @@ async function fetchReportData(tripId: string): Promise<ReportData> {
   if (partiesError) throw partiesError;
   const { data: e, error: expensesError } = await supabase.from("expenses").select("*, allocations(*)").eq("trip_id", tripId);
   if (expensesError) throw expensesError;
+  const payments = await fetchTripPayments(tripId);
+
+  const paidByParty: Record<string, number> = {};
+  for (const payment of payments) {
+    paidByParty[payment.party_id] = (paidByParty[payment.party_id] ?? 0) + payment.amount_nis;
+  }
 
   return {
     tripStartDate: trip?.start_date ?? null,
     currencies: (c ?? []) as TripCurrency[],
     parties: (p ?? []) as TripParty[],
     expenses: (e ?? []) as ExpenseWithAllocations[],
+    paidByParty,
   };
 }
 
@@ -85,7 +86,6 @@ export default function ExpenseReport() {
   const router = useRouter();
   const { menuItems, shareModal } = useTripHamburgerMenu(tripId);
   const isOnline = useNetworkStatus();
-  const [openPartyId, setOpenPartyId] = useState<string | null>(null);
 
   const { data, dataUpdatedAt, refetch } = useQuery({
     queryKey: ["report", tripId],
@@ -95,6 +95,7 @@ export default function ExpenseReport() {
   const currencies = data?.currencies ?? [];
   const parties = data?.parties ?? [];
   const expenses = data?.expenses ?? [];
+  const paidByParty = data?.paidByParty ?? {};
 
   useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
 
@@ -124,16 +125,22 @@ export default function ExpenseReport() {
   const maxTimingValue = Math.max(totalsByTiming["pre-trip"], totalsByTiming["in-trip"]);
 
   const owedByParty: Record<string, number> = {};
-  const owedItemsByParty: Record<string, OwedItem[]> = {};
   for (const e of expenses) {
     for (const a of e.allocations ?? []) {
       if (!a.party_id) continue;
-      const nis = toNis(a.amount, e.currency_code);
-      owedByParty[a.party_id] = (owedByParty[a.party_id] ?? 0) + nis;
-      (owedItemsByParty[a.party_id] ??= []).push({ expenseId: e.id, note: e.note, date: e.expense_date, nis });
+      owedByParty[a.party_id] = (owedByParty[a.party_id] ?? 0) + toNis(a.amount, e.currency_code);
     }
   }
-  const maxOwedValue = Math.max(0, ...Object.values(owedByParty));
+  // "Owed to me" shows what's still outstanding (owed minus payments already
+  // recorded — see lib/settlement.ts), not the raw original allocation, so a
+  // party who's paid back in full stops looking like they still owe forever.
+  // myNetSpendNis stays keyed off the raw total, though — a debt eventually
+  // getting collected doesn't change what the trip actually cost overall.
+  const outstandingByParty: Record<string, number> = {};
+  for (const partyId of Object.keys(owedByParty)) {
+    outstandingByParty[partyId] = Math.max(0, owedByParty[partyId] - (paidByParty[partyId] ?? 0));
+  }
+  const maxOwedValue = Math.max(0, ...Object.values(outstandingByParty));
   const totalOwedToMeNis = Object.values(owedByParty).reduce((sum, v) => sum + v, 0);
   const myNetSpendNis = totalNis - totalOwedToMeNis;
 
@@ -188,11 +195,18 @@ export default function ExpenseReport() {
         <View style={styles.card}>
           {Object.keys(owedByParty).length === 0 && <Text style={styles.empty}>Nobody owes you money on this trip.</Text>}
           {Object.entries(owedByParty).map(([partyId, amt]) => (
-            <Pressable key={partyId} onPress={() => setOpenPartyId(partyId)}>
-              <Bar label={partyName(partyId)} value={amt} maxValue={maxOwedValue} color={colors.coral} />
+            <Pressable key={partyId} onPress={() => router.push(`/trip/${tripId}/settlement/${partyId}`)}>
+              {outstandingByParty[partyId] > 0 ? (
+                <Bar label={partyName(partyId)} value={outstandingByParty[partyId]} maxValue={maxOwedValue} color={colors.coral} />
+              ) : (
+                <View style={styles.settledRow}>
+                  <Text style={styles.settledLabel}>{partyName(partyId)}</Text>
+                  <Text style={styles.settledBadge}>Settled ✓</Text>
+                </View>
+              )}
             </Pressable>
           ))}
-          {Object.keys(owedByParty).length > 0 && <Text style={styles.hint}>Tap a person to see the itemized list.</Text>}
+          {Object.keys(owedByParty).length > 0 && <Text style={styles.hint}>Tap a person to record a payment or see the itemized list.</Text>}
           <View style={styles.netRow}>
             <Text style={styles.netLabel}>You're actually paying</Text>
             <Text style={styles.netAmt}>{"₪"} {myNetSpendNis.toFixed(0)}</Text>
@@ -214,27 +228,6 @@ export default function ExpenseReport() {
         </View>
       </ScrollView>
 
-      <Modal visible={!!openPartyId} transparent animationType="fade" onRequestClose={() => setOpenPartyId(null)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setOpenPartyId(null)}>
-          <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
-            <Text style={styles.modalTitle}>{openPartyId ? partyName(openPartyId) : ""}</Text>
-            <ScrollView style={{ maxHeight: 400 }}>
-              {(openPartyId ? owedItemsByParty[openPartyId] ?? [] : []).map((item, idx) => (
-                <View key={idx} style={styles.itemRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.itemNote}>{item.note || "Expense"}</Text>
-                    {item.date && <Text style={styles.itemDate}>{formatDateDDMMYYYY(item.date)}</Text>}
-                  </View>
-                  <Text style={styles.itemAmt}>{"₪"} {item.nis.toFixed(0)}</Text>
-                </View>
-              ))}
-            </ScrollView>
-            <Pressable style={styles.modalCloseBtn} onPress={() => setOpenPartyId(null)}>
-              <Text style={styles.modalCloseBtnText}>Close</Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
       <TripTabBar tripId={tripId} active="expenses" />
     </View>
   );
@@ -258,19 +251,10 @@ const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   },
   netLabel: { color: colors.ink, fontWeight: "700", fontSize: 13 },
   netAmt: { fontFamily: "JetBrainsMono_600SemiBold", color: colors.ink, fontWeight: "800", fontSize: 16 },
-  modalBackdrop: { flex: 1, backgroundColor: "rgba(33,47,61,0.5)", justifyContent: "center", padding: 24 },
-  modalCard: {
-    backgroundColor: colors.paper, borderRadius: radius.lg, padding: 20,
-    width: "100%", maxWidth: 420, alignSelf: "center",
+  settledRow: {
+    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+    paddingVertical: 6, marginBottom: 12,
   },
-  modalTitle: { color: colors.ink, fontWeight: "800", fontSize: 17, marginBottom: 10 },
-  itemRow: {
-    flexDirection: "row", alignItems: "center", paddingVertical: 10,
-    borderBottomWidth: 1, borderBottomColor: colors.line,
-  },
-  itemNote: { color: colors.ink, fontWeight: "600", fontSize: 13 },
-  itemDate: { color: colors.inkSoft, fontSize: 11, marginTop: 2 },
-  itemAmt: { fontFamily: "JetBrainsMono_600SemiBold", color: colors.ink, fontWeight: "600", fontSize: 13 },
-  modalCloseBtn: { alignItems: "center", padding: 12, marginTop: 10 },
-  modalCloseBtnText: { color: colors.lightBlue, fontWeight: "700", fontSize: 13 },
+  settledLabel: { color: colors.ink, fontWeight: "600", fontSize: 13 },
+  settledBadge: { color: colors.lightBlue, fontWeight: "700", fontSize: 12 },
 });

@@ -172,6 +172,15 @@ export interface Allocation {
   note: string | null;
 }
 
+export interface SettlementPayment {
+  id: string;
+  trip_id: string;
+  party_id: string;
+  amount_nis: number;
+  payment_date: string | null;
+  note: string | null;
+}
+
 export interface PackingItem {
   id: string;
   trip_id: string;
