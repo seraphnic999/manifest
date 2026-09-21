@@ -226,8 +226,19 @@ null and set `default_timezone` by hand (ask the user, or infer from the
 destination) instead of leaving it on the trip-insert default.
 
 **b) Currencies, with a real live rate — not a placeholder `1`.** NIS is
-always the default row. For every *other* currency the trip's cities
-imply (their `cities.currency_code`), look up today's actual rate before
+always the default row. The app pulls the currency list from **every**
+city on the trip, not just the primary one (a Kyoto+Osaka trip is all
+JPY so it won't show, but a multi-country trip like Paris+Rome needs
+both EUR entries deduped into one, and Paris+Bangkok needs EUR *and*
+THB) — get the distinct set first:
+
+```sql
+select distinct c.currency_code
+from trip_cities tc join cities c on c.id = tc.city_id
+where tc.trip_id = '<trip_id>' and c.currency_code != 'NIS';
+```
+
+For each code that comes back, look up today's actual rate before
 inserting — the app does this via Frankfurter (ECB reference rates, free,
 no key): `GET https://api.frankfurter.app/latest?from=<CODE>&to=ILS`,
 reading `.rates.ILS`. Use WebFetch (or curl if you have shell access) to
@@ -238,10 +249,15 @@ it goes stale immediately:
 insert into trip_currencies (trip_id, code, rate_to_nis, is_default)
 values ('<trip_id>', 'NIS', 1, true);
 
--- one row per foreign currency, after fetching its real rate:
+-- one row per distinct foreign currency from the query above, after
+-- fetching each one's real rate:
 insert into trip_currencies (trip_id, code, rate_to_nis, is_default)
 values ('<trip_id>', 'JPY', <fetched_rate_ils_per_jpy>, false);
 ```
+
+A `custom_name` destination (no `cities` row) contributes no currency
+automatically — ask the user or infer it and add it by hand if the trip
+needs it.
 
 If the live lookup fails (network error, unsupported code), fall back to
 `1` the same way the app's own currency-sync does on a failed fetch, but
