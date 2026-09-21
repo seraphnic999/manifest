@@ -45,6 +45,7 @@ RULES (apply to each entry)
 4. is_update_or_cancellation: true if the email's own language signals this changes or cancels a PRIOR booking (e.g. "itinerary change", "your flight has been changed", "cancellation confirmed", "updated confirmation") rather than a fresh new booking. If true, say what changed in "change_summary".
 5. confidence per field: "high" only if the email states it plainly and unambiguously; "medium" if inferred/implied; "none" if not found — never invent a value to fill a field.
 6. basis: a short quote or paraphrase of where in the email each non-null field came from.
+7. flight_number: for a flight only, the airline code immediately followed by the flight number with no space (e.g. "LY2371", not "LY 2371" or "EL AL 2371"). Null for every other type.
 
 Call propose_booking_items exactly once, with one entry per distinct booking. No prose.`;
 
@@ -73,6 +74,7 @@ const PROPOSE_TOOL = {
             vendor: { type: ["string", "null"] },
             booking_source: { type: ["string", "null"] },
             confirmation_code: { type: ["string", "null"] },
+            flight_number: { type: ["string", "null"], description: "Flight-only: airline code + number with no space, e.g. 'LY2371'. Null otherwise." },
             link: { type: ["string", "null"] },
             notes: { type: ["string", "null"], description: "Anything else worth keeping that doesn't fit another field." },
             is_update_or_cancellation: { type: "boolean" },
@@ -173,14 +175,28 @@ async function matchTrip(supabase: Json, ownerId: string, p: Json): Promise<{ tr
   // not applied: the review screen always shows this as a suggestion the
   // user can accept or swap for "create new instead".
   const { data: items } = await supabase
-    .from("items").select("id, title, type, start_date, vendor, confirmation_code")
+    .from("items").select("id, title, type, start_date, vendor, confirmation_code, custom_fields")
     .eq("trip_id", tripId).eq("type", p.type).is("deleted_at", null);
   let best: Json | null = null;
   let bestScore = 0;
+  // Loose enough to survive real-world variance the AI extraction and the
+  // app's own hand-entered/researched data won't always agree on verbatim
+  // ("EL AL" vs "ELAL", "LY 2371" vs "LY2371") — strip everything but
+  // letters/digits before comparing rather than requiring an exact string.
+  const norm = (s: unknown) => String(s ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const pFlightNum = norm(p.flight_number);
   for (const it of items ?? []) {
     let score = 0;
     if (p.confirmation_code && it.confirmation_code && it.confirmation_code.toLowerCase() === String(p.confirmation_code).toLowerCase()) score += 10;
-    if (p.vendor && it.vendor && it.vendor.toLowerCase() === String(p.vendor).toLowerCase()) score += 3;
+    // As decisive as a confirmation code for a flight — same weight.
+    // custom_fields.flight_number is how every flight item in this schema
+    // already carries its number (see research-item's own convention),
+    // whether the item was entered by hand, researched, or itself came from
+    // a prior email — so this is usually populated even when confirmation
+    // code isn't.
+    const itFlightNum = norm(it.custom_fields?.flight_number);
+    if (pFlightNum && itFlightNum && pFlightNum === itFlightNum) score += 10;
+    if (p.vendor && it.vendor && norm(it.vendor) === norm(p.vendor)) score += 3;
     const titleWords = String(p.title).toLowerCase().split(/\s+/).filter((w: string) => w.length > 2);
     const itTitleLower = String(it.title).toLowerCase();
     score += titleWords.filter((w: string) => itTitleLower.includes(w)).length;
@@ -281,6 +297,7 @@ Deno.serve(async (req) => {
         vendor: field(p.vendor, p.vendor ? "medium" : "none"),
         booking_source: field(p.booking_source, p.booking_source ? "medium" : "none"),
         confirmation_code: field(p.confirmation_code, p.confirmation_code ? "high" : "none"),
+        flight_number: field(p.flight_number, p.flight_number ? "high" : "none"),
         link: field(p.link, p.link ? "medium" : "none"),
         notes: field(p.notes, p.notes ? "medium" : "none"),
         is_update_or_cancellation: !!p.is_update_or_cancellation,
