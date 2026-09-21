@@ -90,6 +90,14 @@ auto-seeds a "Work" row in `trip_parties`, see below).
 Creating a trip auto-generates its `days` rows (see next) via a trigger —
 **never insert into `days` yourself for the trip's real date range.**
 
+`cover_photo_id` and `default_timezone` are **not** set automatically by
+any trigger — the app's own "New Trip" screen sets them client-side from
+the primary (`sort_order = 0`) `trip_cities` row the moment it's picked
+(`cover_photo_id` <- `cities.cover_photo_id`, `default_timezone` <-
+`cities.timezone`). A bare `insert into trips` with no follow-up leaves
+both null/default, unlike a trip made in the app. See §2 for the
+follow-up update.
+
 **`days`** — one row per calendar date in `[start_date, end_date]`,
 auto-generated. Columns: `id, trip_id, date, theme, color, city_id,
 custom_city_name, sort_order`. **Every trip also gets exactly one extra
@@ -164,7 +172,10 @@ Tracker companion.
 
 **`trip_currencies`** — `id, trip_id, code, rate_to_nis, is_default`. NIS
 is always present at `rate_to_nis = 1`. Add a foreign currency the trip
-will use before referencing its code from an expense.
+will use before referencing its code from an expense. **The app always
+looks up a real live rate at creation time** (Frankfurter/ECB, free and
+keyless — see §2) rather than defaulting to `1`; do the same instead of
+inserting a placeholder rate.
 
 **`packing_items`** — `id, trip_id, name, category, packed, sort_order`.
 `category` is free text; the app's own UI sticks to `Clothing, Documents,
@@ -184,7 +195,8 @@ returning id, user_id;
 -- Days (including the Proposals day) are auto-generated — no further insert needed.
 ```
 
-Then link real cities (optional but recommended — drives cover photo/map):
+Then link real cities (optional but recommended — drives cover photo/map).
+The **first** row (`sort_order = 0`) is the primary city:
 
 ```sql
 insert into trip_cities (trip_id, city_id, sort_order)
@@ -192,6 +204,54 @@ select '<trip_id>', id, 0 from cities where name = 'Kyoto' limit 1;
 insert into trip_cities (trip_id, city_id, sort_order)
 select '<trip_id>', id, 1 from cities where name = 'Osaka' limit 1;
 ```
+
+**Then do the three things the app's own "New Trip" screen does that the
+trigger does NOT do for you** — skipping these leaves a trip that looks
+noticeably unfinished next to one made in the app (no cover photo, wrong
+timezone, expenses in a foreign currency with no real conversion rate):
+
+**a) Cover photo + timezone, from the primary city:**
+
+```sql
+update trips t set
+  cover_photo_id = c.cover_photo_id,
+  default_timezone = c.timezone
+from trip_cities tc join cities c on c.id = tc.city_id
+where tc.trip_id = t.id and tc.trip_id = '<trip_id>' and tc.sort_order = 0;
+```
+
+If the primary destination isn't in the `cities` table (a `custom_name`
+row), there's no catalog photo/timezone to pull — leave `cover_photo_id`
+null and set `default_timezone` by hand (ask the user, or infer from the
+destination) instead of leaving it on the trip-insert default.
+
+**b) Currencies, with a real live rate — not a placeholder `1`.** NIS is
+always the default row. For every *other* currency the trip's cities
+imply (their `cities.currency_code`), look up today's actual rate before
+inserting — the app does this via Frankfurter (ECB reference rates, free,
+no key): `GET https://api.frankfurter.app/latest?from=<CODE>&to=ILS`,
+reading `.rates.ILS`. Use WebFetch (or curl if you have shell access) to
+hit it for real at trip-creation time — never hardcode a remembered rate,
+it goes stale immediately:
+
+```sql
+insert into trip_currencies (trip_id, code, rate_to_nis, is_default)
+values ('<trip_id>', 'NIS', 1, true);
+
+-- one row per foreign currency, after fetching its real rate:
+insert into trip_currencies (trip_id, code, rate_to_nis, is_default)
+values ('<trip_id>', 'JPY', <fetched_rate_ils_per_jpy>, false);
+```
+
+If the live lookup fails (network error, unsupported code), fall back to
+`1` the same way the app's own currency-sync does on a failed fetch, but
+say so — don't silently present a failed lookup as a real rate.
+
+**c) Skim `trip_parties`, `packing_items`, companions if relevant to the
+conversation** — the app also auto-adds a "Work" party for a
+`business`/`mixed` trip and can pre-fill packing from a template/other
+trip on creation (see §1/§4); replicate whichever of those the user
+actually asked for, rather than all of them by default.
 
 ## 3. Recipe: add itinerary items
 
@@ -323,3 +383,8 @@ the app's own UI doesn't expect:
   impersonation pattern, and confirmed the `returning user_id` actually
   matched — not just that it was non-null. A wrong-but-valid account is
   a silent failure this checklist exists specifically to catch.
+- If you created a new trip with a real (non-custom) primary city, you
+  ran the §2(a) update so `cover_photo_id`/`default_timezone` aren't
+  left null/default, and you added `trip_currencies` rows with real
+  looked-up rates (§2(b)) rather than placeholder `1`s for every
+  non-NIS currency the trip will actually use.
