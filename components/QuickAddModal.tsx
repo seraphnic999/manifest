@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { View, Text, Pressable, Modal, StyleSheet, TextInput, ActivityIndicator, Image, KeyboardAvoidingView, Platform } from "react-native";
 import * as ImagePicker from "expo-image-picker";
+import * as ImageManipulator from "expo-image-manipulator";
 import { radius, fonts, ColorTokens } from "@/lib/theme";
 import { useThemeColors } from "@/lib/ThemeContext";
 import Icon from "@/components/icons/Icon";
@@ -62,21 +63,37 @@ export default function QuickAddModal({ visible, onClose, tripId, fallbackDayId,
       Alert.alert("Permission needed", source === "camera" ? "Allow camera access to take a photo." : "Allow photo library access to pick a photo.");
       return;
     }
-    const options: ImagePicker.ImagePickerOptions = { mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8, base64: true };
+    // base64: false here — the picker's own quality option alone still
+    // left a modern phone photo at 3-4MB (slow to upload on mobile data,
+    // and paying for bytes Claude discards anyway: it downsamples to
+    // ~1568px on arrival). ImageManipulator below does the real work:
+    // resizing to 1200px wide gets a legible photo down to ~150KB.
+    const options: ImagePicker.ImagePickerOptions = { mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8, base64: false };
     const result = source === "camera" ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options);
     if (result.canceled || result.assets.length === 0) return;
     const asset = result.assets[0];
-    if (!asset.base64) { setError("Couldn't read that photo."); return; }
+
+    let manipulated: ImageManipulator.ImageResult;
+    try {
+      manipulated = await ImageManipulator.manipulateAsync(
+        asset.uri,
+        [{ resize: { width: 1200 } }],
+        { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+      );
+    } catch {
+      setError("Couldn't read that photo.");
+      return;
+    }
+    if (!manipulated.base64) { setError("Couldn't read that photo."); return; }
     setError(null);
     setText("");
-    // asset.mimeType can't be trusted here — passing `quality` forces
-    // JPEG re-encoding of the actual output regardless of the source
-    // file's format, but on some Android/picker combinations the asset's
-    // own mimeType still reflects the original (e.g. a picked PNG reports
-    // "image/png" while the bytes underneath are already JPEG), which
-    // Claude's vision API rejects outright as a mismatch. Hardcoding
-    // jpeg here matches what `quality` actually guarantees.
-    setPhoto({ uri: asset.uri, base64: asset.base64, mimeType: "image/jpeg" });
+    // The resize step above always re-encodes to JPEG (format: JPEG), so
+    // this is guaranteed accurate — unlike asset.mimeType, which can lie
+    // about the picker's own output on some Android/picker combinations
+    // (a picked PNG reporting "image/png" while the bytes underneath were
+    // already something else), which Claude's vision API rejects outright
+    // as a mismatch.
+    setPhoto({ uri: manipulated.uri, base64: manipulated.base64, mimeType: "image/jpeg" });
   }
 
   async function submit() {

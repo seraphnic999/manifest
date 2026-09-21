@@ -126,6 +126,28 @@ function extractTitle(html: string): string | null {
   return null;
 }
 
+const MAX_REDIRECTS = 5;
+
+// `redirect: "follow"` only checked the typed URL's own host against
+// isPrivateHost — a page that 302s to an internal host would be followed
+// there without ever being vetted. Each hop gets the same check now,
+// walked by hand with redirect: "manual" rather than trusted blind.
+async function fetchFollowingVettedRedirects(startUrl: URL): Promise<Response> {
+  let url = startUrl;
+  for (let i = 0; i < MAX_REDIRECTS; i++) {
+    const res = await fetch(url.toString(), {
+      redirect: "manual",
+      headers: { "user-agent": "Mozilla/5.0 (compatible; ManifestQuickAdd/1.0)" },
+    });
+    if (res.status < 300 || res.status >= 400 || !res.headers.get("location")) return res;
+    const next = new URL(res.headers.get("location")!, url);
+    if (next.protocol !== "http:" && next.protocol !== "https:") throw new Error("Redirected to an unsupported protocol.");
+    if (isPrivateHost(next.hostname)) throw new Error("Redirected to an unreachable host.");
+    url = next;
+  }
+  throw new Error("Too many redirects.");
+}
+
 async function parseUrl(rawUrl: string): Promise<{ title: string; page_text: string } | { error: string }> {
   let url: URL;
   try {
@@ -142,10 +164,7 @@ async function parseUrl(rawUrl: string): Promise<{ title: string; page_text: str
 
   let html: string;
   try {
-    const res = await fetch(url.toString(), {
-      redirect: "follow",
-      headers: { "user-agent": "Mozilla/5.0 (compatible; ManifestQuickAdd/1.0)" },
-    });
+    const res = await fetchFollowingVettedRedirects(url);
     if (!res.ok) return { error: `Couldn't open that link (${res.status}).` };
     const buf = await res.arrayBuffer();
     html = new TextDecoder("utf-8", { fatal: false }).decode(buf.slice(0, MAX_FETCH_BYTES));
@@ -308,6 +327,12 @@ Deno.serve(async (req) => {
     if (body?.mode === "image") {
       if (!body.base64 || typeof body.base64 !== "string") {
         return new Response(JSON.stringify({ error: "base64 is required" }), { status: 400 });
+      }
+      // ~5.6MB of base64 text (~4MB of actual image bytes) — large enough
+      // for a real photo even without client-side resizing, small enough to
+      // fail fast on an oversized upload instead of tying up the function.
+      if (body.base64.length > 5_600_000) {
+        return new Response(JSON.stringify({ error: "That photo is too large — try a smaller one." }), { status: 413 });
       }
       const result = await parseImage(body.base64, body.media_type || "image/jpeg");
       if ("error" in result) return new Response(JSON.stringify(result), { status: 422 });
