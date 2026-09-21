@@ -16,41 +16,66 @@ development. If the schema visibly disagrees with something here (a column
 renamed, a new table), trust the live schema and treat this doc as stale
 on that point.
 
-## 0. Before writing anything: identify yourself
+## 0. Before writing anything: identify yourself — and verify, don't assume
 
-The Supabase connector for this project runs with elevated (service-role)
-access, not as your own logged-in user — `auth.uid()` resolves to `NULL`
-on a plain query. `trips` has a trigger, `trg_trips_force_owner`, that
-**unconditionally overwrites** `user_id` with `auth.uid()` on every
-insert — even if you explicitly supply a `user_id` value yourself, it gets
-silently discarded and replaced with `NULL`, which then fails the
-`NOT NULL` constraint. This is the only owner-enforcement trigger in the
-schema (checked directly — no other table has one), but it blocks trip
-creation entirely unless you impersonate the real user first.
+The Supabase connector for this project does **not** run as the app's real
+owner — `auth.uid()` resolves to either `NULL` or, worse, a *different
+real account* (this has actually happened: a trip once landed under a
+"claude test" account instead of the owner's). `trips` has a trigger,
+`trg_trips_force_owner`, that **unconditionally overwrites** `user_id`
+with `auth.uid()` on every insert — even if you explicitly supply a
+`user_id` value yourself, it gets silently discarded. This is the only
+owner-enforcement trigger in the schema (checked directly — no other table
+has one), but it means every trip you create lands under whoever
+`auth.uid()` says you are, unless you correct it.
 
-Find the user id once (it doesn't change):
-
-```sql
-select id, email from auth.users where email = 'drorco9@gmail.com';
-```
-
-Then, **at the start of any session that will create a new trip**, set the
-JWT claim so `auth.uid()` resolves correctly:
+**The app's real login email is not necessarily the same email you know
+the user by elsewhere** (their general Claude account, an alias, etc.) —
+guessing this wrong is exactly what caused the earlier misfire. Don't
+hardcode an email you haven't verified against this project's own data.
+Confirm it first:
 
 ```sql
-select set_config(
-  'request.jwt.claims',
-  json_build_object('sub', '<the-user-id-from-above>', 'role', 'authenticated')::text,
-  true  -- local to this transaction/request only
-);
+-- Whoever owns the most/oldest real trips is almost certainly the
+-- app's actual owner in a single-family app like this one.
+select u.email, u.id, count(t.id) as trip_count, min(t.created_at) as first_trip
+from auth.users u join trips t on t.user_id = u.id
+where t.deleted_at is null
+group by u.email, u.id
+order by trip_count desc;
 ```
 
-Run this in the **same batched query** as the `insert into trips (...)`
-that follows — the third argument (`true`) scopes it to the current
-transaction, so it won't carry over to a separate tool call. It's harmless
-to include even when you're only reading or editing an existing trip
-(nothing else in the schema needs it), so the simplest habit is: include
-it at the top of every write-heavy batch, not just trip creation.
+If that's ambiguous, ask the user directly which email they log into
+Manifest with rather than guessing — a wrong guess here doesn't error out,
+it silently creates real data under the wrong account.
+
+Known as of 2026-09-21: the real owner is `seraphnic@hotmail.com`, id
+`027c3ff2-90b0-4a4c-ab90-b96afebea27c`. Treat this as a fast-path, not
+gospel — re-run the query above if it's been a while or anything looks
+off, since this is exactly the kind of fact that goes stale silently.
+
+Once confirmed, use **one single atomic SQL statement** for the trip
+insert, with the impersonation embedded directly in it — not a separate
+statement beforehand. A separate preceding statement only works if it
+lands in the exact same transaction as the insert, which depends on
+connector-internal batching you can't verify from here; embedding it
+removes that uncertainty entirely:
+
+```sql
+insert into trips (name, start_date, end_date, type, destinations, default_timezone)
+select 'Kyoto & Osaka', '2027-04-10', '2027-04-17', 'pleasure', array['Kyoto','Osaka'], 'Asia/Tokyo'
+where set_config('request.jwt.claims',
+  json_build_object('sub', '<verified-user-id>', 'role', 'authenticated')::text, true) is not null
+returning id, user_id;
+```
+
+**Always check the returned `user_id` matches the verified id before
+doing anything else with that trip** — this is the one step that would
+have caught the earlier mistake immediately instead of after the fact.
+No other table in the schema needs this trick (nothing else has an
+owner-enforcement trigger — everything else is reached through `trip_id`,
+which the connector's elevated access can read/write regardless of
+identity), so it's only relevant to the trip-creation statement itself.
 
 ## 1. Schema cheat sheet
 
@@ -147,14 +172,16 @@ Electronics, Toiletries, Other` but doesn't enforce it.
 
 ## 2. Recipe: create a new trip skeleton
 
-```sql
-select set_config('request.jwt.claims',
-  json_build_object('sub', '<user_id>', 'role', 'authenticated')::text, true);
+Using the verified user id from §0, in one statement:
 
+```sql
 insert into trips (name, start_date, end_date, type, destinations, default_timezone)
-values ('Kyoto & Osaka', '2027-04-10', '2027-04-17', 'pleasure', array['Kyoto', 'Osaka'], 'Asia/Tokyo')
-returning id;
--- days (including the Proposals day) are auto-generated — no further insert needed.
+select 'Kyoto & Osaka', '2027-04-10', '2027-04-17', 'pleasure', array['Kyoto', 'Osaka'], 'Asia/Tokyo'
+where set_config('request.jwt.claims',
+  json_build_object('sub', '<verified-user-id>', 'role', 'authenticated')::text, true) is not null
+returning id, user_id;
+-- Confirm user_id in the result matches the verified id from §0 before continuing.
+-- Days (including the Proposals day) are auto-generated — no further insert needed.
 ```
 
 Then link real cities (optional but recommended — drives cover photo/map):
@@ -291,6 +318,8 @@ the app's own UI doesn't expect:
 - `sort_order` values don't collide within the same day.
 - A lodging stay has exactly one `is_stay_span=true` span plus matching
   check-in/check-out rows pointing at it via `parent_item_id`.
-- If you created a new trip, you ran the `set_config` impersonation step
-  first — check `select user_id from trips where id = '<trip_id>'`
-  actually shows the real user id, not null.
+- If you created a new trip, you verified the owner against real existing
+  trips (§0) rather than assuming an email, used the single-statement
+  impersonation pattern, and confirmed the `returning user_id` actually
+  matched — not just that it was non-null. A wrong-but-valid account is
+  a silent failure this checklist exists specifically to catch.
