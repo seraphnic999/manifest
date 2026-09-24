@@ -210,20 +210,29 @@ trigger does NOT do for you** — skipping these leaves a trip that looks
 noticeably unfinished next to one made in the app (no cover photo, wrong
 timezone, expenses in a foreign currency with no real conversion rate):
 
-**a) Cover photo + timezone, from the primary city:**
+**a) Cover photo, timezone, and map coordinates, from the primary city.**
+`trips.latitude`/`longitude` matter as much as the other two — the trip
+overview's map falls back to a hardcoded Paris center when they're null
+and no item has its own coordinates (confirmed live: a skill-created NYC
+trip's map opened centered on Paris for exactly this reason):
 
 ```sql
 update trips t set
   cover_photo_id = c.cover_photo_id,
-  default_timezone = c.timezone
+  default_timezone = c.timezone,
+  latitude = c.latitude,
+  longitude = c.longitude
 from trip_cities tc join cities c on c.id = tc.city_id
 where tc.trip_id = t.id and tc.trip_id = '<trip_id>' and tc.sort_order = 0;
 ```
 
 If the primary destination isn't in the `cities` table (a `custom_name`
-row), there's no catalog photo/timezone to pull — leave `cover_photo_id`
-null and set `default_timezone` by hand (ask the user, or infer from the
-destination) instead of leaving it on the trip-insert default.
+row), there's no catalog photo/timezone/coordinates to pull — leave
+`cover_photo_id` null, set `default_timezone` by hand (ask the user, or
+infer from the destination), and geocode the destination yourself (e.g.
+Nominatim, the same free/keyless service `research-item` uses server-
+side: `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=<destination>`)
+rather than leaving `latitude`/`longitude` null too.
 
 **b) Currencies, with a real live rate — not a placeholder `1`.** NIS is
 always the default row. The app pulls the currency list from **every**
@@ -270,6 +279,23 @@ trip on creation (see §1/§4); replicate whichever of those the user
 actually asked for, rather than all of them by default.
 
 ## 3. Recipe: add itinerary items
+
+**Fill in `address`, `latitude`, and `longitude` whenever you can, not
+just `title`.** An item with no coordinates never gets a pin on the
+trip's map, silently — nothing errors, the map just centers on its
+fallback (a hardcoded Paris) and the item simply isn't drawn. Confirmed
+live: a batch of skill-created items with titles but no addresses
+(a hotel, a venue, a restaurant, all real and identifiable) produced a
+trip with an empty-looking map. If you know a real address (from your
+own research or the conversation), put it in `address`; geocode it with
+Nominatim — free, keyless, the same service `research-item` uses
+server-side — before inserting:
+```
+GET https://nominatim.openstreetmap.org/search?format=json&limit=1&q=<name>, <address or city>
+```
+A title-only item (no address, no coordinates) is still valid and will
+show up everywhere else in the app (day view, list, Proposals) — it just
+won't have a map pin until it does.
 
 Resolve the target day first:
 
@@ -400,7 +426,12 @@ the app's own UI doesn't expect:
   matched — not just that it was non-null. A wrong-but-valid account is
   a silent failure this checklist exists specifically to catch.
 - If you created a new trip with a real (non-custom) primary city, you
-  ran the §2(a) update so `cover_photo_id`/`default_timezone` aren't
-  left null/default, and you added `trip_currencies` rows with real
-  looked-up rates (§2(b)) rather than placeholder `1`s for every
-  non-NIS currency the trip will actually use.
+  ran the §2(a) update so `cover_photo_id`/`default_timezone`/
+  `latitude`/`longitude` aren't left null/default (a null trip location
+  with no geocoded items shows an empty map centered on a hardcoded
+  Paris fallback — confirmed live), and you added `trip_currencies` rows
+  with real looked-up rates (§2(b)) rather than placeholder `1`s for
+  every non-NIS currency the trip will actually use.
+- If you have real addresses for the items you added, you geocoded and
+  set their `latitude`/`longitude` too (§3) — a title-only item is valid
+  but invisible on the map.
