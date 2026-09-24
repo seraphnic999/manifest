@@ -91,7 +91,10 @@ export default function TripMap(props: TripMapProps) {
     }
     // Last-resort fallback for a trip with no cities picked and no
     // geocoded items yet (e.g. a very old trip predating both features).
-    return { centerCoordinate: [2.3488, 48.8534], zoomLevel: 11 };
+    // Home (Ra'anana, Israel) rather than an arbitrary city — this is a
+    // personal single-family app, so "nowhere better to guess" should land
+    // somewhere meaningful to the one owner instead of a random landmark.
+    return { centerCoordinate: [34.8678359, 32.1860244], zoomLevel: 11 };
   }, [visibleItems, focusedItem, props.tripFocus]);
 
   return (
