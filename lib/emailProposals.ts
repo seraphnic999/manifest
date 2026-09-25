@@ -142,6 +142,64 @@ export async function applyEmailProposal(
     return { error: null };
   }
 
+  // Lodging is a span (is_stay_span=true, day_id null, start/end covering
+  // the whole stay) plus separate check-in/check-out day items pointing
+  // back at it via parent_item_id — the same shape app/item/new.tsx builds
+  // for a manually-entered stay. Skipping this and inserting one flat row
+  // (what this function used to do for every type, lodging included) is a
+  // real bug caught live: a lodging email proposal landed as a single item
+  // pinned to its check-in day only, invisible on every night in between
+  // and missing from the day list once the stay properly moved to a span
+  // elsewhere. Falls through to the flat-item path below if there's no
+  // real date range to build a span from.
+  if (draft.type === "lodging" && draft.start_date && draft.end_date && draft.end_date !== draft.start_date) {
+    const { data: span, error: spanError } = await supabase.from("items").insert({
+      trip_id: action.tripId, day_id: null, is_stay_span: true,
+      type: "lodging", title: draft.title, status: "planned",
+      start_date: draft.start_date, end_date: draft.end_date,
+      time_start: draft.time_start || null, time_end: draft.time_end || null,
+      address: draft.address || null, phone: draft.phone || null, vendor: draft.vendor || null,
+      booking_source: draft.booking_source || null, confirmation_code: draft.confirmation_code || null,
+      link: draft.link || null,
+      sort_order: 0,
+      custom_fields: { origin: "email" },
+    }).select().single();
+    if (spanError || !span) return { error: spanError?.message ?? "Couldn't create the lodging." };
+
+    const siblingSortOrder = async (targetDayId: string, atTime: string | null) => {
+      const { data: siblings } = await supabase
+        .from("items").select("id, sort_order, time_start").eq("day_id", targetDayId).is("deleted_at", null);
+      return computeInsertSortOrder(siblings ?? [], atTime);
+    };
+
+    const [{ data: checkInDay }, { data: checkOutDay }] = await Promise.all([
+      supabase.from("days").select("id").eq("trip_id", action.tripId).eq("date", draft.start_date).maybeSingle(),
+      supabase.from("days").select("id").eq("trip_id", action.tripId).eq("date", draft.end_date).maybeSingle(),
+    ]);
+
+    if (checkInDay) {
+      await supabase.from("items").insert({
+        trip_id: action.tripId, day_id: checkInDay.id, parent_item_id: span.id,
+        type: "lodging", title: `Check in — ${draft.title}`, status: "planned",
+        time_start: draft.time_start || null,
+        sort_order: await siblingSortOrder(checkInDay.id, draft.time_start || null),
+      });
+    }
+    if (checkOutDay) {
+      await supabase.from("items").insert({
+        trip_id: action.tripId, day_id: checkOutDay.id, parent_item_id: span.id,
+        type: "lodging", title: `Check out — ${draft.title}`, status: "planned",
+        time_start: draft.time_end || null,
+        sort_order: await siblingSortOrder(checkOutDay.id, draft.time_end || null),
+      });
+    }
+
+    await supabase.from("email_proposals").update({
+      status: "applied", applied_item_id: span.id, applied_action: "created", reviewed_at: new Date().toISOString(),
+    }).eq("id", emailProposal.id);
+    return { error: null };
+  }
+
   let dayId: string | null = null;
   if (draft.start_date) {
     const { data: targetDay } = await supabase
