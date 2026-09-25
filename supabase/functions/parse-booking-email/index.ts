@@ -312,6 +312,18 @@ Deno.serve(async (req) => {
   const { from, subject, plainBody } = extractEmailFields(fields);
   const attachments = await prepareAttachments(fields, rawAttachments);
 
+  // Left in permanently, not just for this diagnosis — the only visibility
+  // into what SendGrid actually sent vs. what this function chose to use,
+  // useful the next time an extraction looks like it should have had an
+  // attachment and didn't.
+  console.log("parse-booking-email attachments:", JSON.stringify({
+    raw_count: rawAttachments.length,
+    raw: rawAttachments.map((a) => ({ key: a.key, name: a.file.name, type: a.file.type, size: a.file.size })),
+    "attachment-info_present": typeof fields["attachment-info"] === "string",
+    prepared_count: attachments.length,
+    prepared_types: attachments.map((a) => a.mediaType),
+  }));
+
   const insertFailed = async (error: string) => {
     await supabase.from("email_proposals").insert({
       user_id: ownerId, raw_from: from, raw_subject: subject, raw_body: plainBody.slice(0, 5000),
