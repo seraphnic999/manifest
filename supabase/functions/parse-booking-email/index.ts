@@ -20,11 +20,15 @@
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { encodeBase64 } from "jsr:@std/encoding/base64";
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-sonnet-5";
 const USD_PER_INPUT_TOKEN = 2 / 1_000_000;
 const USD_PER_OUTPUT_TOKEN = 10 / 1_000_000;
+
+const MAX_ATTACHMENTS = 4;
+const MAX_ATTACHMENT_BYTES = 15_000_000; // a real booking PDF/photo is a few MB at most
 
 const ITEM_TYPES = [
   "flight", "transfer", "transport", "lodging", "activity",
@@ -46,6 +50,7 @@ RULES (apply to each entry)
 5. confidence per field: "high" only if the email states it plainly and unambiguously; "medium" if inferred/implied; "none" if not found — never invent a value to fill a field.
 6. basis: a short quote or paraphrase of where in the email each non-null field came from.
 7. flight_number: for a flight only, the airline code immediately followed by the flight number with no space (e.g. "LY2371", not "LY 2371" or "EL AL 2371"). Null for every other type.
+8. If one or more documents are attached, they are the authoritative source — extract the booking(s) from the attached document(s), not from any email text also given to you. A forwarded thread's own body is very often earlier back-and-forth discussion of OPTIONS that were later superseded by the final booking in the attachment (comparing hotels, asking about prices) — never mistake that discussion for a confirmed booking.
 
 Call propose_booking_items exactly once, with one entry per distinct booking. No prose.`;
 
@@ -109,20 +114,67 @@ function extractEmailFields(body: Json): { from: string; subject: string; plainB
   return { from: String(from), subject: String(subject), plainBody: String(plainBody).slice(0, 20_000) };
 }
 
+interface RawAttachment { key: string; file: File }
+
 // SendGrid Inbound Parse posts multipart/form-data by default (not JSON) —
 // parse whichever content-type actually arrives rather than assuming one,
 // so a future provider change (or a manual JSON curl test) still works.
-async function parseRequestBody(req: Request): Promise<Json> {
+// Attachments (SendGrid's attachment1, attachment2, ... file parts) arrive
+// as non-string form values — previously silently dropped by the
+// string-only filter, which is why a real booking that only existed as a
+// PDF attachment was never read at all.
+async function parseRequestBody(req: Request): Promise<{ fields: Json; attachments: RawAttachment[] }> {
   const contentType = req.headers.get("content-type") ?? "";
   if (contentType.includes("multipart/form-data") || contentType.includes("application/x-www-form-urlencoded")) {
     const form = await req.formData();
-    const obj: Json = {};
+    const fields: Json = {};
+    const attachments: RawAttachment[] = [];
     for (const [key, value] of form.entries()) {
-      if (typeof value === "string") obj[key] = value;
+      if (typeof value === "string") fields[key] = value;
+      else attachments.push({ key, file: value });
     }
-    return obj;
+    return { fields, attachments };
   }
-  return await req.json();
+  return { fields: await req.json(), attachments: [] };
+}
+
+const SUPPORTED_ATTACHMENT_TYPES = new Set([
+  "application/pdf", "image/jpeg", "image/png", "image/gif", "image/webp",
+]);
+
+interface PreparedAttachment { mediaType: string; base64: string }
+
+// Filters SendGrid's raw attachment parts down to the ones actually worth
+// sending to the model: real file attachments only (not inline/embedded
+// images — SendGrid's `attachment-info` JSON marks those with a
+// "content-id", the same mechanism an HTML body's <img src="cid:..."> uses
+// to reference them; an Outlook signature logo or tracking pixel always
+// has one, a genuinely attached booking PDF/photo never does), a type a
+// vision call can actually read, and a sane size.
+async function prepareAttachments(fields: Json, raw: RawAttachment[]): Promise<PreparedAttachment[]> {
+  let info: Json = {};
+  try { info = JSON.parse(fields["attachment-info"] ?? "{}"); } catch { /* missing/malformed — treat as no metadata */ }
+
+  const prepared: PreparedAttachment[] = [];
+  for (const { key, file } of raw) {
+    if (prepared.length >= MAX_ATTACHMENTS) break;
+    if (!/^attachment\d+$/.test(key)) continue;
+    if (info[key]?.["content-id"]) continue;
+    const mediaType = String(info[key]?.type || file.type || "").split(";")[0].trim().toLowerCase();
+    if (!SUPPORTED_ATTACHMENT_TYPES.has(mediaType)) continue;
+    if (file.size === 0 || file.size > MAX_ATTACHMENT_BYTES) continue;
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    prepared.push({ mediaType, base64: encodeBase64(bytes) });
+  }
+  return prepared;
+}
+
+function attachmentContentBlocks(attachments: PreparedAttachment[]): Json[] {
+  return attachments.map((a) => (
+    a.mediaType === "application/pdf"
+      ? { type: "document", source: { type: "base64", media_type: "application/pdf", data: a.base64 } }
+      : { type: "image", source: { type: "base64", media_type: a.mediaType, data: a.base64 } }
+  ));
 }
 
 async function notify(supabase: Json, userId: string, title: string, body: string) {
@@ -212,6 +264,28 @@ async function matchTrip(supabase: Json, ownerId: string, p: Json): Promise<{ tr
   return { tripId, suggestedItemId: null, matchReasoning: null };
 }
 
+async function extractBookingItems(apiKey: string, content: Json[]): Promise<{ items: Json[]; usage: Json } | { error: string }> {
+  const res = await fetch(ANTHROPIC_URL, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: 2500,
+      system: SYSTEM,
+      messages: [{ role: "user", content }],
+      tools: [PROPOSE_TOOL],
+      tool_choice: { type: "tool", name: "propose_booking_items" },
+    }),
+  });
+  if (!res.ok) {
+    const errBody = await res.text();
+    return { error: `Claude API ${res.status}: ${errBody.slice(0, 300)}` };
+  }
+  const json = await res.json();
+  const call = (json.content ?? []).find((c: Json) => c.type === "tool_use" && c.name === "propose_booking_items");
+  return { items: call?.input?.items ?? [], usage: json.usage ?? {} };
+}
+
 Deno.serve(async (req) => {
   const url = new URL(req.url);
   const secret = Deno.env.get("EMAIL_WEBHOOK_SECRET");
@@ -224,15 +298,19 @@ Deno.serve(async (req) => {
   if (!ownerId) return new Response(JSON.stringify({ error: "MANIFEST_OWNER_USER_ID is not set." }), { status: 500 });
   if (!apiKey) return new Response(JSON.stringify({ error: "ANTHROPIC_API_KEY is not set." }), { status: 500 });
 
-  let body: Json;
+  let fields: Json;
+  let rawAttachments: RawAttachment[];
   try {
-    body = await parseRequestBody(req);
+    const parsed = await parseRequestBody(req);
+    fields = parsed.fields;
+    rawAttachments = parsed.attachments;
   } catch {
     return new Response(JSON.stringify({ error: "Invalid request body." }), { status: 400 });
   }
 
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-  const { from, subject, plainBody } = extractEmailFields(body);
+  const { from, subject, plainBody } = extractEmailFields(fields);
+  const attachments = await prepareAttachments(fields, rawAttachments);
 
   const insertFailed = async (error: string) => {
     await supabase.from("email_proposals").insert({
@@ -241,37 +319,44 @@ Deno.serve(async (req) => {
     });
   };
 
-  if (!plainBody.trim()) {
-    await insertFailed("No plain-text body found in the forwarded email.");
+  if (attachments.length === 0 && !plainBody.trim()) {
+    await insertFailed("No plain-text body or usable attachment found in the forwarded email.");
     return new Response(JSON.stringify({ accepted: true }), { status: 200 });
   }
 
   try {
-    const res = await fetch(ANTHROPIC_URL, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 2500,
-        system: SYSTEM,
-        messages: [{ role: "user", content: [{ type: "text", text: `Subject: ${subject}\nFrom: ${from}\n\n${plainBody}` }] }],
-        tools: [PROPOSE_TOOL],
-        tool_choice: { type: "tool", name: "propose_booking_items" },
-      }),
-    });
-    if (!res.ok) {
-      const errBody = await res.text();
-      await insertFailed(`Claude API ${res.status}: ${errBody.slice(0, 300)}`);
+    let items: Json[] = [];
+    let usage: Json = {};
+    let lastError: string | null = null;
+
+    // Attachments first (they're the authoritative source per the system
+    // prompt too) — only fall back to the noisier email body if the
+    // attachment attempt errors or turns up nothing usable, e.g. a
+    // forwarded thread whose final message just says "see attached" over
+    // pages of earlier back-and-forth about OPTIONS that were later
+    // superseded by the real (attached) booking.
+    if (attachments.length > 0) {
+      const attempt = await extractBookingItems(apiKey, [
+        ...attachmentContentBlocks(attachments),
+        { type: "text", text: `Subject: ${subject}\nFrom: ${from}\n\nExtract the booking(s) strictly from the attached document(s) above.` },
+      ]);
+      if ("error" in attempt) lastError = attempt.error;
+      else if (attempt.items.length > 0) { items = attempt.items; usage = attempt.usage; }
+    }
+
+    if (items.length === 0 && plainBody.trim()) {
+      const attempt = await extractBookingItems(apiKey, [
+        { type: "text", text: `Subject: ${subject}\nFrom: ${from}\n\n${plainBody}` },
+      ]);
+      if ("error" in attempt) lastError = attempt.error;
+      else { items = attempt.items; usage = attempt.usage; }
+    }
+
+    if (items.length === 0) {
+      await insertFailed(lastError ?? "The model didn't find a usable booking in this email.");
       return new Response(JSON.stringify({ accepted: true }), { status: 200 });
     }
-    const json = await res.json();
-    const call = (json.content ?? []).find((c: Json) => c.type === "tool_use" && c.name === "propose_booking_items");
-    const items: Json[] = call?.input?.items ?? [];
-    if (!call || items.length === 0) {
-      await insertFailed("The model didn't find a usable booking in this email.");
-      return new Response(JSON.stringify({ accepted: true }), { status: 200 });
-    }
-    const usage = json.usage ?? {};
+
     // One Claude call covers every item in the email — split its cost
     // evenly across the rows it produced rather than recording the whole
     // call's cost on each one.
