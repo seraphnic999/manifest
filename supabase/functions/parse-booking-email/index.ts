@@ -27,7 +27,11 @@ const MODEL = "claude-sonnet-5";
 const USD_PER_INPUT_TOKEN = 2 / 1_000_000;
 const USD_PER_OUTPUT_TOKEN = 10 / 1_000_000;
 
-const MAX_ATTACHMENTS = 4;
+// A bundled travel-agent confirmation can genuinely carry this many
+// distinct real documents — confirmed live: one real email had flight
+// e-tickets, two hotel vouchers, and a transfer receipt, 6 real PDFs
+// after filtering out HTML vouchers and one inline signature logo.
+const MAX_ATTACHMENTS = 8;
 const MAX_ATTACHMENT_BYTES = 15_000_000; // a real booking PDF/photo is a few MB at most
 
 const ITEM_TYPES = [
@@ -142,15 +146,35 @@ const SUPPORTED_ATTACHMENT_TYPES = new Set([
   "application/pdf", "image/jpeg", "image/png", "image/gif", "image/webp",
 ]);
 
+const EXTENSION_TO_TYPE: Json = {
+  pdf: "application/pdf", jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif", webp: "image/webp",
+};
+
+// A signature logo or tracking pixel embedded in the HTML body always
+// lands well under this — confirmed live against a real 3KB Outlook
+// signature image alongside 26KB-171KB real booking PDFs in the same
+// email; a real ticket/voucher/receipt is never this small.
+const MIN_ATTACHMENT_BYTES = 5_000;
+
 interface PreparedAttachment { mediaType: string; base64: string }
 
 // Filters SendGrid's raw attachment parts down to the ones actually worth
-// sending to the model: real file attachments only (not inline/embedded
-// images — SendGrid's `attachment-info` JSON marks those with a
-// "content-id", the same mechanism an HTML body's <img src="cid:..."> uses
-// to reference them; an Outlook signature logo or tracking pixel always
-// has one, a genuinely attached booking PDF/photo never does), a type a
-// vision call can actually read, and a sane size.
+// sending to the model. Two real gotchas confirmed live against an actual
+// travel-agent email, both real attachments getting wrongly excluded:
+//
+// 1. SendGrid's `attachment-info` JSON gives a "content-id" to EVERY
+//    attachment, not just inline/embedded ones — treating its mere
+//    presence as "this is an inline logo, skip it" excluded every single
+//    attachment in the email, including genuine booking PDFs. A
+//    content-id only means something for an image (the only thing an
+//    HTML body's <img src="cid:..."> can reference) — a PDF is never
+//    referenced that way, so the check only applies there, and even for
+//    images the size floor below is the real filter.
+// 2. A mail client can mislabel a real PDF as generic
+//    "application/octet-stream" — two of the real attachments in that
+//    same email were exactly this. Fall back to the file's own extension
+//    rather than trusting a declared type that doesn't match a `.pdf`
+//    sitting right there in the filename.
 async function prepareAttachments(fields: Json, raw: RawAttachment[]): Promise<PreparedAttachment[]> {
   let info: Json = {};
   try { info = JSON.parse(fields["attachment-info"] ?? "{}"); } catch { /* missing/malformed — treat as no metadata */ }
@@ -159,10 +183,16 @@ async function prepareAttachments(fields: Json, raw: RawAttachment[]): Promise<P
   for (const { key, file } of raw) {
     if (prepared.length >= MAX_ATTACHMENTS) break;
     if (!/^attachment\d+$/.test(key)) continue;
-    if (info[key]?.["content-id"]) continue;
-    const mediaType = String(info[key]?.type || file.type || "").split(";")[0].trim().toLowerCase();
-    if (!SUPPORTED_ATTACHMENT_TYPES.has(mediaType)) continue;
-    if (file.size === 0 || file.size > MAX_ATTACHMENT_BYTES) continue;
+
+    const filename = String(info[key]?.filename || info[key]?.name || file.name || "");
+    const ext = filename.split(".").pop()?.toLowerCase() ?? "";
+    const declaredType = String(info[key]?.type || file.type || "").split(";")[0].trim().toLowerCase();
+    const mediaType = SUPPORTED_ATTACHMENT_TYPES.has(declaredType) ? declaredType : EXTENSION_TO_TYPE[ext];
+    if (!mediaType) continue;
+
+    if (mediaType.startsWith("image/") && info[key]?.["content-id"]) continue;
+    if (file.size < MIN_ATTACHMENT_BYTES || file.size > MAX_ATTACHMENT_BYTES) continue;
+
     const bytes = new Uint8Array(await file.arrayBuffer());
     prepared.push({ mediaType, base64: encodeBase64(bytes) });
   }
