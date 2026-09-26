@@ -70,14 +70,14 @@ interface ShoppingRow {
   name: string;
   quantity: number;
   note: string | null;
-  items: { title: string } | null;
+  items: { title: string; start_date: string | null; time_start: string | null } | null;
   allocations: AllocationInfo[];
 }
 
 async function fetchShoppingData(tripId: string): Promise<ShoppingRow[]> {
   const { data, error } = await supabase
     .from("shopping_list_items")
-    .select("*, items(title), allocations(id, amount, party_id, expense_id, expenses(currency_code, note, expense_date))")
+    .select("*, items(title, start_date, time_start), allocations(id, amount, party_id, expense_id, expenses(currency_code, note, expense_date))")
     .eq("trip_id", tripId)
     .order("name");
   if (error) throw error;
@@ -179,12 +179,29 @@ export default function MoneyShoppingScreen() {
   }
 
   const general = rows.filter((r) => !r.item_id);
-  const byActivity = new Map<string, ShoppingRow[]>();
+  // Grouped by item_id (not the title text) so two different linked items
+  // that happen to share a title never merge into one section. Sorted by
+  // the linked item's own date/time — chronological, not alphabetical —
+  // with a linked item that has no date yet (e.g. still in Proposals)
+  // sorted after every dated one rather than interleaved arbitrarily.
+  const byActivityMap = new Map<string, { title: string; startDate: string | null; timeStart: string | null; rows: ShoppingRow[] }>();
   for (const r of rows) {
     if (!r.item_id) continue;
-    const key = r.items?.title ?? "Linked item";
-    byActivity.set(key, [...(byActivity.get(key) ?? []), r]);
+    const existing = byActivityMap.get(r.item_id);
+    if (existing) { existing.rows.push(r); continue; }
+    byActivityMap.set(r.item_id, {
+      title: r.items?.title ?? "Linked item",
+      startDate: r.items?.start_date ?? null,
+      timeStart: r.items?.time_start ?? null,
+      rows: [r],
+    });
   }
+  const activityGroups = [...byActivityMap.values()].sort((a, b) => {
+    if (!a.startDate && !b.startDate) return 0;
+    if (!a.startDate) return 1;
+    if (!b.startDate) return -1;
+    return `${a.startDate} ${a.timeStart ?? "00:00"}`.localeCompare(`${b.startDate} ${b.timeStart ?? "00:00"}`);
+  });
 
   function handleRowTap(row: ShoppingRow) {
     if (row.allocations.length === 0) { setExpenseTarget(row); return; }
@@ -337,10 +354,12 @@ export default function MoneyShoppingScreen() {
               {general.map(renderShoppingRow)}
             </>
           )}
-          {[...byActivity.entries()].map(([activityTitle, items]) => (
-            <View key={activityTitle}>
-              <Text style={styles.sectionLabel}>{activityTitle}</Text>
-              {items.map(renderShoppingRow)}
+          {activityGroups.map((group) => (
+            <View key={group.rows[0].item_id}>
+              <Text style={styles.sectionLabel}>
+                {group.title}{group.startDate ? ` (${formatDateDDMMYYYY(group.startDate)})` : ""}
+              </Text>
+              {group.rows.map(renderShoppingRow)}
             </View>
           ))}
           {rows.length === 0 && <Text style={styles.empty}>Nothing on the list yet.</Text>}

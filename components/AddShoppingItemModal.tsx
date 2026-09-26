@@ -93,7 +93,14 @@ export default function AddShoppingItemModal({
             <TextInput style={styles.input} value={quantity} onChangeText={setQuantity} keyboardType="number-pad" />
 
             <Text style={styles.label}>Note</Text>
-            <TextInput style={styles.input} value={note} onChangeText={setNote} placeholder="Optional" />
+            <TextInput
+              style={[styles.input, styles.inputMulti]}
+              value={note}
+              onChangeText={setNote}
+              placeholder="Optional"
+              multiline
+              textAlignVertical="top"
+            />
 
             <Text style={styles.label}>Linked activity (optional)</Text>
             <Pressable style={styles.input} onPress={() => setPickerOpen(true)}>
@@ -141,6 +148,7 @@ const makeStyles = (colors: ColorTokens) => StyleSheet.create({
     backgroundColor: colors.paperRaised, borderWidth: 1, borderColor: colors.line,
     borderRadius: radius.md, padding: 12, fontSize: 15, color: colors.ink,
   },
+  inputMulti: { minHeight: 70 },
   removeText: { color: colors.coral, fontSize: 11, fontWeight: "600", marginTop: 6 },
   button: { backgroundColor: colors.ink, borderRadius: radius.md, padding: 14, alignItems: "center", marginTop: 24 },
   buttonText: { color: colors.paper, fontWeight: "700" },
