@@ -363,6 +363,7 @@ export interface EmailProposalFields {
   vendor: ProposedField<string>;
   booking_source: ProposedField<string>;
   confirmation_code: ProposedField<string>;
+  flight_number: ProposedField<string>;
   link: ProposedField<string>;
   notes: ProposedField<string>;
   is_update_or_cancellation: boolean;

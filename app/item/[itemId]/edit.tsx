@@ -65,6 +65,7 @@ export default function EditItem() {
   const [flightNumber, setFlightNumber] = useState("");
   const [bookingSource, setBookingSource] = useState("");
   const [confirmationCode, setConfirmationCode] = useState("");
+  const [notes, setNotes] = useState("");
   const [link, setLink] = useState("");
   const [googleMapsLink, setGoogleMapsLink] = useState("");
   const [reminderMinutes, setReminderMinutes] = useState("");
@@ -117,7 +118,7 @@ export default function EditItem() {
   function currentSnapshot() {
     return JSON.stringify({
       title, status, itemType, dayId: selectedDay?.id ?? "", time, address, phone, vendor, flightNumber,
-      bookingSource, confirmationCode, link, googleMapsLink, latitude, longitude, mapIcon,
+      bookingSource, confirmationCode, notes, link, googleMapsLink, latitude, longitude, mapIcon,
       reminderMinutes,
       checkInDate, checkInTime, checkOutDate, checkOutTime,
       arrivalDate, arrivalTime,
@@ -189,6 +190,7 @@ export default function EditItem() {
       setPriceRange(typeof cf.price_range === "string" ? cf.price_range : "");
       setBookingSource(item.booking_source ?? "");
       setConfirmationCode(item.confirmation_code ?? "");
+      setNotes(item.notes ?? "");
       setLink(item.link ?? "");
       setGoogleMapsLink(item.google_maps_link ?? "");
       setLatitude(item.latitude != null ? String(item.latitude) : "");
@@ -213,6 +215,7 @@ export default function EditItem() {
         address: item.address ?? "", phone: item.phone ?? "", vendor: item.vendor ?? "",
         flightNumber: (item.custom_fields as any)?.flight_number ?? "",
         bookingSource: item.booking_source ?? "", confirmationCode: item.confirmation_code ?? "",
+        notes: item.notes ?? "",
         link: item.link ?? "",
         googleMapsLink: item.google_maps_link ?? "",
         latitude: item.latitude != null ? String(item.latitude) : "",
@@ -365,6 +368,7 @@ export default function EditItem() {
       vendor: vendor || null,
       booking_source: bookingSource || null,
       confirmation_code: confirmationCode || null,
+      notes: notes || null,
       link: link || null,
       google_maps_link: googleMapsLink || null,
       latitude: lat,
@@ -602,6 +606,16 @@ export default function EditItem() {
         <><Text style={styles.label}>Link</Text>
         <TextInput style={styles.input} value={link} onChangeText={setLink} autoCapitalize="none" /></>
       )}
+
+      <Text style={styles.label}>Notes</Text>
+      <TextInput
+        style={[styles.input, styles.inputMulti]}
+        value={notes}
+        onChangeText={setNotes}
+        multiline
+        textAlignVertical="top"
+        placeholder="Optional"
+      />
 
       <Text style={styles.label}>Google Maps link (optional)</Text>
       <TextInput style={styles.input} value={googleMapsLink} onChangeText={setGoogleMapsLink} autoCapitalize="none" placeholder="https://maps.app.goo.gl/…" />

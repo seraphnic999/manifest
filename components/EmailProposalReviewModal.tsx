@@ -229,6 +229,9 @@ export default function EmailProposalReviewModal({ visible, onClose, proposal, o
           <Field label="Vendor" meta={p?.vendor} value={draft.vendor} onChange={set("vendor")} placeholder="Not found" />
           <Field label="Booking source" meta={p?.booking_source} value={draft.booking_source} onChange={set("booking_source")} placeholder="Not found" />
           <Field label="Confirmation code" meta={p?.confirmation_code} value={draft.confirmation_code} onChange={set("confirmation_code")} placeholder="Not found" />
+          {draft.type === "flight" && (
+            <Field label="Flight number" meta={p?.flight_number} value={draft.flight_number} onChange={set("flight_number")} placeholder="Not found" />
+          )}
           <Field label="Link" meta={p?.link} value={draft.link} onChange={set("link")} placeholder="Not found" />
           <Field label="Notes" meta={p?.notes} value={draft.notes} onChange={set("notes")} placeholder="—" multiline />
 

@@ -79,6 +79,7 @@ export interface EmailProposalDraft {
   vendor: string;
   booking_source: string;
   confirmation_code: string;
+  flight_number: string;
   link: string;
   notes: string;
 }
@@ -98,6 +99,7 @@ export function draftFromEmailProposal(p: EmailProposalFields | null): EmailProp
     vendor: str(p?.vendor?.value),
     booking_source: str(p?.booking_source?.value),
     confirmation_code: str(p?.confirmation_code?.value),
+    flight_number: str(p?.flight_number?.value),
     link: str(p?.link?.value),
     notes: str(p?.notes?.value),
   };
@@ -116,7 +118,7 @@ export async function applyEmailProposal(
 
   if (action.kind === "update") {
     const { data: current } = await supabase
-      .from("items").select("day_id, trip_id, start_date").eq("id", action.itemId).single();
+      .from("items").select("day_id, trip_id, start_date, custom_fields").eq("id", action.itemId).single();
     if (!current) return { error: "That item no longer exists." };
 
     let dayId = current.day_id;
@@ -125,13 +127,20 @@ export async function applyEmailProposal(
         .from("days").select("id").eq("trip_id", current.trip_id).eq("date", draft.start_date).maybeSingle();
       if (targetDay) dayId = targetDay.id;
     }
+    // Merged, not replaced — an update must not wipe out custom_fields an
+    // earlier research pass already set (short_description, opening_hours,
+    // etc.) just because this email didn't happen to mention them.
+    const customFields = draft.flight_number
+      ? { ...(current.custom_fields ?? {}), flight_number: draft.flight_number }
+      : current.custom_fields;
     const { error } = await supabase.from("items").update({
       type: draft.type, title: draft.title,
       start_date: draft.start_date || null, end_date: draft.end_date || null,
       time_start: draft.time_start || null, time_end: draft.time_end || null,
       address: draft.address || null, phone: draft.phone || null, vendor: draft.vendor || null,
       booking_source: draft.booking_source || null, confirmation_code: draft.confirmation_code || null,
-      link: draft.link || null,
+      link: draft.link || null, notes: draft.notes || null,
+      custom_fields: customFields,
       day_id: dayId,
     }).eq("id", action.itemId);
     if (error) return { error: error.message };
@@ -160,9 +169,9 @@ export async function applyEmailProposal(
       time_start: draft.time_start || null, time_end: draft.time_end || null,
       address: draft.address || null, phone: draft.phone || null, vendor: draft.vendor || null,
       booking_source: draft.booking_source || null, confirmation_code: draft.confirmation_code || null,
-      link: draft.link || null,
+      link: draft.link || null, notes: draft.notes || null,
       sort_order: 0,
-      custom_fields: { origin: "email" },
+      custom_fields: draft.flight_number ? { origin: "email", flight_number: draft.flight_number } : { origin: "email" },
     }).select().single();
     if (spanError || !span) return { error: spanError?.message ?? "Couldn't create the lodging." };
 
@@ -224,9 +233,9 @@ export async function applyEmailProposal(
     time_start: draft.time_start || null, time_end: draft.time_end || null,
     address: draft.address || null, phone: draft.phone || null, vendor: draft.vendor || null,
     booking_source: draft.booking_source || null, confirmation_code: draft.confirmation_code || null,
-    link: draft.link || null,
+    link: draft.link || null, notes: draft.notes || null,
     sort_order: sortOrder,
-    custom_fields: { origin: "email" },
+    custom_fields: draft.flight_number ? { origin: "email", flight_number: draft.flight_number } : { origin: "email" },
   }).select().single();
   if (error || !newItem) return { error: error?.message ?? "Couldn't create the item." };
 

@@ -366,6 +366,7 @@ export default function ItemDetails() {
         ["Vendor", item.vendor],
         ["Address", item.address],
         ["Phone", item.phone],
+        ["Notes", item.notes],
       ]
     : isFlight
     ? [
@@ -378,6 +379,7 @@ export default function ItemDetails() {
         ["Confirmation", item.confirmation_code],
         ["Address", item.address],
         ["Phone", item.phone],
+        ["Notes", item.notes],
       ]
     : [
         ["Date", formatDateDDMMYYYY(item.start_date) || null],
@@ -388,6 +390,7 @@ export default function ItemDetails() {
         ["Confirmation", item.confirmation_code],
         ["Address", item.address],
         ["Phone", item.phone],
+        ["Notes", item.notes],
       ];
 
   return (
