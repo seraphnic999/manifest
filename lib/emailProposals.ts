@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "./supabase";
 import { computeInsertSortOrder } from "./reorder";
+import { refreshFlightStatus } from "./flightStatus";
 import { EmailProposal, EmailProposalFields, EmailProposalStatus, ItemType, Trip } from "./types";
 
 export interface EmailProposalResolved extends EmailProposal {
@@ -105,6 +106,60 @@ export function draftFromEmailProposal(p: EmailProposalFields | null): EmailProp
   };
 }
 
+// Converts an AeroDataBox local-time string's trailing offset (e.g. the
+// "+03:00" in "2026-10-08 11:00+03:00") into a Luxon fixed-offset zone
+// specifier ("UTC+3"). A fixed offset rather than a named IANA zone is
+// deliberate here: it's only ever used to anchor this one specific flight's
+// one specific scheduled day, so it sidesteps ever having to know (or
+// guess) which city/IANA zone a bare airport code actually belongs to —
+// AeroDataBox already resolved that, this just carries its answer forward.
+function offsetToLuxonZone(localIso: string | null | undefined): string | null {
+  if (!localIso) return null;
+  const m = localIso.match(/([+-])(\d{2}):?(\d{2})$/);
+  if (!m) return null;
+  const sign = m[1];
+  const hh = parseInt(m[2], 10);
+  const mm = parseInt(m[3], 10);
+  if (hh === 0 && mm === 0) return "UTC";
+  return `UTC${sign}${hh}${mm ? `:${String(mm).padStart(2, "0")}` : ""}`;
+}
+
+// Flight items never carry a timezone_start/timezone_end of their own at
+// this point — parse-booking-email only ever extracts a LOCAL date/time
+// string per leg, with nothing that says which zone that's local to. Left
+// alone, poll-flight-status and send-reminders both fall back to the
+// trip's own default_timezone, which is simply wrong for an outbound
+// flight departing somewhere other than the trip's primary destination —
+// confirmed live: a Tel Aviv departure on a New York trip computed as
+// departing 7 hours later than reality, which pushed it outside the
+// 4-hour auto-tracking window entirely and delayed both pre-trip
+// notifications by the same 7 hours. Rather than asking the model to
+// infer a timezone from email text (a real hallucination risk — it's
+// exactly the kind of fact that's easy to state confidently and wrong),
+// this calls the same AeroDataBox-backed status check the app already
+// pays for and trusts as the single source of truth, and carries its
+// real per-leg UTC offsets back onto the item. Best-effort: a failed or
+// unavailable lookup just leaves the item exactly as under-specified as
+// it already was, never blocks applying the proposal itself.
+async function backfillFlightTimezones(itemId: string): Promise<void> {
+  try {
+    const { row } = await refreshFlightStatus(itemId);
+    const dep = row?.data?.departure;
+    const arr = row?.data?.arrival;
+    const timezone_start = offsetToLuxonZone(dep?.revised?.local ?? dep?.scheduled?.local);
+    const timezone_end = offsetToLuxonZone(arr?.revised?.local ?? arr?.scheduled?.local);
+    if (timezone_start || timezone_end) {
+      await supabase.from("items").update({
+        ...(timezone_start ? { timezone_start } : {}),
+        ...(timezone_end ? { timezone_end } : {}),
+      }).eq("id", itemId);
+    }
+  } catch {
+    // AeroDataBox unreachable, no API key, flight not found, etc. — leave
+    // the item as-is rather than fail the apply over a nice-to-have.
+  }
+}
+
 // Applies a reviewed draft — create a new item on the given trip (landing
 // on the day matching its date, or Proposals if there's no date/no
 // matching day), or update an existing one. Only ever runs once the user
@@ -144,6 +199,10 @@ export async function applyEmailProposal(
       day_id: dayId,
     }).eq("id", action.itemId);
     if (error) return { error: error.message };
+
+    if (draft.type === "flight" && draft.flight_number) {
+      await backfillFlightTimezones(action.itemId);
+    }
 
     await supabase.from("email_proposals").update({
       status: "applied", applied_item_id: action.itemId, applied_action: "updated", reviewed_at: new Date().toISOString(),
@@ -238,6 +297,10 @@ export async function applyEmailProposal(
     custom_fields: draft.flight_number ? { origin: "email", flight_number: draft.flight_number } : { origin: "email" },
   }).select().single();
   if (error || !newItem) return { error: error?.message ?? "Couldn't create the item." };
+
+  if (draft.type === "flight" && draft.flight_number) {
+    await backfillFlightTimezones(newItem.id);
+  }
 
   await supabase.from("email_proposals").update({
     status: "applied", applied_item_id: newItem.id, applied_action: "created", reviewed_at: new Date().toISOString(),
